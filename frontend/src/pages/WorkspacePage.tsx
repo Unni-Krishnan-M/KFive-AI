@@ -22,7 +22,7 @@ export default function WorkspacePage() {
   const [isAiLoading, setIsAiLoading] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem('nexus-workspace-tasks');
+    const saved = localStorage.getItem('kfive-workspace-tasks');
     if (saved) {
       try {
         setTasks(JSON.parse(saved));
@@ -31,7 +31,7 @@ export default function WorkspacePage() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('nexus-workspace-tasks', JSON.stringify(tasks));
+    localStorage.setItem('kfive-workspace-tasks', JSON.stringify(tasks));
   }, [tasks]);
 
   const addTask = (e: React.FormEvent) => {

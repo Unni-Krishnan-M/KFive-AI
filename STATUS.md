@@ -46,8 +46,8 @@ npm run ollama:setup
 npm run docker:up
 
 # Or manually start MongoDB and Redis
-docker run -d -p 27017:27017 --name nexus-mongodb mongo:7.0
-docker run -d -p 6379:6379 --name nexus-redis redis:7.2-alpine
+docker run -d -p 27017:27017 --name kfive-mongodb mongo:7.0
+docker run -d -p 6379:6379 --name kfive-redis redis:7.2-alpine
 ```
 
 #### 3. **Access the Application:**

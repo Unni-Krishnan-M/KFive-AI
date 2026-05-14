@@ -17,6 +17,7 @@ import SettingsPage from '@/pages/SettingsPage';
 import ProfilePage from '@/pages/ProfilePage';
 import NotFoundPage from '@/pages/NotFoundPage';
 import FileActionsPage from '@/pages/FileActionsPage';
+import ResumeActionsPage from '@/pages/ResumeActionsPage';
 
 // Components
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
@@ -65,6 +66,7 @@ function App() {
                         <Route path="settings" element={<SettingsPage />} />
                         <Route path="profile" element={<ProfilePage />} />
                         <Route path="files" element={<FileActionsPage />} />
+                        <Route path="resume" element={<ResumeActionsPage />} />
                         <Route path="*" element={<Navigate to="/not-found" replace />} />
                       </Routes>
                     </AnimatePresence>

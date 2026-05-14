@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, User, Send, StopCircle, Check, Copy, RefreshCw, MessageSquare, Plus, Trash2, Brain, AlertCircle, FileText } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Bot, User, Send, StopCircle, Check, Copy, RefreshCw, MessageSquare, Plus, Brain, AlertCircle, FileText, Mic, X } from 'lucide-react';
 import { chatApi } from '@/services/api';
 import toast from 'react-hot-toast';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
@@ -8,6 +8,8 @@ import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { getToken } from '@/utils/getToken';
+
+const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
 interface Message {
   _id?: string;
@@ -35,12 +37,72 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedModel, setSelectedModel] = useState(localStorage.getItem('nexus-default-model') || 'llama3');
+  const [selectedModel, setSelectedModel] = useState(localStorage.getItem('kfive-default-model') || 'llama3');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
+
+  useEffect(() => {
+    if (SpeechRecognitionAPI && !recognitionRef.current) {
+      const recognition = new SpeechRecognitionAPI();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      
+      recognition.onresult = (event: any) => {
+        let currentFinal = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            currentFinal += event.results[i][0].transcript + ' ';
+          }
+        }
+        if (currentFinal) {
+          setInput(prev => prev + currentFinal);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        if (event.error === 'not-allowed') {
+          toast.error('Microphone access denied.');
+        }
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, []);
+
+  const toggleListening = () => {
+    if (!SpeechRecognitionAPI) {
+      toast.error('Browser does not support Speech Recognition.');
+      return;
+    }
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+    } else {
+      try {
+        recognitionRef.current?.start();
+        setIsListening(true);
+      } catch (err) {}
+    }
+  };
 
   useEffect(() => {
     fetchConversations();
@@ -81,7 +143,7 @@ export default function ChatPage() {
   // Handle Model change
   const handleModelChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedModel(e.target.value);
-    localStorage.setItem('nexus-default-model', e.target.value);
+    localStorage.setItem('kfive-default-model', e.target.value);
   };
 
   // Auto-resize textarea
@@ -117,6 +179,7 @@ export default function ChatPage() {
     const userMessage: Message = { id: Date.now().toString(), role: 'user', content: text };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
+    setAttachedFile(null);
     setIsLoading(true);
     
     if (textareaRef.current) {
@@ -414,20 +477,62 @@ export default function ChatPage() {
         <div className="p-4 md:p-6 bg-gradient-to-t from-[#09090B] pb-8 pt-4">
           <div className="max-w-4xl mx-auto relative group">
             <div className="absolute inset-0 bg-gradient-to-r from-primary/30 to-cyan-500/30 rounded-2xl blur-md opacity-20 group-focus-within:opacity-50 transition-opacity pointer-events-none"></div>
-            <div className="relative bg-[#0f121d] border border-white/10 rounded-2xl flex items-end p-2 pb-0 sm:pb-2 focus-within:border-primary/50 transition-colors shadow-2xl">
+            <div className="relative bg-[#0f121d] border border-white/10 rounded-2xl flex flex-col p-2 pb-0 sm:pb-2 focus-within:border-primary/50 transition-colors shadow-2xl">
                
-               <textarea
-                 ref={textareaRef}
-                 value={input}
-                 onChange={handleInput}
-                 onKeyDown={handleKeyDown}
-                 placeholder="Ask KFive AI anything..."
-                 className="flex-1 bg-transparent text-white px-4 py-3 pb-4 resize-none max-h-48 min-h-[56px] focus:outline-none scrollbar-thin scrollbar-thumb-white/10 leading-relaxed text-[15px]"
-                 style={{ height: '56px' }}
-                 disabled={isLoading}
-               />
+               {attachedFile && (
+                 <div className="px-3 pt-2 pb-1 flex items-center">
+                   <div className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 flex items-center gap-2 text-sm text-gray-300">
+                     <FileText size={14} className="text-cyan-400" />
+                     <span className="truncate max-w-[200px]">{attachedFile.name}</span>
+                     <button onClick={() => setAttachedFile(null)} className="text-gray-500 hover:text-red-400 transition-colors ml-1">
+                       <X size={14} />
+                     </button>
+                   </div>
+                 </div>
+               )}
+
+               <div className="flex items-end flex-1">
+                 <input 
+                   type="file" 
+                   ref={fileInputRef} 
+                   className="hidden" 
+                   onChange={(e) => setAttachedFile(e.target.files?.[0] || null)} 
+                   accept=".pdf,.doc,.docx,.txt,.csv"
+                 />
+                 <div className="p-2 shrink-0 self-end mb-1">
+                   <button 
+                     onClick={() => fileInputRef.current?.click()}
+                     className="p-3 rounded-xl bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 transition-colors border border-transparent"
+                     title="Attach document"
+                   >
+                     <Plus className="w-5 h-5 opacity-80" />
+                   </button>
+                 </div>
+                 
+                 <textarea
+                   ref={textareaRef}
+                   value={input}
+                   onChange={handleInput}
+                   onKeyDown={handleKeyDown}
+                   placeholder="Ask KFive AI anything..."
+                   className="flex-1 bg-transparent text-white px-2 py-3 pb-4 resize-none max-h-48 min-h-[56px] focus:outline-none scrollbar-thin scrollbar-thumb-white/10 leading-relaxed text-[15px]"
+                   style={{ height: '56px' }}
+                   disabled={isLoading}
+                 />
                
-               <div className="p-2 shrink-0 self-end mb-1">
+               <div className="p-2 shrink-0 self-end mb-1 flex items-center gap-2">
+                 <button
+                   onClick={toggleListening}
+                   className={`p-3 rounded-xl transition-all border ${
+                     isListening 
+                       ? 'bg-red-500/20 text-red-400 border-red-500/30' 
+                       : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 border-transparent'
+                   }`}
+                   title={isListening ? "Stop listening" : "Start Voice Input"}
+                 >
+                   <Mic className={`w-5 h-5 ${isListening ? 'animate-pulse text-red-500' : ''}`} />
+                 </button>
+
                  {isLoading ? (
                     <button 
                       onClick={stopGeneration}
@@ -444,6 +549,7 @@ export default function ChatPage() {
                       <Send className="w-5 h-5" />
                     </button>
                  )}
+               </div>
                </div>
             </div>
             

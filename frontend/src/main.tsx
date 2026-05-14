@@ -44,7 +44,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider defaultTheme="dark" storageKey="nexus-ui-theme">
+        <ThemeProvider defaultTheme="dark" storageKey="kfive-ui-theme">
           <AuthProvider>
             <SocketProvider>
               <VoiceProvider>

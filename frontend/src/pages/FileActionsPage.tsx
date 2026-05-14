@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FolderOpen, FileText, FileSpreadsheet, Presentation, 
@@ -8,6 +8,7 @@ import {
 import toast from 'react-hot-toast';
 import { PDFDocument, degrees } from 'pdf-lib';
 import { getToken } from '@/utils/getToken';
+import { useSearchParams } from 'react-router-dom';
 
 type ToolId = 'merge' | 'pdf-word' | 'pdf-excel' | 'pdf-ppt' | 'ppt-pdf' | 'word-pdf' | 'excel-pdf' | 'jpg-pdf' | 'pdf-jpg' | 'rotate';
 
@@ -35,6 +36,7 @@ const TOOLS: Tool[] = [
 ];
 
 export default function FileActionsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeTool, setActiveTool] = useState<Tool | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -46,6 +48,17 @@ export default function FileActionsPage() {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    const toolQuery = searchParams.get('tool');
+    if (toolQuery) {
+      const tool = TOOLS.find(t => t.id === toolQuery);
+      if (tool) {
+        setActiveTool(tool);
+        resetState();
+      }
+    }
+  }, [searchParams]);
+
   const resetState = () => {
     setFiles([]);
     setStatus('idle');
@@ -55,8 +68,12 @@ export default function FileActionsPage() {
   };
 
   const handleToolClick = (tool: Tool) => {
-    setActiveTool(tool);
-    resetState();
+    setSearchParams({ tool: tool.id });
+  };
+
+  const handleBack = () => {
+    setSearchParams({});
+    setActiveTool(null);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -276,7 +293,7 @@ export default function FileActionsPage() {
             className="flex-1 flex flex-col max-w-4xl mx-auto w-full"
           >
             <button 
-              onClick={() => setActiveTool(null)}
+              onClick={handleBack}
               className="flex items-center gap-2 text-gray-400 hover:text-white mb-8 group w-fit transition-colors"
             >
               <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />

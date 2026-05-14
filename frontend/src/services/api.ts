@@ -36,7 +36,7 @@ apiClient.interceptors.response.use(
 
       try {
         // Get refresh token from localStorage
-        const authData = localStorage.getItem('nexus-auth');
+        const authData = localStorage.getItem('kfive-auth');
         if (authData) {
           const { state } = JSON.parse(authData);
           if (state?.refreshToken) {
@@ -53,7 +53,7 @@ apiClient.interceptors.response.use(
                 refreshToken: response.data.data.refreshToken,
               }
             };
-            localStorage.setItem('nexus-auth', JSON.stringify(newAuthData));
+            localStorage.setItem('kfive-auth', JSON.stringify(newAuthData));
             
             // Retry original request with new token
             originalRequest.headers.Authorization = `Bearer ${response.data.data.accessToken}`;
@@ -62,14 +62,14 @@ apiClient.interceptors.response.use(
         }
       } catch (refreshError) {
         // Refresh failed, clear auth data and redirect to login
-        localStorage.removeItem('nexus-auth');
+        localStorage.removeItem('kfive-auth');
         window.location.href = '/login';
         return Promise.reject(refreshError);
       }
     }
 
     if (error.response?.status && error.response.status >= 500) {
-      const settings = localStorage.getItem('nexus-settings');
+      const settings = localStorage.getItem('kfive-settings');
       let showToast = true;
       if (settings) {
         try {

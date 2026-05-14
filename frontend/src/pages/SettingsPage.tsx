@@ -6,8 +6,8 @@ import toast from 'react-hot-toast';
 import { userApi, chatApi } from '@/services/api';
 
 export default function SettingsPage() {
-  const [theme, setTheme] = useState(localStorage.getItem('nexus-theme') || 'dark');
-  const [sidebarMode, setSidebarMode] = useState(localStorage.getItem('nexus-sidebar-collapsed') === 'true' ? 'collapsed' : 'expanded');
+  const [theme, setTheme] = useState(localStorage.getItem('kfive-theme') || 'dark');
+  const [sidebarMode, setSidebarMode] = useState(localStorage.getItem('kfive-sidebar-collapsed') === 'true' ? 'collapsed' : 'expanded');
   const [fontSize, setFontSize] = useState('md');
   const [defaultModel, setDefaultModel] = useState('llama3');
   const [temperature, setTemperature] = useState(0.7);
@@ -19,7 +19,7 @@ export default function SettingsPage() {
   // Load from local storage
   useEffect(() => {
     try {
-      const savedSettings = localStorage.getItem('nexus-settings');
+      const savedSettings = localStorage.getItem('kfive-settings');
       if (savedSettings) {
         const parsed = JSON.parse(savedSettings);
         if (parsed.fontSize) setFontSize(parsed.fontSize);
@@ -36,7 +36,7 @@ export default function SettingsPage() {
   // Save to local storage on change
   useEffect(() => {
     const settings = { fontSize, defaultModel, temperature, streaming, toastsEnabled };
-    localStorage.setItem('nexus-settings', JSON.stringify(settings));
+    localStorage.setItem('kfive-settings', JSON.stringify(settings));
     
     // Apply font size globally if needed (custom logic)
     if (fontSize === 'sm') document.documentElement.style.fontSize = '14px';
@@ -47,14 +47,14 @@ export default function SettingsPage() {
 
   const handleThemeChange = (newTheme: string) => {
     setTheme(newTheme);
-    localStorage.setItem('nexus-theme', newTheme);
+    localStorage.setItem('kfive-theme', newTheme);
     if (newTheme === 'dark') document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
   };
 
   const handleSidebarChange = (mode: string) => {
     setSidebarMode(mode);
-    localStorage.setItem('nexus-sidebar-collapsed', mode === 'collapsed' ? 'true' : 'false');
+    localStorage.setItem('kfive-sidebar-collapsed', mode === 'collapsed' ? 'true' : 'false');
     // Note: requires reload or state sync in AppLayout to take effect immediately without context
     toast.success('Sidebar preference updated (Reload to see full effect)');
   };

@@ -136,7 +136,7 @@ export const useAuth = create<AuthState>()(
       },
     }),
     {
-      name: 'nexus-auth',
+      name: 'kfive-auth',
       partialize: (state) => ({
         user: state.user,
         accessToken: state.accessToken,

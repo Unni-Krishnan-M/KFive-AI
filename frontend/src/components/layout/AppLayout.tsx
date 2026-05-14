@@ -6,9 +6,7 @@ import {
   LayoutDashboard, 
   MessageSquare, 
   Bot, 
-  FileText, 
   Code, 
-  Mic, 
   Settings, 
   User,
   LogOut,
@@ -18,9 +16,10 @@ import {
   PanelLeftOpen,
   Sun,
   Moon,
-  Search,
   CheckSquare,
-  FolderOpen
+  FolderOpen,
+  Briefcase,
+  Search as SearchIcon
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -32,11 +31,24 @@ const navigation = [
   { name: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard },
   { name: 'AI Chat', href: '/app/chat', icon: MessageSquare },
   { name: 'Agents', href: '/app/agents', icon: Bot },
-  { name: 'Documents', href: '/app/documents', icon: FileText },
   { name: 'Code Studio', href: '/app/code-studio', icon: Code },
-  { name: 'Voice AI', href: '/app/voice', icon: Mic },
   { name: 'Workspace', href: '/app/workspace', icon: CheckSquare },
   { name: 'File Actions', href: '/app/files', icon: FolderOpen },
+  { name: 'Resume Actions', href: '/app/resume', icon: Briefcase },
+];
+
+const searchableItems = [
+  ...navigation.map(n => ({ name: n.name, type: 'Page', href: n.href, icon: n.icon })),
+  { name: 'Merge PDF', type: 'File Tool', href: '/app/files?tool=merge', icon: FolderOpen },
+  { name: 'PDF to Word', type: 'File Tool', href: '/app/files?tool=pdf-word', icon: FolderOpen },
+  { name: 'PDF to Excel', type: 'File Tool', href: '/app/files?tool=pdf-excel', icon: FolderOpen },
+  { name: 'PDF to PowerPoint', type: 'File Tool', href: '/app/files?tool=pdf-ppt', icon: FolderOpen },
+  { name: 'PowerPoint to PDF', type: 'File Tool', href: '/app/files?tool=ppt-pdf', icon: FolderOpen },
+  { name: 'Word to PDF', type: 'File Tool', href: '/app/files?tool=word-pdf', icon: FolderOpen },
+  { name: 'Excel to PDF', type: 'File Tool', href: '/app/files?tool=excel-pdf', icon: FolderOpen },
+  { name: 'JPG to PDF', type: 'File Tool', href: '/app/files?tool=jpg-pdf', icon: FolderOpen },
+  { name: 'PDF to JPG', type: 'File Tool', href: '/app/files?tool=pdf-jpg', icon: FolderOpen },
+  { name: 'Rotate PDF', type: 'File Tool', href: '/app/files?tool=rotate', icon: FolderOpen },
 ];
 
 export function AppLayout({ children }: AppLayoutProps) {
@@ -46,19 +58,19 @@ export function AppLayout({ children }: AppLayoutProps) {
   
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(() => {
-    return localStorage.getItem('nexus-sidebar-collapsed') === 'true';
+    return localStorage.getItem('kfive-sidebar-collapsed') === 'true';
   });
   
   const [theme, setTheme] = useState<'dark'|'light'>(() => {
-    return (localStorage.getItem('nexus-theme') as 'dark'|'light') || 'dark';
+    return (localStorage.getItem('kfive-theme') as 'dark'|'light') || 'dark';
   });
 
   useEffect(() => {
-    localStorage.setItem('nexus-sidebar-collapsed', String(isCollapsed));
+    localStorage.setItem('kfive-sidebar-collapsed', String(isCollapsed));
   }, [isCollapsed]);
 
   useEffect(() => {
-    localStorage.setItem('nexus-theme', theme);
+    localStorage.setItem('kfive-theme', theme);
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
@@ -66,17 +78,23 @@ export function AppLayout({ children }: AppLayoutProps) {
     }
   }, [theme]);
 
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
   // Global Ctrl+K / Cmd+K handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        // In a real app we'd open a command palette modal
+        setSearchOpen(true);
+      }
+      if (e.key === 'Escape' && searchOpen) {
+        setSearchOpen(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [searchOpen]);
 
   const handleLogout = () => {
     logout();
@@ -195,9 +213,9 @@ export function AppLayout({ children }: AppLayoutProps) {
         <div className="flex-1 overflow-y-auto py-4 px-2 scrollbar-none flex flex-col gap-1">
           {/* Search shortcut hint */}
           {!isCollapsed && (
-            <div className="mb-4 px-3 py-2.5 mx-1 bg-white/5 border border-white/5 rounded-xl flex items-center justify-between text-sm text-gray-400 cursor-pointer hover:bg-white/10 transition-colors group">
+            <div onClick={() => setSearchOpen(true)} className="mb-4 px-3 py-2.5 mx-1 bg-white/5 border border-white/5 rounded-xl flex items-center justify-between text-sm text-gray-400 cursor-pointer hover:bg-white/10 transition-colors group">
               <div className="flex items-center gap-2">
-                <Search className="w-4 h-4 group-hover:text-primary transition-colors" />
+                <SearchIcon className="w-4 h-4 group-hover:text-primary transition-colors" />
                 <span>Search</span>
               </div>
               <div className="flex items-center gap-1 opacity-60">
@@ -303,6 +321,68 @@ export function AppLayout({ children }: AppLayoutProps) {
           {children}
         </div>
       </main>
+
+      {/* Global Command Palette */}
+      <AnimatePresence>
+        {searchOpen && (
+          <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setSearchOpen(false)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: -20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: -20 }}
+              className="relative w-full max-w-2xl bg-[#09090B] border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
+            >
+              <div className="flex items-center px-4 border-b border-border">
+                <SearchIcon className="w-5 h-5 text-gray-400 mr-3" />
+                <input 
+                  type="text" autoFocus
+                  placeholder="Search for tools, pages, or files..."
+                  className="w-full bg-transparent border-none outline-none py-5 text-lg text-white placeholder-gray-500"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                <div className="text-xs text-gray-500 px-2 py-1 bg-white/5 rounded border border-white/5">ESC</div>
+              </div>
+              
+              <div className="max-h-[60vh] overflow-y-auto w-full">
+                {searchQuery.trim() === '' ? (
+                  <div className="p-8 text-center text-gray-500">Type to search across KFive AI...</div>
+                ) : (
+                  <div className="p-2 space-y-1">
+                    {searchableItems
+                      .filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                      .map((item, id) => (
+                        <div 
+                          key={id}
+                          className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer rounded-xl group transition-colors"
+                          onClick={() => {
+                            setSearchOpen(false);
+                            setSearchQuery('');
+                            navigate(item.href);
+                          }}
+                        >
+                          <div className="w-10 h-10 bg-black/40 border border-white/5 rounded-lg flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                            <item.icon className="w-5 h-5 text-gray-400 group-hover:text-primary transition-colors" />
+                          </div>
+                          <div>
+                            <div className="text-white font-medium">{item.name}</div>
+                            <div className="text-xs text-gray-500">{item.type}</div>
+                          </div>
+                        </div>
+                    ))}
+                    {searchableItems.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
+                       <div className="p-8 text-center text-gray-500">No tools or pages found for "{searchQuery}".</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

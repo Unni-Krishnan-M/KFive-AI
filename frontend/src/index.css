@@ -1,0 +1,112 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background text-foreground font-sans antialiased overflow-x-hidden;
+    background-color: #09090B;
+    color: #FAFAFA;
+  }
+
+  ::selection {
+    @apply bg-primary/30 text-white;
+  }
+
+  /* Custom Scrollbar for a premium feel */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-surface rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-primary/50;
+  }
+}
+
+@layer components {
+  /* Core Glassmorphism */
+  .glass-panel {
+    @apply relative overflow-hidden rounded-[1rem] bg-surface border border-border transition-all duration-300;
+  }
+  
+  .glass-panel::before {
+    content: '';
+    @apply absolute inset-0 bg-glass-gradient pointer-events-none opacity-20 z-0;
+  }
+  
+  .glass-card {
+    @apply glass-panel hover:border-primary/50 hover:shadow-[0_4px_20px_0_rgba(37,99,235,0.1)] hover:-translate-y-1;
+  }
+
+  .glass-navbar {
+    @apply fixed top-0 w-full z-50 bg-[#09090B]/90 backdrop-blur-xl border-b border-border transition-all duration-300;
+  }
+
+  .premium-button {
+    @apply relative overflow-hidden inline-flex items-center justify-center rounded-lg px-6 py-3 text-sm font-medium transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background;
+  }
+
+  .premium-button-primary {
+    @apply premium-button bg-primary text-white hover:bg-primary/90 hover:shadow-[0_0_20px_rgba(37,99,235,0.3)];
+  }
+
+  .premium-button-secondary {
+    @apply premium-button bg-surface border border-border text-text-secondary hover:text-white hover:border-primary/50 hover:bg-white/5;
+  }
+
+  /* Typography */
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary via-secondary to-accent;
+  }
+
+  .gradient-text-subtle {
+    @apply bg-clip-text text-transparent bg-gradient-to-br from-white to-text-secondary;
+  }
+
+  /* AI Assistant Orb */
+  .ai-orb-container {
+    @apply relative flex items-center justify-center;
+  }
+  
+  .ai-orb {
+    @apply w-32 h-32 rounded-full relative;
+    background: radial-gradient(circle at 30% 30%, rgba(56,189,248,1) 0%, rgba(37,99,235,1) 50%, rgba(9,9,11,1) 100%);
+    box-shadow: 0 0 40px 10px rgba(37,99,235,0.2), inset 0 0 20px rgba(56,189,248,0.3);
+    animation: float 4s ease-in-out infinite;
+  }
+
+  .ai-orb::before {
+    content: '';
+    @apply absolute inset-0 rounded-full animate-ai-pulse;
+    border: 2px solid rgba(56,189,248,0.4);
+  }
+
+  .ai-orb::after {
+    content: '';
+    @apply absolute -inset-4 rounded-full;
+    background: radial-gradient(circle at center, rgba(37,99,235,0.15) 0%, transparent 70%);
+    animation: glow 3s infinite alternate;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Base background particle effects canvas styling if needed */
+#particle-canvas {
+  @apply fixed inset-0 pointer-events-none z-[-1];
+  background: radial-gradient(circle at top right, rgba(37,99,235,0.03), transparent 40%),
+              radial-gradient(circle at bottom left, rgba(56,189,248,0.03), transparent 40%);
+}

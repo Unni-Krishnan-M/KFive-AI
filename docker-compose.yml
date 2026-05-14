@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: nexus-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: nexus
+      MONGO_INITDB_ROOT_PASSWORD: nexus123
+      MONGO_INITDB_DATABASE: kfive_ai
+    volumes:
+      - mongodb_data:/data/db
+      - ./backend/scripts/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    networks:
+      - nexus-network
+
+  # Redis Cache
+  redis:
+    image: redis:7.2-alpine
+    container_name: nexus-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass nexus123
+    volumes:
+      - redis_data:/data
+    networks:
+      - nexus-network
+
+  # ChromaDB Vector Database
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: nexus-chromadb
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - CHROMA_SERVER_HOST=0.0.0.0
+      - CHROMA_SERVER_HTTP_PORT=8000
+    volumes:
+      - chromadb_data:/chroma/chroma
+    networks:
+      - nexus-network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nexus-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      MONGODB_URI: mongodb://nexus:nexus123@mongodb:27017/kfive_ai?authSource=admin
+      REDIS_URL: redis://:nexus123@redis:6379
+      CHROMA_URL: http://chromadb:8000
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      JWT_REFRESH_SECRET: your-super-secret-refresh-key-change-in-production
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+    depends_on:
+      - mongodb
+      - redis
+      - chromadb
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/logs:/app/logs
+    networks:
+      - nexus-network
+
+  # Frontend Web App
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: nexus-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      VITE_API_URL: http://localhost:5000
+      VITE_WS_URL: ws://localhost:5000
+    depends_on:
+      - backend
+    networks:
+      - nexus-network
+
+volumes:
+  mongodb_data:
+  redis_data:
+  chromadb_data:
+
+networks:
+  nexus-network:
+    driver: bridge

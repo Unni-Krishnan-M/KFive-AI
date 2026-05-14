@@ -1,0 +1,29 @@
+
+> nexus-ai-frontend@1.0.0 build
+> tsc && vite build
+
+src/components/ui/ConfirmDialog.tsx(1,1): error TS6133: 'React' is declared but its value is never read.
+src/pages/ChatPage.tsx(2,18): error TS6133: 'AnimatePresence' is declared but its value is never read.
+src/pages/ChatPage.tsx(3,84): error TS6133: 'Trash2' is declared but its value is never read.
+src/pages/CodeStudioPage.tsx(22,11): error TS6133: 'token' is declared but its value is never read.
+src/pages/CodeStudioPage.tsx(24,11): error TS6133: 'API_URL' is declared but its value is never read.
+src/pages/CodeStudioPage.tsx(25,9): error TS6133: 'promptPrefix' is declared but its value is never read.
+src/pages/CodeStudioPage.tsx(39,13): error TS6133: 'chunks' is declared but its value is never read.
+src/pages/DashboardPage.tsx(116,27): error TS6133: 'index' is declared but its value is never read.
+src/pages/DocumentsPage.tsx(2,18): error TS6133: 'AnimatePresence' is declared but its value is never read.
+src/pages/DocumentsPage.tsx(4,3): error TS6133: 'FileText' is declared but its value is never read.
+src/pages/DocumentsPage.tsx(5,35): error TS6133: 'X' is declared but its value is never read.
+src/pages/FileActionsPage.tsx(6,27): error TS6133: 'Loader2' is declared but its value is never read.
+src/pages/NotFoundPage.tsx(1,1): error TS6133: 'React' is declared but its value is never read.
+src/pages/SettingsPage.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/pages/SettingsPage.tsx(6,1): error TS6192: All imports in import declaration are unused.
+src/pages/VoiceAssistantPage.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/pages/VoiceAssistantPage.tsx(4,1): error TS6133: 'chatApi' is declared but its value is never read.
+src/pages/VoiceAssistantPage.tsx(345,31): error TS6133: 'i' is declared but its value is never read.
+npm error Lifecycle script `build` failed with error:
+npm error code 2
+npm error path /home/lenovo/Desktop/Kris_Bot/frontend
+npm error workspace nexus-ai-frontend@1.0.0
+npm error location /home/lenovo/Desktop/Kris_Bot/frontend
+npm error command failed
+npm error command sh -c tsc && vite build

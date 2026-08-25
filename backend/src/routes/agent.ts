@@ -1,93 +1,103 @@
-import { Router } from 'express';
+import { Response, Router } from 'express';
 import { asyncHandler } from '@/middleware/errorHandler';
-import { Agent } from '@/models/Agent';
-import { AppError } from '@/middleware/errorHandler';
-import { ollamaService } from '@/services/ollama';
+import { getAuthenticatedUserId } from '@/middleware/auth';
+import { aiLimiter } from '@/middleware/rateLimiter';
+import { AgentService, agentService } from '@/services/agentService';
+import { AgentRunError, AgentRunService, AgentRunStreamEvent, agentRunService } from '@/services/agentRunService';
 
-const router = Router();
+function writeSse(res: Response, event: string, value: unknown): void {
+  if (res.writableEnded || res.destroyed) return;
+  res.write(`event: ${event}\ndata: ${JSON.stringify(value)}\n\n`);
+  res.flush?.();
+}
 
-// Get user agents
-router.get('/', asyncHandler(async (req, res) => {
-  const userId = (req as any).user?.userId || 'default-user-id';
-  const agents = await Agent.find({ userId }).sort({ updatedAt: -1 });
+export function createAgentRouter(service: AgentService = agentService, runs: AgentRunService = agentRunService): Router {
+  const router = Router();
 
-  res.json({
-    success: true,
-    data: agents
-  });
-}));
+  router.get('/', asyncHandler(async (req, res) => {
+    const agents = await service.list(getAuthenticatedUserId(req), req.query.projectId);
+    res.json({ success: true, data: agents });
+  }));
 
-// Create an agent
-router.post('/', asyncHandler(async (req, res) => {
-  const userId = (req as any).user?.userId || 'default-user-id';
-  const { name, description, systemPrompt, aiModel, temperature, tools } = req.body;
+  router.post('/', asyncHandler(async (req, res) => {
+    const agent = await service.create(getAuthenticatedUserId(req), req.body);
+    res.status(201).json({ success: true, data: agent });
+  }));
 
-  if (!name || !systemPrompt) {
-    throw new AppError('Name and system prompt are required', 400);
-  }
+  router.get('/:id/runs', asyncHandler(async (req, res) => {
+    const records = await runs.list(getAuthenticatedUserId(req), req.params.id, req.query.page);
+    res.json({ success: true, data: records });
+  }));
 
-  const agent = await Agent.create({
-    userId,
-    name,
-    description: description || 'A helpful AI Agent',
-    systemPrompt,
-    aiModel: aiModel || process.env.OLLAMA_CHAT_MODEL || 'phi3',
-    temperature: temperature || 0.7,
-    tools: tools || []
-  });
+  router.get('/:id/runs/:runId', asyncHandler(async (req, res) => {
+    const run = await runs.get(getAuthenticatedUserId(req), req.params.id, req.params.runId);
+    res.json({ success: true, data: { run } });
+  }));
 
-  res.status(201).json({ success: true, data: agent });
-}));
+  router.post('/:id/runs/:runId/cancel', asyncHandler(async (req, res) => {
+    const result = await runs.cancel(getAuthenticatedUserId(req), req.params.id, req.params.runId);
+    res.json({ success: true, data: result });
+  }));
 
-// Execute agent logic
-router.post('/:id/execute', asyncHandler(async (req, res) => {
-  const agent = await Agent.findById(req.params.id);
-  if (!agent) throw new AppError('Agent not found', 404);
+  router.delete('/:id/runs/:runId', asyncHandler(async (req, res) => {
+    const result = await runs.delete(getAuthenticatedUserId(req), req.params.id, req.params.runId);
+    res.json({ success: true, data: result });
+  }));
 
-  const { prompt } = req.body;
-  if (!prompt) throw new AppError('Prompt required for execution', 400);
-
-  // For SSE Execution
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-
-  try {
-    const formattedMessages = [
-      { role: 'system', content: agent.systemPrompt },
-      { role: 'user', content: prompt }
-    ];
-
-    let fullResponse = '';
-
-    await ollamaService.chatStream(
-      {
-        model: agent.aiModel,
-        messages: formattedMessages as any,
-        options: {
-          temperature: agent.temperature
-        }
-      },
-      (chunk) => {
-        fullResponse += chunk.message.content;
-        res.write(`data: ${JSON.stringify({ content: chunk.message.content })}\n\n`);
+  const execute = asyncHandler(async (req, res) => {
+    const prepared = await runs.prepare(getAuthenticatedUserId(req), req.params.id, req.body);
+    res.status(200);
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders?.();
+    const connection = new AbortController();
+    res.once('close', () => {
+      if (!res.writableEnded) connection.abort();
+    });
+    const emit = (event: AgentRunStreamEvent): void => {
+      if (event.type === 'run') writeSse(res, 'run', { run: event.run });
+      else if (event.type === 'start') writeSse(res, 'start', { runId: event.runId, provider: event.provider, model: event.model });
+      else if (event.type === 'delta') writeSse(res, 'delta', { runId: event.runId, content: event.content });
+      else if (event.type === 'usage') writeSse(res, 'usage', { runId: event.runId, usage: event.usage });
+      else writeSse(res, 'completed', { run: event.run });
+    };
+    try {
+      await runs.execute(prepared, emit, connection.signal);
+      if (!res.writableEnded && !res.destroyed) {
+        res.write('data: [DONE]\n\n');
+        res.end();
       }
-    );
+    } catch (error) {
+      if (!res.writableEnded && !res.destroyed) {
+        const safe = error instanceof AgentRunError
+          ? { code: error.code, message: error.message }
+          : { code: 'AGENT_EXECUTION_FAILED', message: 'The agent run failed.' };
+        writeSse(res, 'error', { error: safe.message, code: safe.code });
+        res.end();
+      }
+    }
+  });
 
-    res.write('data: [DONE]\n\n');
-    res.end();
-  } catch (error: any) {
-    res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
-    res.end();
-  }
-}));
+  router.post('/:id/runs', aiLimiter, execute);
+  router.post('/:id/execute', aiLimiter, execute);
 
-// Delete agent
-router.delete('/:id', asyncHandler(async (req, res) => {
-  const agent = await Agent.findByIdAndDelete(req.params.id);
-  if (!agent) throw new AppError('Agent not found', 404);
+  router.get('/:id', asyncHandler(async (req, res) => {
+    const agent = await service.get(getAuthenticatedUserId(req), req.params.id);
+    res.json({ success: true, data: agent });
+  }));
 
-  res.json({ success: true, data: agent });
-}));
+  router.patch('/:id', asyncHandler(async (req, res) => {
+    const agent = await service.update(getAuthenticatedUserId(req), req.params.id, req.body);
+    res.json({ success: true, data: agent });
+  }));
 
-export default router;
+  router.delete('/:id', asyncHandler(async (req, res) => {
+    const result = await service.delete(getAuthenticatedUserId(req), req.params.id);
+    res.json({ success: true, data: result });
+  }));
+
+  return router;
+}
+
+export default createAgentRouter();

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'react-hot-toast';
+import { socketUrl } from '@/config/runtime';
 
 interface SocketContextType {
   socket: Socket | null;
@@ -34,9 +35,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:3001';
-    
-    const newSocket = io(WS_URL, {
+    const newSocket = io(socketUrl(), {
       auth: {
         token: accessToken,
       },

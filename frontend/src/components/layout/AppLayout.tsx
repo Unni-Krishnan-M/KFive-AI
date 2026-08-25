@@ -6,7 +6,6 @@ import {
   LayoutDashboard, 
   MessageSquare, 
   Bot, 
-  Code, 
   Settings, 
   User,
   LogOut,
@@ -18,8 +17,15 @@ import {
   Moon,
   CheckSquare,
   FolderOpen,
-  Briefcase,
-  Search as SearchIcon
+  Search as SearchIcon,
+  FileText,
+  Mic2,
+  Boxes,
+  FolderKanban,
+  Code2,
+  BookOpen,
+  GitBranch,
+  Network,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -30,25 +36,24 @@ interface AppLayoutProps {
 const navigation = [
   { name: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard },
   { name: 'AI Chat', href: '/app/chat', icon: MessageSquare },
+  { name: 'Code Lab', href: '/app/code', icon: Code2 },
   { name: 'Agents', href: '/app/agents', icon: Bot },
-  { name: 'Code Studio', href: '/app/code-studio', icon: Code },
+  { name: 'Documents', href: '/app/documents', icon: FileText },
+  { name: 'Knowledge / RAG', href: '/app/knowledge', icon: BookOpen },
+  { name: 'Repository Analyzer', href: '/app/repositories', icon: GitBranch },
+  { name: 'Workflows', href: '/app/workflows', icon: Network },
+  { name: 'Voice Assistant', href: '/app/voice', icon: Mic2 },
+  { name: 'Models', href: '/app/models', icon: Boxes },
+  { name: 'Projects', href: '/app/projects', icon: FolderKanban },
   { name: 'Workspace', href: '/app/workspace', icon: CheckSquare },
-  { name: 'File Actions', href: '/app/files', icon: FolderOpen },
-  { name: 'Resume Actions', href: '/app/resume', icon: Briefcase },
+  { name: 'PDF Utilities', href: '/app/files', icon: FolderOpen },
 ];
 
 const searchableItems = [
   ...navigation.map(n => ({ name: n.name, type: 'Page', href: n.href, icon: n.icon })),
-  { name: 'Merge PDF', type: 'File Tool', href: '/app/files?tool=merge', icon: FolderOpen },
-  { name: 'PDF to Word', type: 'File Tool', href: '/app/files?tool=pdf-word', icon: FolderOpen },
-  { name: 'PDF to Excel', type: 'File Tool', href: '/app/files?tool=pdf-excel', icon: FolderOpen },
-  { name: 'PDF to PowerPoint', type: 'File Tool', href: '/app/files?tool=pdf-ppt', icon: FolderOpen },
-  { name: 'PowerPoint to PDF', type: 'File Tool', href: '/app/files?tool=ppt-pdf', icon: FolderOpen },
-  { name: 'Word to PDF', type: 'File Tool', href: '/app/files?tool=word-pdf', icon: FolderOpen },
-  { name: 'Excel to PDF', type: 'File Tool', href: '/app/files?tool=excel-pdf', icon: FolderOpen },
-  { name: 'JPG to PDF', type: 'File Tool', href: '/app/files?tool=jpg-pdf', icon: FolderOpen },
-  { name: 'PDF to JPG', type: 'File Tool', href: '/app/files?tool=pdf-jpg', icon: FolderOpen },
-  { name: 'Rotate PDF', type: 'File Tool', href: '/app/files?tool=rotate', icon: FolderOpen },
+  { name: 'Merge PDF', type: 'PDF Utility', href: '/app/files?tool=merge', icon: FolderOpen },
+  { name: 'Extract PDF Pages', type: 'PDF Utility', href: '/app/files?tool=extract', icon: FolderOpen },
+  { name: 'Rotate PDF Pages', type: 'PDF Utility', href: '/app/files?tool=rotate', icon: FolderOpen },
 ];
 
 export function AppLayout({ children }: AppLayoutProps) {

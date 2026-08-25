@@ -2,12 +2,13 @@ import { Router } from 'express';
 import { asyncHandler } from '@/middleware/errorHandler';
 import { User } from '@/models/User';
 import { AppError } from '@/middleware/errorHandler';
+import { getAuthenticatedUserId } from '@/middleware/auth';
 
 const router = Router();
 
 // Get user profile
 router.get('/profile', asyncHandler(async (req, res) => {
-  const userId = (req as any).user?.userId || 'default-user-id';
+  const userId = getAuthenticatedUserId(req);
   const user = await User.findById(userId);
   if (!user) throw new AppError('User not found', 404);
   res.json({ success: true, data: user });
@@ -15,13 +16,9 @@ router.get('/profile', asyncHandler(async (req, res) => {
 
 // Update user profile
 router.put('/profile', asyncHandler(async (req, res) => {
-  const userId = (req as any).user?.userId || 'default-user-id';
-  const updates = req.body;
-  
-  // Exclude sensitive fields
-  delete updates.password;
-  delete updates.role;
-  delete updates.email;
+  const userId = getAuthenticatedUserId(req);
+  const { firstName, lastName, username, preferences } = req.body;
+  const updates = { firstName, lastName, username, preferences };
 
   const user = await User.findByIdAndUpdate(userId, updates, { new: true, runValidators: true });
   if (!user) throw new AppError('User not found', 404);
@@ -31,7 +28,7 @@ router.put('/profile', asyncHandler(async (req, res) => {
 
 // Get user usage stats
 router.get('/usage', asyncHandler(async (req, res) => {
-  const userId = (req as any).user?.userId || 'default-user-id';
+  const userId = getAuthenticatedUserId(req);
   const user = await User.findById(userId);
   if (!user) throw new AppError('User not found', 404);
   
@@ -40,7 +37,7 @@ router.get('/usage', asyncHandler(async (req, res) => {
 
 // Get recent activity across app
 router.get('/activity', asyncHandler(async (req, res) => {
-  const userId = (req as any).user?.userId || 'default-user-id';
+  const userId = getAuthenticatedUserId(req);
   
   // To resolve dependencies safely without cyclical issues inside a single prompt,
   // we query mongoose collections generically or use direct imports.

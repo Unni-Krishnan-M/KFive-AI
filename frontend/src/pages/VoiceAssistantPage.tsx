@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, AlertCircle, Bot, Loader2, Volume2, Square, VolumeX, History, Globe } from 'lucide-react';
-import { chatApi } from '@/services/api';
 import toast from 'react-hot-toast';
 import { getToken } from '@/utils/getToken';
+import { chatApi } from '@/services/api';
+import { apiUrl } from '@/config/runtime';
+import { readSseResponse } from '@/utils/sse';
 
 const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
@@ -136,15 +138,15 @@ export default function VoiceAssistantPage() {
     try {
       let chatId = conversationId;
       if (!chatId) {
-        // mock API or realistic
-        chatId = 'voice-' + Date.now();
+        const created = await chatApi.createConversation({ title: trimmed.slice(0, 60) || 'Voice conversation' });
+        chatId = created.data?.data?._id;
+        if (!chatId) throw new Error('Conversation could not be created');
         setConversationId(chatId);
       }
 
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
       const token = getToken();
 
-      const response = await fetch(`${API_URL}/api/v1/chat/conversations/${chatId}/stream`, {
+      const response = await fetch(apiUrl(`/chat/conversations/${chatId}/stream`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -158,46 +160,28 @@ export default function VoiceAssistantPage() {
         throw new Error('API Error');
       }
 
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
       let fullText = '';
       
       const aiMsgId = (Date.now() + 1).toString();
       setHistory(prev => [...prev, { id: aiMsgId, role: 'assistant', content: '' }]);
 
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n');
-          
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const dataStr = line.replace('data: ', '').trim();
-              if (dataStr === '[DONE]') break;
-              
-              try {
-                const data = JSON.parse(dataStr);
-                if (data.content) {
-                  fullText += data.content;
-                  setHistory(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: m.content + data.content } : m));
-                }
-              } catch(e) {}
-            }
-          }
+      await readSseResponse(response, (dataString) => {
+        if (dataString === '[DONE]') return;
+        const data = JSON.parse(dataString);
+        if (data.error) throw new Error(data.error);
+        if (data.content) {
+          fullText += data.content;
+          setHistory(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: m.content + data.content } : m));
         }
-      }
+      });
 
       speakText(fullText);
 
     } catch (error) {
-      // Demo Fallback Mode
       const aiMsgId = (Date.now() + 1).toString();
-      const demoResponse = `I heard: ${trimmed}. Since backends are mostly offline, I'm just acknowledging you.`;
-      setHistory(prev => [...prev, { id: aiMsgId, role: 'assistant', content: demoResponse }]);
-      speakText(demoResponse);
+      const failureMessage = 'Voice AI is unavailable because the backend or configured AI provider could not complete the request.';
+      setHistory(prev => [...prev, { id: aiMsgId, role: 'assistant', content: failureMessage }]);
+      toast.error(failureMessage);
     } finally {
       setIsProcessing(false);
     }
@@ -342,7 +326,7 @@ export default function VoiceAssistantPage() {
               <p>No messages yet.</p>
             </div>
           ) : (
-            history.map((msg, i) => (
+            history.map((msg) => (
               <motion.div 
                 key={msg.id}
                 initial={{ opacity: 0, x: msg.role === 'user' ? 20 : -20 }}

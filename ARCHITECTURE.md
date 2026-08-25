@@ -1,296 +1,59 @@
-# KFive AI - Architecture Overview
+# KFive AI Architecture
 
-## 🏗️ System Architecture
+## Current implemented foundation
 
-KFive AI is built as a modern, scalable, offline-first AI workspace platform with the following architecture:
+The browser frontend is React/TypeScript/Vite. It uses same-origin REST and Socket.IO routing by default. The Node/Express/TypeScript backend owns authentication, persistence models, streaming orchestration, dependency health, and configuration validation.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        KFive AI Platform                        │
-├─────────────────────────────────────────────────────────────────┤
-│  Frontend (React + TypeScript)                                 │
-│  ├── Pages (Landing, Dashboard, Chat, Agents, etc.)            │
-│  ├── Components (UI, Layout, Features)                         │
-│  ├── Services (API, WebSocket, Voice)                          │
-│  ├── Stores (Zustand - Auth, Chat, Settings)                   │
-│  └── Providers (Theme, Socket, Voice, Auth)                    │
-├─────────────────────────────────────────────────────────────────┤
-│  Backend (Node.js + Express + TypeScript)                      │
-│  ├── Routes (Auth, Chat, User, Ollama)                         │
-│  ├── Controllers (Business Logic)                              │
-│  ├── Services (AI, Vector, Memory, Queue)                      │
-│  ├── Models (User, Conversation, Agent, Document)              │
-│  ├── Middleware (Auth, Validation, Error Handling)             │
-│  └── Socket.IO (Real-time Communication)                       │
-├─────────────────────────────────────────────────────────────────┤
-│  AI Engine (Ollama + Local Models)                             │
-│  ├── Chat Models (Llama3, DeepSeek Coder)                      │
-│  ├── Vision Models (LLaVA)                                     │
-│  ├── Embedding Models (Nomic Embed Text)                       │
-│  └── Speech Models (Whisper)                                   │
-├─────────────────────────────────────────────────────────────────┤
-│  Databases                                                      │
-│  ├── MongoDB (Primary Data - Users, Conversations)             │
-│  ├── Redis (Cache, Sessions, Queues)                           │
-│  └── ChromaDB (Vector Embeddings, RAG)                         │
-└─────────────────────────────────────────────────────────────────┘
+```text
+Browser
+  ├─ /                  -> frontend static server
+  ├─ /api/v1            -> Express REST/SSE
+  └─ /socket.io         -> authenticated Socket.IO
+                              │
+                              ├─ MongoDB (users, projects, chats, agents, agent-run timelines,
+                              │            workflow definitions/runs, documents, RAG sources,
+                              │            repository-analysis reports)
+                              ├─ Redis/BullMQ (cache, coordination, code-runs queue)
+                              │       └─ trusted Code Runner broker (opt-in profile)
+                              │              └─ disposable non-root runtime container
+                              ├─ ChromaDB 0.4.24 (scoped knowledge chunks/vectors)
+                              └─ AI provider abstraction
+                                   ├─ Ollama adapter (experimental)
+                                   ├─ OpenAI Chat Completions adapter (experimental)
+                                   ├─ Anthropic Messages adapter (experimental)
+                                   └─ OpenAI-compatible/custom adapters (experimental)
 ```
 
-## 🎯 Core Design Principles
+Runtime configuration is parsed once into a typed `EnvironmentConfig`. `KFIVE_MODE` describes deployment topology; service URLs remain environment-owned. Provider selection never silently falls back. Unsupported configured providers return explicit adapter errors.
 
-### 1. **Offline-First Architecture**
-- All AI processing happens locally using Ollama
-- No external API dependencies for core functionality
-- Local data storage and caching
-- Progressive enhancement for online features
+Liveness reports only process health. Readiness separately reports MongoDB and Redis availability plus configured/unconfigured/not-checked states for AI, ChromaDB, Code Runner, Document Processor, and OCR.
 
-### 2. **Modular & Scalable Design**
-- Feature-based folder structure
-- Microservice-ready backend architecture
-- Reusable UI components
-- Plugin-ready agent system
+## Security boundaries
 
-### 3. **Real-time & Responsive**
-- WebSocket-based real-time communication
-- Streaming AI responses
-- Optimistic UI updates
-- Progressive Web App (PWA) support
+- JWT HTTP and Socket.IO authentication validates algorithm, issuer, audience, and payload shape.
+- User-owned chat and agent records are queried with `userId` scope.
+- Agent definitions and run history are owner-scoped. Each run stores a bounded prompt/output, an immutable execution snapshot, safe status metadata, and a bounded audit timeline; paginated list responses omit prompt/output/timeline while authenticated detail responses include them. Terminal-run deletion reclaims space under the 500-run owner cap, while archived-project history stays read-only.
+- Agent execution is prompt-to-provider only. The server tool allowlist is empty, non-empty tool configuration is rejected, and no tool schema is sent to a provider. There is no write-action approval subsystem because no tool actions can currently execute.
+- The in-progress Phase 10 Workflow contract accepts only a server-validated `Input -> Prompt -> LLM -> Output` graph. Definitions and runs are owner/project-scoped; active projects permit mutations and execution while archived projects permit only definition/history reads, plus cancellation of an already-active or orphaned run as a safe-shutdown exception. Output from the provider-neutral SSE path is inert text and is never evaluated, dispatched as a tool call, or treated as authorization.
+- Projects are owner-scoped; new project associations are revalidated server-side and deletion requires a one-use confirmation.
+- Refresh tokens are stored as SHA-256 hashes rather than plaintext.
+- PDF merge/extract/rotate use bounded browser-local structural processing; inputs are not uploaded and outputs are not automatically persisted.
+- Knowledge source metadata is owner/project-scoped in MongoDB. Chroma collections are fingerprinted by owner/provider/model/dimension/chunking version; reads and deletes include owner/scope selectors and retrieved metadata is checked again against ready MongoDB records.
+- Knowledge ingestion requires a separate embedding model, validates finite nonzero vectors and consistent dimensions, and cleans partial vectors on failure. Retrieved text is passed to generation only inside explicit untrusted-data delimiters.
+- Repository ZIPs are accepted only through authenticated, rate/admission-limited memory uploads. A deterministic bounded parser inventories paths and selected `package.json` data without extraction, code execution, install hooks, filesystem writes, or network access; persisted/public reports omit archive bytes, file contents, and package-script commands.
+- Native document conversion is disabled in the backend. A future native parser must live in a separate constrained Document Processor service.
+- Databases are internal-only in the local Compose network.
+- Containers are configured as non-root with `no-new-privileges`.
+- Code Lab never executes user code in the browser or backend. Its authenticated API submits fixed-schema jobs to a separate broker. Only that trusted broker receives Docker-daemon access; runtime containers do not receive it.
+- Runtime containers use a fixed language/image/command registry, non-root user, read-only root filesystem, no network/IPC/capabilities/host mounts, and fixed CPU, memory, PID, output, temporary-storage and time limits.
+- Code-run completion is accepted only when its run identity, language, and runtime version match the pending persisted request. Queue replay/reconciliation and label-scoped stale cleanup bound failure recovery.
 
-### 4. **Security & Privacy**
-- Local AI processing (no data leaves your machine)
-- JWT-based authentication
-- Input validation and sanitization
-- Role-based access control
+## Planned boundaries
 
-## 📁 Project Structure
+Agent execution currently runs inside the backend request lifecycle. Its owner concurrency map, per-agent lease, abort controllers, and count-then-create retention enforcement are process-local; MongoDB stores history but is not a distributed lock, cancellation channel, or atomic quota. Periodic reconciliation terminalizes stale records but does not resume work. Multiple replicas, restart-safe execution, cross-process cancellation, atomic retention, and durable resumption require a queue/worker and distributed coordination. The target-host provider/Mongo/browser path is still pending. Future tools, especially write-capable tools, require reviewed allowlists, authorization, isolation, idempotency, audit, and approval boundaries before enablement.
 
-```
-kfive-ai/
-├── frontend/                 # React TypeScript Frontend
-│   ├── src/
-│   │   ├── components/       # Reusable UI Components
-│   │   │   ├── ui/          # Base UI Components
-│   │   │   ├── layout/      # Layout Components
-│   │   │   ├── features/    # Feature-specific Components
-│   │   │   └── providers/   # Context Providers
-│   │   ├── pages/           # Page Components
-│   │   ├── hooks/           # Custom React Hooks
-│   │   ├── services/        # API & External Services
-│   │   ├── store/           # State Management (Zustand)
-│   │   ├── utils/           # Utility Functions
-│   │   └── types/           # TypeScript Type Definitions
-│   ├── public/              # Static Assets
-│   └── package.json
-├── backend/                  # Node.js Express Backend
-│   ├── src/
-│   │   ├── routes/          # API Route Handlers
-│   │   ├── controllers/     # Business Logic Controllers
-│   │   ├── services/        # Business Services
-│   │   │   ├── ollama.ts    # Ollama AI Service
-│   │   │   ├── vector.ts    # Vector Database Service
-│   │   │   └── memory.ts    # AI Memory Service
-│   │   ├── models/          # Database Models
-│   │   ├── middleware/      # Express Middleware
-│   │   ├── config/          # Configuration Files
-│   │   ├── utils/           # Utility Functions
-│   │   └── types/           # TypeScript Type Definitions
-│   └── package.json
-├── scripts/                  # Setup & Utility Scripts
-├── docker-compose.yml        # Docker Services Configuration
-└── package.json             # Root Package Configuration
-```
+Phase 10 Workflow execution has the same deliberate single-process deployment constraint while its source slice is being implemented: one active run per owner is coordinated in process, and the 100-definition and 500-run owner caps use count-then-create checks that are non-atomic across replicas. Runs are limited to 16 KiB input/templates/system prompts, 256 KiB output, 30 seconds, 50 summaries per page over at most ten pages, and 50 timeline events. Workflow and Agent execution leases are separate process-local controls and do not form a shared AI/GPU limit or durable job queue. MongoDB persistence provides history, detail, cancellation state, and terminal deletion, not a distributed lease or cancellation bus. Browser/provider/Mongo target-host E2E remains pending.
 
-## 🔄 Data Flow
+Workflow input, prompt templates, system prompts, and generated output are intentionally retained as application-readable plaintext for execution and history detail. Every run snapshots the complete definition, including the template and system prompt. A remote provider receives the rendered prompt/input and system prompt. Owner scoping, bounded retention, and terminal deletion do not provide field encryption, secure erasure, redaction, or age-based expiry.
 
-### 1. **User Authentication Flow**
-```
-User → Frontend → Backend API → JWT Token → Redis Session → Response
-```
-
-### 2. **AI Chat Flow**
-```
-User Message → Frontend → WebSocket → Backend → Ollama → Streaming Response → Frontend
-```
-
-### 3. **Document Processing Flow**
-```
-File Upload → Backend → Document Parser → Chunking → Embeddings → ChromaDB → RAG Ready
-```
-
-### 4. **Agent Execution Flow**
-```
-Agent Trigger → Backend → Agent Service → Ollama → Task Execution → Result → Frontend
-```
-
-## 🧠 AI Architecture
-
-### **Multi-Model System**
-- **Llama3**: Primary conversational AI and reasoning
-- **DeepSeek Coder**: Code generation, analysis, and debugging
-- **LLaVA**: Image understanding and visual analysis
-- **Nomic Embed Text**: Text embeddings for RAG and search
-- **Whisper**: Speech-to-text processing
-
-### **Agent System**
-```
-Agent Manager
-├── Code Architect Agent
-├── Research Analyst Agent
-├── Bug Hunter Agent
-├── Career Mentor Agent
-└── Productivity Agent
-```
-
-### **Memory System**
-```
-Memory Engine
-├── Short-term Memory (Redis)
-├── Long-term Memory (MongoDB)
-├── Semantic Memory (ChromaDB)
-└── Episodic Memory (Conversation History)
-```
-
-## 🔌 API Architecture
-
-### **RESTful API Endpoints**
-```
-/api/v1/
-├── /auth          # Authentication & Authorization
-├── /user          # User Management & Preferences
-├── /chat          # Conversations & Messages
-├── /agents        # AI Agent Management
-├── /documents     # Document Upload & Processing
-├── /workspace     # Workspace Management
-└── /ollama        # AI Model Management
-```
-
-### **WebSocket Events**
-```
-Socket.IO Events:
-├── chat:message   # Real-time chat messages
-├── chat:stream    # Streaming AI responses
-├── agent:status   # Agent execution status
-├── voice:data     # Voice interaction data
-└── workspace:sync # Workspace synchronization
-```
-
-## 🚀 Deployment Architecture
-
-### **Development Environment**
-```
-Local Machine
-├── Frontend (Vite Dev Server) :3000
-├── Backend (Node.js) :5000
-├── MongoDB :27017
-├── Redis :6379
-├── ChromaDB :8000
-└── Ollama :11434
-```
-
-### **Production Environment**
-```
-Cloud Infrastructure
-├── Frontend (Vercel/Netlify)
-├── Backend (Railway/Render/AWS)
-├── MongoDB Atlas
-├── Redis Cloud
-├── ChromaDB (Self-hosted)
-└── Ollama (Self-hosted GPU)
-```
-
-## 🔧 Technology Stack
-
-### **Frontend Technologies**
-- **React 18**: Modern React with hooks and concurrent features
-- **TypeScript**: Type-safe development
-- **Vite**: Fast build tool and dev server
-- **TailwindCSS**: Utility-first CSS framework
-- **Framer Motion**: Smooth animations and transitions
-- **Zustand**: Lightweight state management
-- **React Query**: Server state management
-- **Socket.IO Client**: Real-time communication
-
-### **Backend Technologies**
-- **Node.js**: JavaScript runtime
-- **Express.js**: Web application framework
-- **TypeScript**: Type-safe server development
-- **Socket.IO**: Real-time bidirectional communication
-- **MongoDB**: Document database
-- **Redis**: In-memory data store
-- **BullMQ**: Background job processing
-- **JWT**: Authentication tokens
-
-### **AI & ML Technologies**
-- **Ollama**: Local LLM inference engine
-- **ChromaDB**: Vector database for embeddings
-- **LangChain**: AI application framework
-- **Whisper**: Speech recognition
-- **Web Speech API**: Browser speech capabilities
-
-## 📊 Performance Considerations
-
-### **Frontend Optimization**
-- Code splitting and lazy loading
-- Component memoization
-- Virtual scrolling for large lists
-- Optimistic UI updates
-- Service worker caching
-
-### **Backend Optimization**
-- Connection pooling
-- Response caching
-- Background job processing
-- Streaming responses
-- Rate limiting
-
-### **AI Optimization**
-- Model quantization
-- Context window management
-- Prompt optimization
-- Embedding caching
-- Batch processing
-
-## 🔒 Security Architecture
-
-### **Authentication & Authorization**
-- JWT access tokens (15 minutes)
-- Refresh tokens (7 days)
-- Role-based access control
-- Session management
-
-### **Data Protection**
-- Input validation and sanitization
-- SQL injection prevention
-- XSS protection
-- CSRF protection
-- Rate limiting
-
-### **Privacy**
-- Local AI processing
-- No external data transmission
-- Encrypted data storage
-- User data ownership
-
-## 🔮 Future Architecture Enhancements
-
-### **Scalability Improvements**
-- Microservices migration
-- Kubernetes deployment
-- Load balancing
-- Database sharding
-
-### **AI Enhancements**
-- Multi-agent orchestration
-- Custom model fine-tuning
-- Federated learning
-- Edge AI deployment
-
-### **Feature Expansions**
-- Real-time collaboration
-- Plugin marketplace
-- Mobile native apps
-- Desktop applications
-
----
-
-This architecture provides a solid foundation for building a production-level AI workspace platform that can scale from individual use to enterprise deployment while maintaining privacy and performance.
+Code Runner has an Experimental vertical slice and disabled-by-default Compose profile, but still requires target-host isolation tests and immutable runtime image digests. Docker-daemon access makes the trusted broker a high-privilege boundary; production deployments should prefer a dedicated or rootless daemon. Browser-local PDF merge/extract/rotate, bounded TXT/Markdown Knowledge/RAG, deterministic ZIP repository analysis, and the fixed Phase 10 Workflow slice are Experimental. Their live browser/provider/storage paths, a future isolated repository importer, the isolated Document Processor/OCR, general-purpose workflow capabilities, datasets, experiments, observability, Kubernetes, and remote production deployment still require independent verification or vertical slices. Project Rooms have an experimental CRUD/context slice, but export/import and the broader project-owned modules remain planned.

@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { asyncHandler } from '@/middleware/errorHandler';
 import { Conversation } from '@/models/Conversation';
 import { AppError } from '@/middleware/errorHandler';
+import { getAuthenticatedUserId } from '@/middleware/auth';
+import { projectService } from '@/services/projectService';
 
 const router = Router();
 
@@ -10,16 +12,16 @@ router.get('/conversations', asyncHandler(async (req, res) => {
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 20;
 
-  // Temporary fix for auth since the frontend might not pass valid tokens yet if not strictly logged in
-  // Usually this would use req.user.userId
-  const userId = (req as any).user?.userId || 'default-user-id';
+  const userId = getAuthenticatedUserId(req);
+  const project = await projectService.resolveOwnedProject(userId, req.query.projectId);
+  const filter = { userId, ...(project ? { projectId: project._id } : {}) };
 
-  const conversations = await Conversation.find({ userId })
+  const conversations = await Conversation.find(filter)
     .sort({ 'metadata.lastMessageAt': -1 })
     .skip((page - 1) * limit)
     .limit(limit);
 
-  const total = await Conversation.countDocuments({ userId });
+  const total = await Conversation.countDocuments(filter);
 
   res.json({
     success: true,
@@ -37,7 +39,8 @@ router.get('/conversations', asyncHandler(async (req, res) => {
 router.get('/conversations/:id', asyncHandler(async (req, res) => {
 
   
-  const conversation = await Conversation.findById(req.params.id);
+  const userId = getAuthenticatedUserId(req);
+  const conversation = await Conversation.findOne({ _id: req.params.id, userId });
   if (!conversation) throw new AppError('Conversation not found', 404);
 
   res.json({ success: true, data: conversation });
@@ -45,12 +48,14 @@ router.get('/conversations/:id', asyncHandler(async (req, res) => {
 
 // Create conversation
 router.post('/conversations', asyncHandler(async (req, res) => {
-  const userId = (req as any).user?.userId || 'default-user-id';
+  const userId = getAuthenticatedUserId(req);
   
-  const { title, messages, settings, agent, workspace } = req.body;
+  const { title, messages, settings, agent, workspace, projectId } = req.body;
+  const project = await projectService.resolveActiveProject(userId, projectId);
   
   const conversation = await Conversation.create({
     userId,
+    ...(project ? { projectId: project._id } : {}),
     title: title || 'New Conversation',
     messages: messages || [],
     settings: settings || {},
@@ -71,8 +76,10 @@ router.post('/conversations', asyncHandler(async (req, res) => {
 
 // Send message
 router.post('/conversations/:id/messages', asyncHandler(async (req, res) => {
-  const conversation = await Conversation.findById(req.params.id);
+  const userId = getAuthenticatedUserId(req);
+  const conversation = await Conversation.findOne({ _id: req.params.id, userId });
   if (!conversation) throw new AppError('Conversation not found', 404);
+  await projectService.resolveActiveProject(userId, conversation.projectId?.toString());
 
   const message = req.body;
   message.timestamp = message.timestamp || new Date();
@@ -83,15 +90,23 @@ router.post('/conversations/:id/messages', asyncHandler(async (req, res) => {
   res.json({ success: true, data: conversation });
 }));
 
-import { ollamaService } from '@/services/ollama';
+import { AiMessage, getAiProvider } from '@/services/aiProvider';
+import { aiLimiter } from '@/middleware/rateLimiter';
+import { getEnvironment } from '@/config/environment';
 
 // Stream chat completion
-router.post('/conversations/:id/stream', asyncHandler(async (req, res) => {
-  const conversation = await Conversation.findById(req.params.id);
+router.post('/conversations/:id/stream', aiLimiter, asyncHandler(async (req, res) => {
+  const userId = getAuthenticatedUserId(req);
+  const conversation = await Conversation.findOne({ _id: req.params.id, userId });
   if (!conversation) throw new AppError('Conversation not found', 404);
+  await projectService.resolveActiveProject(userId, conversation.projectId?.toString());
 
-  const { message } = req.body;
+  const { message, model } = req.body;
   if (!message) throw new AppError('Message is required', 400);
+  const environment = getEnvironment();
+  const selectedModel = typeof model === 'string' && model.length <= 200
+    ? model
+    : conversation.settings?.model || environment.aiDefaultModel;
 
   // Add user message to conversation
   conversation.messages.push({
@@ -104,24 +119,37 @@ router.post('/conversations/:id/stream', asyncHandler(async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
+  const abortController = new AbortController();
+  res.on('close', () => {
+    if (!res.writableEnded) abortController.abort();
+  });
 
   try {
-    const formattedMessages = conversation.messages.map(msg => ({
+    const formattedMessages: AiMessage[] = conversation.messages.map(msg => ({
       role: msg.role === 'system' ? 'system' : (msg.role === 'assistant' ? 'assistant' : 'user'),
       content: msg.content
     }));
 
     let fullResponse = '';
 
-    await ollamaService.chatStream(
+    const provider = getAiProvider();
+    await provider.chatStream(
       {
-        model: conversation.settings?.model || 'phi3', // Optimized for lower RAM environments than llama3
-        messages: formattedMessages as any,
+        model: selectedModel,
+        messages: formattedMessages,
+        temperature: conversation.settings?.temperature,
       },
-      (chunk) => {
-        fullResponse += chunk.message.content;
-        res.write(`data: ${JSON.stringify({ content: chunk.message.content })}\n\n`);
-      }
+      (event) => {
+        if (event.type === 'start') {
+          res.write(`data: ${JSON.stringify({ provider: event.provider, model: event.model })}\n\n`);
+        } else if (event.type === 'delta') {
+          fullResponse += event.content;
+          res.write(`data: ${JSON.stringify({ content: event.content })}\n\n`);
+        } else if (event.type === 'usage') {
+          res.write(`data: ${JSON.stringify({ usage: event.usage })}\n\n`);
+        }
+      },
+      { signal: abortController.signal }
     );
 
     // Save AI message to DB
@@ -135,8 +163,10 @@ router.post('/conversations/:id/stream', asyncHandler(async (req, res) => {
     res.write('data: [DONE]\n\n');
     res.end();
   } catch (error: any) {
-    res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
-    res.end();
+    if (!res.writableEnded && !res.destroyed) {
+      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+      res.end();
+    }
   }
 }));
 

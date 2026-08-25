@@ -1,0 +1,25 @@
+{
+  "name": "@kfive/code-runner",
+  "version": "0.1.0",
+  "description": "Isolated disposable-container execution core for KFive Code Lab",
+  "private": true,
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "lint": "tsc --noEmit",
+    "test": "tsc && node --test dist/test/*.test.js",
+    "start": "node dist/src/main.js"
+  },
+  "dependencies": {
+    "bullmq": "^4.15.4",
+    "redis": "^4.6.11"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.4",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

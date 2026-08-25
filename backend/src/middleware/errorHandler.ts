@@ -4,6 +4,7 @@ import { logger } from '@/utils/logger';
 export interface ApiError extends Error {
   statusCode?: number;
   isOperational?: boolean;
+  code?: string | number;
 }
 
 export class AppError extends Error implements ApiError {
@@ -23,7 +24,7 @@ export function errorHandler(
   error: ApiError,
   req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ): void {
   let { statusCode = 500, message } = error;
 
@@ -64,6 +65,7 @@ export function errorHandler(
     success: false,
     error: {
       message,
+      ...(error.isOperational && typeof error.code === 'string' ? { code: error.code } : {}),
       ...(process.env.NODE_ENV === 'development' && { stack: error.stack }),
     },
   });

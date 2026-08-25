@@ -1,7 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, X, Trash2, Bot, GripVertical } from 'lucide-react';
 import { SlideOver } from '@/components/ui/SlideOver';
+import { chatApi } from '@/services/api';
+import { apiUrl } from '@/config/runtime';
+import { getToken } from '@/utils/getToken';
+import { readSseResponse } from '@/utils/sse';
+import { readableApiError } from '@/services/runtimeSettings';
 
 interface Task {
   id: string;
@@ -20,6 +25,10 @@ export default function WorkspacePage() {
   const [aiContextTask, setAiContextTask] = useState<Task | null>(null);
   const [aiStream, setAiStream] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string>();
+  const [aiConversationId, setAiConversationId] = useState<string>();
+  const [followUp, setFollowUp] = useState('');
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('kfive-workspace-tasks');
@@ -33,6 +42,8 @@ export default function WorkspacePage() {
   useEffect(() => {
     localStorage.setItem('kfive-workspace-tasks', JSON.stringify(tasks));
   }, [tasks]);
+
+  useEffect(() => () => abortControllerRef.current?.abort(), []);
 
   const addTask = (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,29 +80,73 @@ export default function WorkspacePage() {
     setTasks(tasks.map(t => t.id === id ? { ...t, column } : t));
   };
 
+  const streamPrompt = async (prompt: string, task: Task, existingConversationId?: string) => {
+    if (!prompt.trim() || isAiLoading) return;
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    setAiError(undefined);
+    setAiStream('');
+    setIsAiLoading(true);
+
+    try {
+      let conversationId = existingConversationId;
+      if (!conversationId) {
+        const response = await chatApi.createConversation({ title: `Workspace: ${task.title}`.slice(0, 120) });
+        conversationId = response.data?.data?._id;
+        if (!conversationId) throw new Error('The AI conversation could not be created.');
+        setAiConversationId(conversationId);
+      }
+
+      const response = await fetch(apiUrl(`/chat/conversations/${conversationId}/stream`), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify({ message: prompt }),
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => undefined);
+        throw new Error(readableApiError({ response: { data: payload } }, `AI request failed with HTTP ${response.status}.`));
+      }
+      await readSseResponse(response, (dataString) => {
+        if (dataString === '[DONE]') return;
+        const data = JSON.parse(dataString) as { content?: string; error?: string };
+        if (data.error) throw new Error(data.error);
+        if (data.content) setAiStream((current) => current + data.content);
+      });
+    } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      setAiError(readableApiError(error, 'The configured AI provider could not analyze this task.'));
+    } finally {
+      if (abortControllerRef.current === controller) abortControllerRef.current = null;
+      setIsAiLoading(false);
+    }
+  };
+
   const askAI = (task: Task) => {
     setAiContextTask(task);
     setAiStream('');
+    setAiError(undefined);
+    setAiConversationId(undefined);
+    setFollowUp('');
     setAiModalOpen(true);
-    setIsAiLoading(true);
-    
-    // Simulate streaming response
-    const demoResponse = `Here's an analysis of your task: "${task.title}". \n\nTo complete this effectively, I recommend breaking it down into 3 sub-steps. \n1. Initial research \n2. Implementation \n3. Testing and Review \n\nWould you like me to generate specific code or a detailed plan?`;
-    
-    let currentText = '';
-    const words = demoResponse.split(' ');
-    let i = 0;
-    
-    const interval = setInterval(() => {
-      if (i < words.length) {
-        currentText += (i > 0 ? ' ' : '') + words[i];
-        setAiStream(currentText);
-        i++;
-      } else {
-        clearInterval(interval);
-        setIsAiLoading(false);
-      }
-    }, 50);
+    void streamPrompt(`Analyze this workspace task and propose concrete implementation and verification steps: ${task.title}`, task);
+  };
+
+  const askFollowUp = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!aiContextTask || !followUp.trim()) return;
+    const prompt = followUp.trim();
+    setFollowUp('');
+    void streamPrompt(prompt, aiContextTask, aiConversationId);
+  };
+
+  const closeAi = () => {
+    abortControllerRef.current?.abort();
+    setAiModalOpen(false);
   };
 
   const columns: { id: Task['column'], title: string, color: string }[] = [
@@ -209,7 +264,7 @@ export default function WorkspacePage() {
 
       <SlideOver 
         isOpen={aiModalOpen} 
-        onClose={() => setAiModalOpen(false)} 
+        onClose={closeAi}
         title="AI Assistant"
       >
         <div className="flex flex-col h-full">
@@ -220,25 +275,29 @@ export default function WorkspacePage() {
           
           <div className="flex-1 bg-black/40 border border-white/10 rounded-xl p-5 mb-4 relative overflow-y-auto w-full">
             <div className="prose prose-invert prose-sm max-w-none break-words">
-              {aiStream || "Waiting for response..."}
+              {aiError ? <span className="text-red-300">{aiError}</span> : aiStream || "Waiting for the configured AI provider…"}
               {isAiLoading && <span className="ml-1 inline-block w-2 h-4 bg-primary animate-pulse"/>}
             </div>
           </div>
           
-          <div className="relative mt-auto">
+          <form className="relative mt-auto" onSubmit={askFollowUp}>
             <input 
               type="text" 
               placeholder="Ask a follow-up question..." 
+              value={followUp}
+              onChange={(event) => setFollowUp(event.target.value)}
               className="w-full bg-black/40 border border-white/10 rounded-xl pl-4 pr-12 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-primary/50"
-              disabled={isAiLoading}
+              disabled={isAiLoading || !aiConversationId}
             />
             <button 
+              type="submit"
               className="absolute right-2 top-2 bottom-2 aspect-square bg-primary/20 text-primary hover:bg-primary hover:text-white rounded-lg flex items-center justify-center transition-colors disabled:opacity-50"
-              disabled={isAiLoading}
+              disabled={isAiLoading || !aiConversationId || !followUp.trim()}
+              aria-label="Send follow-up"
             >
               <Bot size={16} />
             </button>
-          </div>
+          </form>
         </div>
       </SlideOver>
     </motion.div>

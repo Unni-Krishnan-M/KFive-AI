@@ -1,13 +1,10 @@
 import mongoose from 'mongoose';
 import { logger } from '@/utils/logger';
+import { getEnvironment } from './environment';
 
 export async function connectDatabase(): Promise<void> {
   try {
-    const mongoUri = process.env.MONGODB_URI;
-    
-    if (!mongoUri) {
-      throw new Error('MONGODB_URI environment variable is not defined');
-    }
+    const mongoUri = getEnvironment().mongodbUrl;
 
     const options = {
       maxPoolSize: 10,

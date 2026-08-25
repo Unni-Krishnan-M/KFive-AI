@@ -1,459 +1,252 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  FolderOpen, FileText, FileSpreadsheet, Presentation, 
-  Image as ImageIcon, Combine, RotateCw, ArrowRight, 
-  UploadCloud, ArrowLeft, Loader2, Download, CheckCircle, File as FileIcon
+import { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+  ArrowDown, ArrowLeft, ArrowRight, ArrowUp, CheckCircle, Combine, Download,
+  File as FileIcon, FolderOpen, Loader2, RotateCw, Scissors, Trash2, UploadCloud,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
-import { PDFDocument, degrees } from 'pdf-lib';
-import { getToken } from '@/utils/getToken';
 import { useSearchParams } from 'react-router-dom';
+import {
+  PdfInput, PdfToolError, extractPdfPages, mergePdfs, rotatePdfPages,
+} from '@/services/pdfTools';
 
-type ToolId = 'merge' | 'pdf-word' | 'pdf-excel' | 'pdf-ppt' | 'ppt-pdf' | 'word-pdf' | 'excel-pdf' | 'jpg-pdf' | 'pdf-jpg' | 'rotate';
+type ToolId = 'merge' | 'extract' | 'rotate';
+type RotationAngle = 90 | 180 | 270;
 
 interface Tool {
   id: ToolId;
   name: string;
   description: string;
-  icon: React.ElementType;
-  color: string;
+  icon: typeof Combine;
   multiple: boolean;
-  acceptedTypes: string;
+}
+
+interface PdfResult {
+  filename: string;
+  pageCount: number;
+  url: string;
 }
 
 const TOOLS: Tool[] = [
-  { id: 'merge', name: 'Merge PDF', description: 'Combine multiple PDFs into one unified document.', icon: Combine, color: 'text-purple-400', multiple: true, acceptedTypes: '.pdf' },
-  { id: 'pdf-word', name: 'PDF to Word', description: 'Convert your PDF to an editable Word document.', icon: FileText, color: 'text-blue-400', multiple: false, acceptedTypes: '.pdf' },
-  { id: 'pdf-excel', name: 'PDF to Excel', description: 'Extract tables from PDF to Excel spreadsheets.', icon: FileSpreadsheet, color: 'text-green-400', multiple: false, acceptedTypes: '.pdf' },
-  { id: 'pdf-ppt', name: 'PDF to PowerPoint', description: 'Turn your PDF files into easy to edit PPT presentations.', icon: Presentation, color: 'text-orange-400', multiple: false, acceptedTypes: '.pdf' },
-  { id: 'ppt-pdf', name: 'PowerPoint to PDF', description: 'Make PPT and PPTX slideshows easy to view by converting to PDF.', icon: Presentation, color: 'text-red-400', multiple: false, acceptedTypes: '.ppt,.pptx' },
-  { id: 'word-pdf', name: 'Word to PDF', description: 'Make DOC and DOCX files easy to read by converting to PDF.', icon: FileText, color: 'text-red-400', multiple: false, acceptedTypes: '.doc,.docx' },
-  { id: 'excel-pdf', name: 'Excel to PDF', description: 'Make EXCEL spreadsheets easy to read by converting to PDF.', icon: FileSpreadsheet, color: 'text-red-400', multiple: false, acceptedTypes: '.xls,.xlsx,.csv' },
-  { id: 'jpg-pdf', name: 'JPG to PDF', description: 'Convert JPG images to PDF in seconds.', icon: ImageIcon, color: 'text-cyan-400', multiple: true, acceptedTypes: '.jpg,.jpeg,.png' },
-  { id: 'pdf-jpg', name: 'PDF to JPG', description: 'Extract images from your PDF or convert each page to a JPG.', icon: ImageIcon, color: 'text-yellow-400', multiple: false, acceptedTypes: '.pdf' },
-  { id: 'rotate', name: 'Rotate PDF', description: 'Rotate your PDFs the way you need them.', icon: RotateCw, color: 'text-indigo-400', multiple: false, acceptedTypes: '.pdf' },
+  { id: 'merge', name: 'Merge PDF', description: 'Combine 2–10 PDFs in the order you choose.', icon: Combine, multiple: true },
+  { id: 'extract', name: 'Extract Pages', description: 'Create a new PDF from selected pages of one PDF.', icon: Scissors, multiple: false },
+  { id: 'rotate', name: 'Rotate Pages', description: 'Rotate selected pages by 90, 180, or 270 degrees.', icon: RotateCw, multiple: false },
 ];
+
+const outputFilename = (tool: ToolId, input?: File): string => {
+  const base = input?.name.replace(/\.pdf$/i, '') || 'document';
+  if (tool === 'merge') return 'kfive-merged.pdf';
+  if (tool === 'extract') return `${base}-extracted.pdf`;
+  return `${base}-rotated.pdf`;
+};
+
+const readPdfInput = async (file: File): Promise<PdfInput> => ({
+  name: file.name,
+  mimeType: file.type,
+  bytes: new Uint8Array(await file.arrayBuffer()),
+});
 
 export default function FileActionsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTool, setActiveTool] = useState<Tool | null>(null);
+  const requestedTool = searchParams.get('tool');
+  const [activeTool, setActiveTool] = useState<Tool>();
   const [files, setFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
-  
-  const [status, setStatus] = useState<'idle' | 'processing' | 'done'>('idle');
-  const [progress, setProgress] = useState(0);
-  const [resultBlob, setResultBlob] = useState<Blob | null>(null);
-  const [resultFilename, setResultFilename] = useState<string>('');
-  
+  const [processing, setProcessing] = useState(false);
+  const [pageSelection, setPageSelection] = useState('all');
+  const [rotationAngle, setRotationAngle] = useState<RotationAngle>(90);
+  const [error, setError] = useState<string>();
+  const [result, setResult] = useState<PdfResult>();
+  const resultUrlRef = useRef<string>();
+  const operationIdRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const toolQuery = searchParams.get('tool');
-    if (toolQuery) {
-      const tool = TOOLS.find(t => t.id === toolQuery);
-      if (tool) {
-        setActiveTool(tool);
-        resetState();
-      }
-    }
-  }, [searchParams]);
+  const clearResult = () => {
+    if (resultUrlRef.current) URL.revokeObjectURL(resultUrlRef.current);
+    resultUrlRef.current = undefined;
+    setResult(undefined);
+  };
 
   const resetState = () => {
+    operationIdRef.current += 1;
+    clearResult();
     setFiles([]);
-    setStatus('idle');
-    setProgress(0);
-    setResultBlob(null);
-    setResultFilename('');
+    setIsDragging(false);
+    setProcessing(false);
+    setPageSelection('all');
+    setRotationAngle(90);
+    setError(undefined);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleToolClick = (tool: Tool) => {
-    setSearchParams({ tool: tool.id });
-  };
+  useEffect(() => {
+    const tool = TOOLS.find((candidate) => candidate.id === requestedTool);
+    setActiveTool(tool);
+    resetState();
+  }, [requestedTool]);
 
-  const handleBack = () => {
+  useEffect(() => () => {
+    operationIdRef.current += 1;
+    if (resultUrlRef.current) URL.revokeObjectURL(resultUrlRef.current);
+  }, []);
+
+  const leaveTool = () => {
+    resetState();
     setSearchParams({});
-    setActiveTool(null);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      handleFilesAdded(Array.from(e.target.files));
+  const addFiles = (incoming: File[]) => {
+    if (!activeTool || incoming.length === 0) return;
+    clearResult();
+    setError(undefined);
+    if (!activeTool.multiple) {
+      setFiles([incoming[0]]);
+      return;
     }
+    setFiles((current) => {
+      const combined = [...current, ...incoming];
+      if (combined.length > 10) setError('Merge PDF accepts at most 10 files. Extra files were not added.');
+      return combined.slice(0, 10);
+    });
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (e.dataTransfer.files) {
-      handleFilesAdded(Array.from(e.dataTransfer.files));
-    }
-  };
-
-  const handleFilesAdded = (newFiles: File[]) => {
-    if (activeTool?.multiple) {
-      setFiles(prev => [...prev, ...newFiles]);
-    } else {
-      setFiles([newFiles[0]]);
-    }
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    addFiles(Array.from(event.target.files || []));
+    event.target.value = '';
   };
 
   const removeFile = (index: number) => {
-    setFiles(prev => prev.filter((_, i) => i !== index));
+    clearResult();
+    setError(undefined);
+    setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  };
+
+  const moveFile = (index: number, offset: -1 | 1) => {
+    setFiles((current) => {
+      const destination = index + offset;
+      if (destination < 0 || destination >= current.length) return current;
+      const reordered = [...current];
+      [reordered[index], reordered[destination]] = [reordered[destination], reordered[index]];
+      return reordered;
+    });
   };
 
   const processFiles = async () => {
-    if (files.length === 0 || !activeTool) return;
-    
-    setStatus('processing');
-    setProgress(10);
-    
+    if (!activeTool || processing) return;
+    if (activeTool.id === 'merge' && (files.length < 2 || files.length > 10)) {
+      setError('Select between 2 and 10 PDF files to merge.');
+      return;
+    }
+    if (activeTool.id !== 'merge' && files.length !== 1) {
+      setError(`Select one PDF to ${activeTool.id === 'extract' ? 'extract pages from' : 'rotate'}.`);
+      return;
+    }
+    if (activeTool.id !== 'merge' && !pageSelection.trim()) {
+      setError('Enter a page selection such as 1-3,5 or all.');
+      return;
+    }
+
+    clearResult();
+    setError(undefined);
+    setProcessing(true);
+    const operationId = operationIdRef.current + 1;
+    operationIdRef.current = operationId;
     try {
-      let finalBlob: Blob;
-      let filename = `kfive_${activeTool.id}_${Date.now()}`;
-
-      // NATIVE FRONTEND PROCESSING WITH PDF-LIB
-      if (activeTool.id === 'merge') {
-        const mergedPdf = await PDFDocument.create();
-        for (let i = 0; i < files.length; i++) {
-          const file = files[i];
-          const arrayBuffer = await file.arrayBuffer();
-          const pdfDoc = await PDFDocument.load(arrayBuffer);
-          const copiedPages = await mergedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
-          copiedPages.forEach((page) => mergedPdf.addPage(page));
-          setProgress(10 + Math.floor((i / files.length) * 80));
-        }
-        const pdfBytes = await mergedPdf.save();
-        // @ts-ignore - TS types for pdf-lib Uint8Array
-        finalBlob = new Blob([pdfBytes], { type: 'application/pdf' });
-        filename += '.pdf';
-
-      } else if (activeTool.id === 'rotate') {
-        const arrayBuffer = await files[0].arrayBuffer();
-        const pdfDoc = await PDFDocument.load(arrayBuffer);
-        const pages = pdfDoc.getPages();
-        pages.forEach(page => {
-          const currentRotation = page.getRotation().angle;
-          page.setRotation(degrees(currentRotation + 90));
-        });
-        setProgress(80);
-        const pdfBytes = await pdfDoc.save();
-        // @ts-ignore
-        finalBlob = new Blob([pdfBytes], { type: 'application/pdf' });
-        filename += '_rotated.pdf';
-
-      } else if (activeTool.id === 'jpg-pdf') {
-        const pdfDoc = await PDFDocument.create();
-        for (let i = 0; i < files.length; i++) {
-          const file = files[i];
-          const arrayBuffer = await file.arrayBuffer();
-          let image;
-          if (file.type === 'image/jpeg' || file.type === 'image/jpg') {
-            image = await pdfDoc.embedJpg(arrayBuffer);
-          } else if (file.type === 'image/png') {
-            image = await pdfDoc.embedPng(arrayBuffer);
-          } else {
-            continue;
-          }
-          const page = pdfDoc.addPage([image.width, image.height]);
-          page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
-          setProgress(10 + Math.floor((i / files.length) * 80));
-        }
-        const pdfBytes = await pdfDoc.save();
-        // @ts-ignore
-        finalBlob = new Blob([pdfBytes], { type: 'application/pdf' });
-        filename += '.pdf';
-
-      } else {
-        // PROPRIETARY FORMATS (Word, Excel, PPT)
-        // These require a real backend (e.g., LibreOffice, Pandoc).
-        setProgress(40);
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-        const token = getToken();
-        
-        const formData = new FormData();
-        files.forEach(f => formData.append('files', f));
-        formData.append('toolId', activeTool.id);
-        
-        try {
-          const response = await fetch(`${API_URL}/api/v1/documents/convert`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
-            body: formData
-          });
-
-          if (!response.ok) {
-            const errBody = await response.json().catch(() => ({}));
-            throw new Error(errBody.message || 'Server-side conversion failed natively.');
-          }
-
-          finalBlob = await response.blob();
-          let ext = 'pdf';
-          const targetFormat = activeTool.id.split('-').pop();
-          if (targetFormat === 'word') ext = 'docx';
-          else if (targetFormat === 'excel') ext = 'xlsx';
-          else if (targetFormat === 'ppt') ext = 'pptx';
-          else if (targetFormat === 'jpg') ext = 'jpg';
-          else ext = targetFormat || 'pdf';
-          
-          filename += `.${ext}`;
-          setProgress(90);
-        } catch (err: any) {
-          toast.error(err.message || 'Server-side conversion failed.');
-          setStatus('idle');
-          return;
-        }
-      }
-
-      setProgress(100);
-      setResultBlob(finalBlob);
-      setResultFilename(filename);
-      setStatus('done');
-      toast.success(`${activeTool?.name} completed successfully!`);
-
-    } catch (error) {
-      console.error(error);
-      toast.error('Failed to process file(s). Please check format.');
-      setStatus('idle');
-      setProgress(0);
+      const inputs = await Promise.all(files.map(readPdfInput));
+      const output = activeTool.id === 'merge'
+        ? await mergePdfs(inputs)
+        : activeTool.id === 'extract'
+          ? await extractPdfPages(inputs[0], pageSelection)
+          : await rotatePdfPages(inputs[0], pageSelection, rotationAngle);
+      if (operationIdRef.current !== operationId) return;
+      const bytes = new Uint8Array(output.bytes);
+      const url = URL.createObjectURL(new Blob([bytes.buffer], { type: 'application/pdf' }));
+      resultUrlRef.current = url;
+      setResult({ filename: outputFilename(activeTool.id, files[0]), pageCount: output.pageCount, url });
+    } catch (processingError) {
+      if (operationIdRef.current !== operationId) return;
+      setError(processingError instanceof PdfToolError
+        ? processingError.message
+        : processingError instanceof Error
+          ? processingError.message
+          : 'The PDF operation could not be completed.');
+    } finally {
+      if (operationIdRef.current === operationId) setProcessing(false);
     }
   };
 
-  const triggerDownload = () => {
-    if (!resultBlob) return;
-    const element = document.createElement("a");
-    element.href = URL.createObjectURL(resultBlob);
-    element.download = resultFilename;
-    document.body.appendChild(element); 
-    element.click();
-    document.body.removeChild(element);
-    URL.revokeObjectURL(element.href);
-    
-    toast.success("File downloaded!");
-  };
+  const canProcess = activeTool?.id === 'merge'
+    ? files.length >= 2 && files.length <= 10
+    : files.length === 1 && Boolean(pageSelection.trim());
 
   return (
-    <div className="p-6 md:p-8 flex flex-col h-full overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden p-6 md:p-8">
       <AnimatePresence mode="wait">
         {!activeTool ? (
-          <motion.div
-            key="grid"
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            className="space-y-8 flex-1 overflow-y-auto pb-10 scrollbar-thin overflow-x-hidden w-full max-w-7xl mx-auto"
-          >
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-                <FolderOpen className="w-8 h-8 text-primary" />
-                File Actions
-              </h1>
-              <p className="text-gray-400 mt-2 text-lg">
-                Powerful document operations right in your browser safely and securely.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <motion.div key="tools" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mx-auto w-full max-w-6xl flex-1 space-y-8 overflow-y-auto pb-10">
+            <header>
+              <h1 className="flex items-center gap-3 text-3xl font-bold text-white"><FolderOpen className="h-8 w-8 text-primary" />PDF Utilities</h1>
+              <p className="mt-2 text-gray-400">These three operations run locally in this browser. Inputs are not uploaded, and results are downloads—not saved to Documents or Projects.</p>
+            </header>
+            <div className="grid gap-5 md:grid-cols-3">
               {TOOLS.map((tool) => (
-                <motion.div
-                  key={tool.id}
-                  whileHover={{ y: -4 }}
-                  onClick={() => handleToolClick(tool)}
-                  className="bg-surface hover:bg-white/5 border border-border hover:border-primary/50 cursor-pointer rounded-2xl p-6 transition-all group relative overflow-hidden"
-                >
-                  <div className={`w-12 h-12 rounded-xl bg-black/20 flex items-center justify-center mb-4 border border-white/5 group-hover:border-white/10 transition-colors`}>
-                    <tool.icon className={`w-6 h-6 ${tool.color}`} />
-                  </div>
-                  <h3 className="text-lg font-semibold text-white mb-2">{tool.name}</h3>
-                  <p className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors">{tool.description}</p>
-                  
-                  <div className="absolute right-4 top-4 p-2 bg-primary/10 rounded-full opacity-0 group-hover:opacity-100 transition-opacity translate-x-2 group-hover:translate-x-0">
-                    <ArrowRight className="w-4 h-4 text-primary" />
-                  </div>
-                </motion.div>
+                <button key={tool.id} onClick={() => setSearchParams({ tool: tool.id })} className="group relative rounded-2xl border border-white/10 bg-white/5 p-6 text-left transition hover:-translate-y-1 hover:border-primary/50">
+                  <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl border border-white/5 bg-black/20"><tool.icon className="h-6 w-6 text-primary" /></div>
+                  <h2 className="text-lg font-semibold text-white">{tool.name}</h2>
+                  <p className="mt-2 text-sm leading-6 text-gray-400">{tool.description}</p>
+                  <ArrowRight className="absolute right-5 top-5 h-4 w-4 text-gray-600 transition group-hover:text-primary" />
+                </button>
               ))}
             </div>
           </motion.div>
         ) : (
-          <motion.div
-            key="action"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            className="flex-1 flex flex-col max-w-4xl mx-auto w-full"
-          >
-            <button 
-              onClick={handleBack}
-              className="flex items-center gap-2 text-gray-400 hover:text-white mb-8 group w-fit transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-              Back to all tools
-            </button>
-            
-            <div className="bg-surface border border-border rounded-2xl p-8 shadow-2xl flex-1 flex flex-col">
-              <div className="flex items-center gap-4 mb-8 pb-8 border-b border-white/10">
-                <div className="w-16 h-16 rounded-2xl bg-black/20 flex items-center justify-center border border-white/5">
-                  <activeTool.icon className={`w-8 h-8 ${activeTool.color}`} />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-white">{activeTool.name}</h2>
-                  <p className="text-gray-400 mt-1">{activeTool.description}</p>
-                </div>
-              </div>
+          <motion.div key={activeTool.id} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} className="mx-auto flex w-full max-w-4xl flex-1 flex-col overflow-y-auto">
+            <button onClick={leaveTool} className="mb-6 inline-flex w-fit items-center gap-2 text-sm text-gray-400 hover:text-white"><ArrowLeft className="h-4 w-4" />Back to PDF Utilities</button>
+            <section className="flex-1 rounded-2xl border border-white/10 bg-white/5 p-6 md:p-8">
+              <header className="flex items-start gap-4 border-b border-white/10 pb-6">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10"><activeTool.icon className="h-7 w-7 text-primary" /></div>
+                <div><h1 className="text-2xl font-bold text-white">{activeTool.name}</h1><p className="mt-1 text-gray-400">{activeTool.description}</p><p className="mt-2 text-xs text-gray-500">Processed locally. The output is not added to your KFive document library.</p></div>
+              </header>
 
-              {status === 'idle' && (
-                <div className="flex-1 flex flex-col">
-                  {files.length === 0 ? (
-                    <div 
-                      onDragOver={handleDragOver}
-                      onDragLeave={handleDragLeave}
-                      onDrop={handleDrop}
-                      onClick={() => fileInputRef.current?.click()}
-                      className={`flex-1 min-h-[300px] border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all ${
-                        isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-white/5'
-                      }`}
-                    >
-                      <input 
-                        type="file" 
-                        ref={fileInputRef} 
-                        onChange={handleFileChange} 
-                        className="hidden" 
-                        accept={activeTool.acceptedTypes}
-                        multiple={activeTool.multiple}
-                      />
-                      <UploadCloud className={`w-16 h-16 mb-4 ${isDragging ? 'text-primary' : 'text-gray-500'}`} />
-                      <h3 className="text-xl font-medium text-white mb-2">Select files</h3>
-                      <p className="text-gray-400 max-w-xs text-center text-sm">
-                        Drag and drop {activeTool.multiple ? 'files' : 'a file'} here, or click to browse.
-                      </p>
-                      <span className="mt-4 px-3 py-1 bg-black/40 border border-white/10 rounded-full text-xs text-gray-400">
-                        Accepted: {activeTool.acceptedTypes}
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="flex-1 flex flex-col">
-                      <div className="flex justify-between items-end mb-4">
-                        <h3 className="text-lg font-medium text-white">Files to process ({files.length})</h3>
-                        {activeTool.multiple && (
-                          <button 
-                            onClick={() => fileInputRef.current?.click()}
-                            className="text-sm text-primary hover:text-white transition-colors flex items-center gap-1"
-                          >
-                            <input 
-                              type="file" 
-                              ref={fileInputRef} 
-                              onChange={handleFileChange} 
-                              className="hidden" 
-                              accept={activeTool.acceptedTypes}
-                              multiple={activeTool.multiple}
-                            />
-                            + Add more files
-                          </button>
-                        )}
-                      </div>
-                      
-                      <div className="grid grid-cols-1 gap-3 mb-6 max-h-[300px] overflow-y-auto pr-2 scrollbar-thin">
-                        {files.map((f, i) => (
-                          <div key={i} className="flex items-center justify-between p-4 bg-black/20 border border-white/5 rounded-xl hover:border-white/10 transition-colors">
-                            <div className="flex items-center gap-3 overflow-hidden">
-                              <FileIcon className="w-5 h-5 text-gray-400 shrink-0" />
-                              <span className="text-sm font-medium text-white truncate">{f.name}</span>
-                              <span className="text-xs text-gray-500 shrink-0">{(f.size / 1024 / 1024).toFixed(2)} MB</span>
-                            </div>
-                            <button 
-                              onClick={() => removeFile(i)}
-                              className="text-gray-500 hover:text-red-400 p-1 rounded-lg hover:bg-black/40 transition-colors"
-                            >
-                              &times;
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                      
-                      <div className="mt-auto flex justify-end gap-3 pt-6 border-t border-white/10">
-                        <button 
-                          onClick={resetState}
-                          className="px-6 py-2.5 rounded-xl border border-border text-gray-300 hover:bg-white/5 font-medium transition-colors"
-                        >
-                          Cancel
-                        </button>
-                        <button 
-                          onClick={processFiles}
-                          className="px-8 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-white font-medium transition-colors flex items-center gap-2"
-                        >
-                          Process {files.length > 1 ? 'Files' : 'File'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+              <input ref={fileInputRef} type="file" accept=".pdf,application/pdf" multiple={activeTool.multiple} onChange={handleFileChange} className="hidden" />
 
-              {status === 'processing' && (
-                <div className="flex-1 flex flex-col items-center justify-center py-12">
-                  <div className="relative w-24 h-24 mb-8">
-                    <svg className="animate-spin w-full h-full text-white/10" viewBox="0 0 24 24">
-                       <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none" />
-                    </svg>
-                    <svg className="animate-spin w-full h-full text-primary absolute left-0 top-0" style={{ animationDirection: 'reverse', animationDuration: '3s' }} viewBox="0 0 24 24">
-                       <circle strokeDasharray="30 100" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-sm font-bold text-white">{Math.floor(progress)}%</span>
-                    </div>
+              {!result && !processing ? (
+                <div className="mt-6 space-y-6">
+                  <div onDragOver={(event) => { event.preventDefault(); setIsDragging(true); }} onDragLeave={(event) => { event.preventDefault(); setIsDragging(false); }} onDrop={(event) => { event.preventDefault(); setIsDragging(false); addFiles(Array.from(event.dataTransfer.files)); }} className={`rounded-2xl border-2 border-dashed p-8 text-center transition ${isDragging ? 'border-primary bg-primary/5' : 'border-white/10 bg-black/20'}`}>
+                    <UploadCloud className="mx-auto h-12 w-12 text-gray-500" />
+                    <p className="mt-3 font-medium text-white">Drop {activeTool.multiple ? 'PDF files' : 'a PDF file'} here</p>
+                    <p className="mt-1 text-sm text-gray-500">or choose files from this device</p>
+                    <button onClick={() => fileInputRef.current?.click()} className="mt-4 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-gray-200 hover:border-primary/40">Choose PDF{activeTool.multiple ? 's' : ''}</button>
                   </div>
-                  <h3 className="text-xl font-medium text-white mb-2">Processing Document...</h3>
-                  <p className="text-gray-400">Please wait while we magically transform your {files.length > 1 ? 'files' : 'file'}.</p>
-                  
-                  <div className="w-full max-w-md bg-black/40 h-2 rounded-full mt-8 overflow-hidden border border-white/5">
-                    <div 
-                      className="bg-primary h-full rounded-full transition-all duration-75 relative overflow-hidden" 
-                      style={{ width: `${progress}%` }}
-                    >
-                       <div className="absolute top-0 bottom-0 left-0 right-0 bg-white/20 animate-pulse"></div>
-                    </div>
-                  </div>
-                </div>
-              )}
 
-              {status === 'done' && (
-                <div className="flex-1 flex flex-col items-center justify-center py-12 animate-in zoom-in duration-500">
-                  <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mb-6">
-                    <CheckCircle className="w-10 h-10 text-green-400" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-white mb-2">Task Complete!</h3>
-                  <p className="text-gray-400 mb-8 max-w-sm text-center">
-                    Your {files.length > 1 ? 'files have' : 'file has'} been successfully processed by KFive AI.
-                  </p>
-                  
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    <button 
-                      onClick={triggerDownload}
-                      className="px-8 py-3 rounded-xl bg-primary hover:bg-primary/90 text-white font-medium transition-colors flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(37,99,235,0.3)]"
-                    >
-                      <Download className="w-5 h-5" />
-                      Download Result
-                    </button>
-                    <button 
-                      onClick={resetState}
-                      className="px-8 py-3 rounded-xl border border-border text-gray-300 hover:bg-white/5 font-medium transition-colors"
-                    >
-                      Start Over
-                    </button>
-                  </div>
+                  {files.length ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between"><h2 className="font-semibold text-white">Selected files ({files.length}{activeTool.multiple ? '/10' : ''})</h2>{activeTool.multiple && files.length < 10 ? <button onClick={() => fileInputRef.current?.click()} className="text-sm text-primary hover:text-white">Add PDFs</button> : null}</div>
+                      {files.map((file, index) => (
+                        <div key={`${file.name}-${file.lastModified}-${index}`} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 p-3">
+                          <FileIcon className="h-5 w-5 shrink-0 text-gray-500" />
+                          <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-white">{file.name}</p><p className="text-xs text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p></div>
+                          {activeTool.multiple ? <div className="flex gap-1"><button onClick={() => moveFile(index, -1)} disabled={index === 0} aria-label={`Move ${file.name} up`} className="rounded p-1.5 text-gray-400 hover:bg-white/5 hover:text-white disabled:opacity-25"><ArrowUp className="h-4 w-4" /></button><button onClick={() => moveFile(index, 1)} disabled={index === files.length - 1} aria-label={`Move ${file.name} down`} className="rounded p-1.5 text-gray-400 hover:bg-white/5 hover:text-white disabled:opacity-25"><ArrowDown className="h-4 w-4" /></button></div> : null}
+                          <button onClick={() => removeFile(index)} aria-label={`Remove ${file.name}`} className="rounded p-1.5 text-gray-500 hover:bg-red-500/10 hover:text-red-300"><Trash2 className="h-4 w-4" /></button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {activeTool.id !== 'merge' && files.length === 1 ? (
+                    <div className="grid gap-4 rounded-xl border border-white/10 bg-black/20 p-4 sm:grid-cols-2">
+                      <label className="text-sm font-medium text-gray-300">Pages<input value={pageSelection} onChange={(event) => { setPageSelection(event.target.value); setError(undefined); }} placeholder="all or 1-3,5" className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-primary/50" /><span className="mt-1 block text-xs font-normal text-gray-500">Use all or a list such as 1-3,5.</span></label>
+                      {activeTool.id === 'rotate' ? <label className="text-sm font-medium text-gray-300">Rotation<select value={rotationAngle} onChange={(event) => setRotationAngle(Number(event.target.value) as RotationAngle)} className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-primary/50"><option value={90}>90° clockwise</option><option value={180}>180°</option><option value={270}>270° clockwise</option></select></label> : <div className="text-sm text-gray-500 sm:pt-7">The selected pages are copied into one new PDF in the specified order.</div>}
+                    </div>
+                  ) : null}
+
+                  {error ? <div role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">{error}</div> : null}
+                  <div className="flex justify-end gap-3 border-t border-white/10 pt-5"><button onClick={resetState} disabled={!files.length} className="rounded-xl border border-white/10 px-5 py-2.5 text-sm font-medium text-gray-300 disabled:opacity-40">Reset</button><button onClick={() => void processFiles()} disabled={!canProcess} className="rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40">{activeTool.name}</button></div>
                 </div>
-              )}
-            </div>
+              ) : null}
+
+              {processing ? <div className="flex min-h-80 flex-col items-center justify-center text-center"><Loader2 className="h-12 w-12 animate-spin text-primary" /><h2 className="mt-5 text-xl font-semibold text-white">Processing locally…</h2><p className="mt-2 max-w-md text-sm text-gray-400">Keep this tab open while the browser reads and writes the PDF. No percentage is available.</p></div> : null}
+              {result ? <div className="flex min-h-80 flex-col items-center justify-center text-center"><div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10"><CheckCircle className="h-8 w-8 text-emerald-400" /></div><h2 className="mt-5 text-2xl font-bold text-white">PDF ready</h2><p className="mt-2 text-gray-400">The result contains {result.pageCount} {result.pageCount === 1 ? 'page' : 'pages'} and has not been saved to Documents or Projects.</p><div className="mt-7 flex flex-wrap justify-center gap-3"><a href={result.url} download={result.filename} className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 font-medium text-white"><Download className="h-5 w-5" />Download {result.filename}</a><button onClick={resetState} className="rounded-xl border border-white/10 px-6 py-3 font-medium text-gray-300 hover:text-white">Start over</button></div></div> : null}
+            </section>
           </motion.div>
         )}
       </AnimatePresence>

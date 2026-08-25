@@ -1,6 +1,8 @@
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { logger } from '@/utils/logger';
+import { Conversation } from '@/models/Conversation';
+import { isValidObjectId } from 'mongoose';
 
 export function setupSocketHandlers(io: Server): void {
   // Authentication middleware
@@ -12,7 +14,14 @@ export function setupSocketHandlers(io: Server): void {
         return next(new Error('Authentication error: No token provided'));
       }
 
-      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
+      const decoded = jwt.verify(token, process.env.JWT_SECRET!, {
+        algorithms: ['HS256'],
+        issuer: 'kfive-ai',
+        audience: 'kfive-web',
+      });
+      if (typeof decoded === 'string' || typeof decoded.userId !== 'string' || typeof decoded.email !== 'string') {
+        return next(new Error('Authentication error: Invalid token payload'));
+      }
       socket.data.userId = decoded.userId;
       socket.data.email = decoded.email;
       
@@ -31,8 +40,17 @@ export function setupSocketHandlers(io: Server): void {
     socket.join(`user:${userId}`);
 
     // Handle chat events
-    socket.on('chat:join', (conversationId: string) => {
-      socket.join(`conversation:${conversationId}`);
+    socket.on('chat:join', async (conversationId: string) => {
+      if (!isValidObjectId(conversationId)) {
+        socket.emit('chat:error', { message: 'Conversation not found' });
+        return;
+      }
+      const ownsConversation = await Conversation.exists({ _id: conversationId, userId });
+      if (!ownsConversation) {
+        socket.emit('chat:error', { message: 'Conversation not found' });
+        return;
+      }
+      await socket.join(`conversation:${conversationId}`);
       logger.debug(`User ${userId} joined conversation ${conversationId}`);
     });
 
@@ -41,7 +59,16 @@ export function setupSocketHandlers(io: Server): void {
       logger.debug(`User ${userId} left conversation ${conversationId}`);
     });
 
-    socket.on('chat:typing', (data: { conversationId: string; isTyping: boolean }) => {
+    socket.on('chat:typing', async (data: { conversationId: string; isTyping: boolean }) => {
+      if (!isValidObjectId(data.conversationId)) {
+        socket.emit('chat:error', { message: 'Conversation not found' });
+        return;
+      }
+      const ownsConversation = await Conversation.exists({ _id: data.conversationId, userId });
+      if (!ownsConversation) {
+        socket.emit('chat:error', { message: 'Conversation not found' });
+        return;
+      }
       socket.to(`conversation:${data.conversationId}`).emit('chat:user-typing', {
         userId,
         isTyping: data.isTyping
@@ -65,9 +92,8 @@ export function setupSocketHandlers(io: Server): void {
     });
 
     // Handle workspace events
-    socket.on('workspace:join', (workspaceId: string) => {
-      socket.join(`workspace:${workspaceId}`);
-      logger.debug(`User ${userId} joined workspace ${workspaceId}`);
+    socket.on('workspace:join', () => {
+      socket.emit('workspace:error', { message: 'Workspace rooms are unavailable until project authorization is implemented' });
     });
 
     socket.on('workspace:leave', (workspaceId: string) => {
@@ -76,7 +102,16 @@ export function setupSocketHandlers(io: Server): void {
     });
 
     // Handle agent events
-    socket.on('agent:thinking', (data: { conversationId: string; agentId: string }) => {
+    socket.on('agent:thinking', async (data: { conversationId: string; agentId: string }) => {
+      if (!isValidObjectId(data.conversationId)) {
+        socket.emit('chat:error', { message: 'Conversation not found' });
+        return;
+      }
+      const ownsConversation = await Conversation.exists({ _id: data.conversationId, userId });
+      if (!ownsConversation) {
+        socket.emit('chat:error', { message: 'Conversation not found' });
+        return;
+      }
       socket.to(`conversation:${data.conversationId}`).emit('agent:status', {
         agentId: data.agentId,
         status: 'thinking'

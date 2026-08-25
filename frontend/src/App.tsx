@@ -1,23 +1,27 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
 
-// Pages
-import LandingPage from '@/pages/LandingPage';
-import LoginPage from '@/pages/auth/LoginPage';
-import RegisterPage from '@/pages/auth/RegisterPage';
-import DashboardPage from '@/pages/DashboardPage';
-import WorkspacePage from '@/pages/WorkspacePage';
-import ChatPage from '@/pages/ChatPage';
-import AgentsPage from '@/pages/AgentsPage';
-import DocumentsPage from '@/pages/DocumentsPage';
-import CodeStudioPage from '@/pages/CodeStudioPage';
-import VoiceAssistantPage from '@/pages/VoiceAssistantPage';
-import SettingsPage from '@/pages/SettingsPage';
-import ProfilePage from '@/pages/ProfilePage';
-import NotFoundPage from '@/pages/NotFoundPage';
-import FileActionsPage from '@/pages/FileActionsPage';
-import ResumeActionsPage from '@/pages/ResumeActionsPage';
+const LandingPage = lazy(() => import('@/pages/LandingPage'));
+const LoginPage = lazy(() => import('@/pages/auth/LoginPage'));
+const RegisterPage = lazy(() => import('@/pages/auth/RegisterPage'));
+const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
+const WorkspacePage = lazy(() => import('@/pages/WorkspacePage'));
+const ChatPage = lazy(() => import('@/pages/ChatPage'));
+const AgentsPage = lazy(() => import('@/pages/AgentsPage'));
+const DocumentsPage = lazy(() => import('@/pages/DocumentsPage'));
+const VoiceAssistantPage = lazy(() => import('@/pages/VoiceAssistantPage'));
+const SettingsPage = lazy(() => import('@/pages/SettingsPage'));
+const ModelsPage = lazy(() => import('@/pages/ModelsPage'));
+const ProjectsPage = lazy(() => import('@/pages/ProjectsPage'));
+const ProfilePage = lazy(() => import('@/pages/ProfilePage'));
+const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
+const FileActionsPage = lazy(() => import('@/pages/FileActionsPage'));
+const CodeLabPage = lazy(() => import('@/pages/CodeLabPage'));
+const KnowledgePage = lazy(() => import('@/pages/KnowledgePage'));
+const RepositoryAnalyzerPage = lazy(() => import('@/pages/RepositoryAnalyzerPage'));
+const WorkflowsPage = lazy(() => import('@/pages/WorkflowsPage'));
 
 // Components
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
@@ -39,8 +43,9 @@ function App() {
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
-        <AnimatePresence mode="wait">
-          <Routes location={location} key={location.pathname}>
+        <Suspense fallback={<LoadingScreen />}>
+          <AnimatePresence mode="wait">
+            <Routes location={location} key={location.pathname}>
             {/* Public Routes */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
@@ -61,12 +66,16 @@ function App() {
                         <Route path="chat/:conversationId" element={<ChatPage />} />
                         <Route path="agents" element={<AgentsPage />} />
                         <Route path="documents" element={<DocumentsPage />} />
-                        <Route path="code-studio" element={<CodeStudioPage />} />
                         <Route path="voice" element={<VoiceAssistantPage />} />
                         <Route path="settings" element={<SettingsPage />} />
+                        <Route path="models" element={<ModelsPage />} />
+                        <Route path="projects" element={<ProjectsPage />} />
                         <Route path="profile" element={<ProfilePage />} />
                         <Route path="files" element={<FileActionsPage />} />
-                        <Route path="resume" element={<ResumeActionsPage />} />
+                        <Route path="code" element={<CodeLabPage />} />
+                        <Route path="knowledge" element={<KnowledgePage />} />
+                        <Route path="repositories" element={<RepositoryAnalyzerPage />} />
+                        <Route path="workflows" element={<WorkflowsPage />} />
                         <Route path="*" element={<Navigate to="/not-found" replace />} />
                       </Routes>
                     </AnimatePresence>
@@ -78,8 +87,9 @@ function App() {
             {/* Catch all route - map to 404 Instead of Redirecting */}
             <Route path="/not-found" element={<NotFoundPage />} />
             <Route path="*" element={<Navigate to="/not-found" replace />} />
-          </Routes>
-        </AnimatePresence>
+            </Routes>
+          </AnimatePresence>
+        </Suspense>
       </div>
     </ErrorBoundary>
   );

@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { AppError } from './errorHandler';
 
-interface AuthenticatedRequest extends Request {
+export interface AuthenticatedRequest extends Request {
   user?: {
     userId: string;
     email: string;
@@ -19,8 +19,17 @@ export function authenticateToken(req: AuthenticatedRequest, res: Response, next
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
-    req.user = decoded;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!, {
+      algorithms: ['HS256'],
+      issuer: 'kfive-ai',
+      audience: 'kfive-web',
+    });
+
+    if (typeof decoded === 'string' || typeof decoded.userId !== 'string' || typeof decoded.email !== 'string' || typeof decoded.role !== 'string') {
+      throw new jwt.JsonWebTokenError('Invalid token payload');
+    }
+
+    req.user = { userId: decoded.userId, email: decoded.email, role: decoded.role };
     next();
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
@@ -31,6 +40,12 @@ export function authenticateToken(req: AuthenticatedRequest, res: Response, next
       throw new AppError('Authentication failed', 401);
     }
   }
+}
+
+export function getAuthenticatedUserId(req: Request): string {
+  const userId = (req as AuthenticatedRequest).user?.userId;
+  if (!userId) throw new AppError('Authentication required', 401);
+  return userId;
 }
 
 export function requireRole(roles: string[]) {

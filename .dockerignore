@@ -1,0 +1,12 @@
+.git
+.env
+**/.env
+**/node_modules
+**/dist
+**/coverage
+**/logs
+**/uploads
+frontend/build_errors*.txt
+*.log
+.agents
+.codex

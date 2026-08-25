@@ -70,11 +70,8 @@ main() {
     echo
     
     # Core models for KFive AI
-    pull_model "llama3" "Main conversational AI model"
-    pull_model "deepseek-coder" "Code generation and analysis"
-    pull_model "llava" "Vision and image understanding"
-    pull_model "nomic-embed-text" "Text embeddings for RAG"
-    pull_model "whisper" "Speech-to-text processing"
+    pull_model "phi3" "Conservative local chat model"
+    pull_model "nomic-embed-text" "Text embeddings for future RAG support"
     
     echo
     print_status "Verifying model installation..."
@@ -88,11 +85,8 @@ main() {
     print_success "🎉 All KFive AI models are ready!"
     echo
     echo "📋 Model Usage:"
-    echo "  • llama3: Main chat and reasoning"
-    echo "  • deepseek-coder: Code generation and debugging"
-    echo "  • llava: Image analysis and vision tasks"
+    echo "  • phi3: Local chat"
     echo "  • nomic-embed-text: Document embeddings"
-    echo "  • whisper: Voice-to-text conversion"
     echo
     echo "🚀 You can now start KFive AI:"
     echo "  npm run dev"

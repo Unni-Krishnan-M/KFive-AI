@@ -1,36 +1,24 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-echo "🧪 Testing KFive AI Authentication System"
-echo "=========================================="
+api_base_url=${API_BASE_URL:-http://127.0.0.1:5000/api/v1}
+test_suffix=$(date +%s)
+email="kfive-smoke-${test_suffix}@example.invalid"
+username="kfive_smoke_${test_suffix}"
+password=${KFIVE_TEST_PASSWORD:-KFive-Smoke-Test-Password-42}
 
-# Test login endpoint
-echo "📝 Testing login..."
-LOGIN_RESPONSE=$(curl -s -X POST http://localhost:3001/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","password":"password123"}')
+curl --fail --silent --show-error "${api_base_url}/health" >/dev/null
 
-echo "Login Response:"
-echo $LOGIN_RESPONSE | jq '.' 2>/dev/null || echo $LOGIN_RESPONSE
+register_response=$(curl --fail --silent --show-error \
+  --request POST "${api_base_url}/auth/register" \
+  --header 'Content-Type: application/json' \
+  --data "{\"email\":\"${email}\",\"username\":\"${username}\",\"password\":\"${password}\"}")
 
-echo ""
+login_response=$(curl --fail --silent --show-error \
+  --request POST "${api_base_url}/auth/login" \
+  --header 'Content-Type: application/json' \
+  --data "{\"email\":\"${email}\",\"password\":\"${password}\"}")
 
-# Test registration endpoint
-echo "📝 Testing registration..."
-REGISTER_RESPONSE=$(curl -s -X POST http://localhost:3001/api/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"newuser@example.com","username":"newuser","password":"password123","firstName":"New","lastName":"User"}')
-
-echo "Register Response:"
-echo $REGISTER_RESPONSE | jq '.' 2>/dev/null || echo $REGISTER_RESPONSE
-
-echo ""
-
-# Test health endpoint
-echo "📝 Testing health endpoint..."
-HEALTH_RESPONSE=$(curl -s http://localhost:3001/api/v1/health)
-
-echo "Health Response:"
-echo $HEALTH_RESPONSE | jq '.' 2>/dev/null || echo $HEALTH_RESPONSE
-
-echo ""
-echo "✅ Authentication tests completed!"
+node -e "const r=JSON.parse(process.argv[1]); if(!r.success || !r.data?.accessToken) process.exit(1)" "$register_response"
+node -e "const r=JSON.parse(process.argv[1]); if(!r.success || !r.data?.accessToken) process.exit(1)" "$login_response"
+echo "Authentication smoke test passed for a newly created test user."

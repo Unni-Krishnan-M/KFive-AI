@@ -1,13 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Bot, User, Send, StopCircle, Check, Copy, RefreshCw, MessageSquare, Plus, Brain, AlertCircle, FileText, Mic, X } from 'lucide-react';
-import { chatApi } from '@/services/api';
+import { Bot, User, Send, StopCircle, Check, Copy, RefreshCw, MessageSquare, Plus, Brain, AlertCircle, FolderKanban, Mic, X } from 'lucide-react';
+import { chatApi, modelApi } from '@/services/api';
 import toast from 'react-hot-toast';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { getToken } from '@/utils/getToken';
+import { apiUrl } from '@/config/runtime';
+import { readSseResponse } from '@/utils/sse';
+import { ModelInfo, normalizeModelCatalog } from '@/services/modelManager';
+import { readableApiError, unwrapApiData } from '@/services/runtimeSettings';
+import { PROJECT_ARCHIVED_MESSAGE, projectContextPath, projectNavigationState } from '@/services/projectContext';
+import { useProjectContext } from '@/hooks/useProjectContext';
 
 const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
@@ -25,20 +31,29 @@ interface Conversation {
   title: string;
   updatedAt: string;
   messages?: Message[];
+  projectId?: string;
 }
 
 export default function ChatPage() {
   const { conversationId } = useParams<{ conversationId: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
-  const linkedDocumentId = location.state?.documentId;
+  const { requested: projectRequested, context: projectContext, loading: projectLoading, error: projectError } = useProjectContext();
+  const projectId = projectContext?.projectId;
+  const projectScopeReady = !projectRequested || Boolean(projectContext);
+  const projectMutationsAllowed = projectScopeReady && projectContext?.status !== 'archived';
   
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedModel, setSelectedModel] = useState(localStorage.getItem('kfive-default-model') || 'llama3');
+  const [selectedModel, setSelectedModel] = useState(localStorage.getItem('kfive-default-model') || '');
+  const [modelOptions, setModelOptions] = useState<ModelInfo[]>([]);
+  const [selectedProvider, setSelectedProvider] = useState('provider');
+  const [taskType, setTaskType] = useState('general-chat');
+  const [smartRouting, setSmartRouting] = useState(true);
+  const [lastSelection, setLastSelection] = useState<{ provider: string; model: string; reasons?: string[] }>();
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [pageError, setPageError] = useState<string>();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -46,8 +61,6 @@ export default function ChatPage() {
 
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [attachedFile, setAttachedFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (SpeechRecognitionAPI && !recognitionRef.current) {
@@ -88,6 +101,18 @@ export default function ChatPage() {
     };
   }, []);
 
+  useEffect(() => {
+    modelApi.getCatalog().then((response) => {
+      const catalog = normalizeModelCatalog(response.data);
+      setModelOptions(catalog.models);
+      setSelectedProvider(catalog.provider);
+      setSelectedModel((current) => catalog.models.some((model) => model.id === current) ? current : '');
+    }).catch(() => {
+      setModelOptions([]);
+      setSelectedProvider('provider');
+    });
+  }, []);
+
   const toggleListening = () => {
     if (!SpeechRecognitionAPI) {
       toast.error('Browser does not support Speech Recognition.');
@@ -105,33 +130,43 @@ export default function ChatPage() {
   };
 
   useEffect(() => {
+    if (!projectScopeReady) {
+      setConversations([]);
+      return;
+    }
     fetchConversations();
-  }, [conversationId]);
+  }, [conversationId, projectId, projectScopeReady]);
 
   useEffect(() => {
-    if (conversationId) {
+    if (conversationId && projectScopeReady) {
       loadConversationContext(conversationId);
     } else {
       setMessages([]);
     }
-  }, [conversationId]);
+  }, [conversationId, projectId, projectScopeReady]);
 
   const fetchConversations = async () => {
     try {
-      const res = await chatApi.getConversations(1, 20);
-      if (res.data?.data?.conversations) {
-        setConversations(res.data.data.conversations);
+      const res = await chatApi.getConversations(1, 20, projectId);
+      if (Array.isArray(res.data?.data)) {
+        setConversations(res.data.data);
       }
-    } catch(e) {}
+    } catch(error) { setPageError(readableApiError(error, 'Conversations could not be loaded.')); }
   };
 
   const loadConversationContext = async (id: string) => {
     try {
       const res = await chatApi.getConversation(id);
-      if (res.data?.data?.messages) {
-        setMessages(res.data.data.messages);
+      const conversation = res.data?.data as Conversation | undefined;
+      if (projectId && String(conversation?.projectId || '') !== projectId) {
+        setMessages([]);
+        setPageError('This conversation does not belong to the selected project. Project-scoped actions are disabled.');
+        return;
       }
-    } catch {}
+      if (conversation?.messages) {
+        setMessages(conversation.messages);
+      }
+    } catch(error) { setPageError(readableApiError(error, 'Conversation could not be loaded.')); }
   };
 
   // Scroll to bottom
@@ -171,15 +206,21 @@ export default function ChatPage() {
 
   const sendPayload = async (text: string) => {
     if (!text.trim() || isLoading) return;
+    if (!projectMutationsAllowed) {
+      const message = projectError || PROJECT_ARCHIVED_MESSAGE;
+      setPageError(message);
+      toast.error(message);
+      return;
+    }
     
     // Stop any ongoing stream just in case
     stopGeneration();
     abortControllerRef.current = new AbortController();
+    setPageError(undefined);
 
     const userMessage: Message = { id: Date.now().toString(), role: 'user', content: text };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
-    setAttachedFile(null);
     setIsLoading(true);
     
     if (textareaRef.current) {
@@ -191,20 +232,35 @@ export default function ChatPage() {
     try {
       if (!activeConversationId) {
         const title = text.slice(0, 30) + (text.length > 30 ? '...' : '');
-        const res = await chatApi.createConversation({ title });
+        const res = await chatApi.createConversation({ title, ...(projectId ? { projectId } : {}) });
         activeConversationId = res.data?.data?._id;
-        navigate(`/app/chat/${activeConversationId}`, { replace: true });
+        if (!activeConversationId) throw new Error('The conversation could not be created.');
+        if (projectContext) {
+          navigate(projectContextPath(`/app/chat/${activeConversationId}`, projectContext), {
+            replace: true,
+            state: projectNavigationState(projectContext),
+          });
+        } else {
+          navigate(`/app/chat/${activeConversationId}`, { replace: true });
+        }
         // Update history
         fetchConversations();
       }
 
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
       const token = getToken();
+      let requestModel = selectedModel || undefined;
+      if (smartRouting) {
+        const routingResponse = await modelApi.routeModel(taskType, requestModel);
+        const decision = unwrapApiData(routingResponse.data) as { provider: string; model: string; reasons?: string[] };
+        if (!decision?.provider || !decision?.model) throw new Error('The model router returned an invalid decision.');
+        requestModel = decision.model;
+        setLastSelection(decision);
+      }
 
       const aiMsgId = Date.now().toString() + 'ai';
       setMessages(prev => [...prev, { id: aiMsgId, role: 'assistant', content: '' }]);
 
-      const response = await fetch(`${API_URL}/api/v1/chat/conversations/${activeConversationId}/stream`, {
+      const response = await fetch(apiUrl(`/chat/conversations/${activeConversationId}/stream`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -212,39 +268,26 @@ export default function ChatPage() {
         },
         body: JSON.stringify({ 
           message: text, 
-          model: selectedModel,
-          documentId: linkedDocumentId 
+          model: requestModel,
+          projectId,
         }),
         signal: abortControllerRef.current.signal
       });
 
-      if (!response.ok) throw new Error('API request failed');
-
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n');
-          
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const dataStr = line.replace('data: ', '').trim();
-              if (dataStr === '[DONE]') break;
-              try {
-                const data = JSON.parse(dataStr);
-                if (data.content) {
-                  setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: m.content + data.content } : m));
-                }
-              } catch(e) {}
-            }
-          }
-        }
+      if (!response.ok) {
+        const payload = await response.json().catch(() => undefined);
+        throw new Error(readableApiError({ response: { data: payload } }, `Chat request failed with HTTP ${response.status}.`));
       }
+
+      await readSseResponse(response, (dataString) => {
+        if (dataString === '[DONE]') return;
+        const data = JSON.parse(dataString);
+        if (data.error) throw new Error(data.error);
+        if (data.provider && data.model) setLastSelection({ provider: data.provider, model: data.model });
+        if (data.content) {
+          setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: m.content + data.content } : m));
+        }
+      });
     } catch (error: any) {
       if (error.name !== 'AbortError') {
         const errorMsgId = Date.now().toString() + 'err';
@@ -256,7 +299,9 @@ export default function ChatPage() {
           }
           return [...prev, { id: errorMsgId, role: 'assistant', content: 'Sorry, I encountered an error. Please try again.', isStreamingError: true }];
         });
-        toast.error('Failed to get response');
+        const message = readableApiError(error, 'Failed to get response.');
+        setPageError(message);
+        toast.error(message);
       }
     } finally {
       setIsLoading(false);
@@ -283,8 +328,11 @@ export default function ChatPage() {
       <div className="hidden md:flex flex-col w-[280px] border-r border-white/10 bg-[#0a0d1a] h-full shrink-0">
         <div className="p-4 border-b border-white/10 shrink-0">
           <button 
-            onClick={() => navigate('/app/chat')}
-            className="w-full flex items-center justify-center gap-2 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl transition-all font-medium"
+            onClick={() => projectContext
+              ? navigate(projectContextPath('/app/chat', projectContext), { state: projectNavigationState(projectContext) })
+              : navigate('/app/chat')}
+            disabled={!projectMutationsAllowed || projectLoading}
+            className="w-full flex items-center justify-center gap-2 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl transition-all font-medium disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Plus size={18} /> New Chat
           </button>
@@ -296,7 +344,9 @@ export default function ChatPage() {
             return (
               <div 
                 key={conv._id || conv.id} 
-                onClick={() => navigate(`/app/chat/${conv._id || conv.id}`)}
+                onClick={() => projectContext
+                  ? navigate(projectContextPath(`/app/chat/${conv._id || conv.id}`, projectContext), { state: projectNavigationState(projectContext) })
+                  : navigate(`/app/chat/${conv._id || conv.id}`)}
                 className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors group ${isActive ? 'bg-primary/20 text-white border border-primary/20' : 'text-gray-400 hover:bg-white/5 hover:text-white border border-transparent'}`}
               >
                 <MessageSquare size={16} className={isActive ? 'text-primary' : 'text-gray-500 group-hover:text-gray-300'} />
@@ -315,21 +365,27 @@ export default function ChatPage() {
         <div className="h-16 border-b border-white/10 flex items-center justify-between px-6 bg-[#09090B]/95 backdrop-blur-xl shrink-0 z-10">
           <div className="flex flex-col items-start min-w-0 pr-4">
              <div className="font-semibold text-white truncate w-full text-lg">{activeTitle || 'New Conversation'}</div>
-             {linkedDocumentId && <div className="text-xs text-primary font-medium flex items-center gap-1"><FileText size={10}/> Analyzing Document</div>}
+             <div className="flex flex-wrap items-center gap-2 text-xs font-medium">{projectLoading ? <span className="text-gray-500">Verifying project…</span> : projectContext ? <span className="flex items-center gap-1 text-primary"><FolderKanban size={11} />{projectContext.projectName} <span className="capitalize text-gray-500">({projectContext.status})</span><button onClick={() => navigate('/app/chat', { replace: true, state: null })} className="ml-1 text-gray-500 hover:text-white" aria-label="Leave project context"><X size={11} /></button></span> : <span className="text-gray-500">No project context</span>}</div>
           </div>
-          <div className="flex items-center">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <label className="flex items-center gap-1.5 text-xs text-gray-500"><span>Model routing task</span><select value={taskType} onChange={(event) => setTaskType(event.target.value)} disabled={!smartRouting} aria-label="Model routing task" className="bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-gray-300 disabled:opacity-50">
+              <option value="general-chat">General chat</option><option value="coding">Coding</option><option value="reasoning">Reasoning</option><option value="document-analysis">Document</option><option value="repository-analysis">Repository</option><option value="structured-extraction">Extraction</option><option value="workflow">Workflow</option>
+            </select></label>
             <select 
               value={selectedModel}
               onChange={handleModelChange}
               className="bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-gray-300 font-medium focus:outline-none focus:ring-1 focus:ring-primary appearance-none cursor-pointer hover:bg-white/5 transition-colors"
             >
-              <option value="llama3">Llama 3 (8B)</option>
-              <option value="mistral">Mistral (7B)</option>
-              <option value="deepseek-coder">DeepSeek Coder</option>
-              <option value="phi3">Phi-3 Mini</option>
+              <option value="">{selectedProvider} default</option>
+              {modelOptions.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
             </select>
+            <label className="flex items-center gap-1.5 text-xs text-gray-400"><input type="checkbox" checked={smartRouting} onChange={(event) => setSmartRouting(event.target.checked)} />Smart route</label>
           </div>
         </div>
+        {projectError ? <div role="alert" className="border-b border-red-500/20 bg-red-500/10 px-6 py-2 text-xs text-red-200">{projectError} Project-scoped actions are disabled.</div> : null}
+        {projectContext?.status === 'archived' ? <div role="alert" className="border-b border-amber-500/20 bg-amber-500/10 px-6 py-2 text-xs text-amber-200">{PROJECT_ARCHIVED_MESSAGE}</div> : null}
+        {pageError ? <div role="alert" className="border-b border-amber-500/20 bg-amber-500/10 px-6 py-2 text-xs text-amber-200">{pageError}</div> : null}
+        {lastSelection ? <div className="border-b border-white/10 bg-primary/5 px-6 py-2 text-xs text-gray-400">Selected <span className="font-medium text-primary">{lastSelection.provider} / {lastSelection.model}</span>{lastSelection.reasons?.length ? ` — ${lastSelection.reasons.join(' ')}` : ''}</div> : null}
 
         {/* Message Thread */}
         <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 px-4 md:px-8 py-6">
@@ -352,6 +408,7 @@ export default function ChatPage() {
                   <button 
                     key={i} 
                     onClick={() => handleSuggestion(prompt)}
+                    disabled={!projectMutationsAllowed}
                     className="p-4 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 rounded-2xl text-sm text-left transition-all group"
                   >
                     <span className="text-gray-300 group-hover:text-white line-clamp-2">{prompt}</span>
@@ -396,7 +453,7 @@ export default function ChatPage() {
                             ) : (
                               <ReactMarkdown
                                 components={{
-                                  code({node, inline, className, children, ...props}: any) {
+                                  code({node: _node, inline, className, children, ...props}: any) {
                                     const match = /language-(\w+)/.exec(className || '')
                                     return !inline && match ? (
                                       <div className="relative mt-4 mb-4 rounded-lg overflow-hidden group/code border border-white/10">
@@ -456,6 +513,7 @@ export default function ChatPage() {
                                  const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
                                  if (lastUserMsg) sendPayload(lastUserMsg.content);
                                }}
+                               disabled={!projectMutationsAllowed}
                                className="p-1.5 text-gray-500 hover:text-white rounded bg-white/5 hover:bg-white/10 transition-colors"
                                title="Regenerate response"
                              >
@@ -479,36 +537,7 @@ export default function ChatPage() {
             <div className="absolute inset-0 bg-gradient-to-r from-primary/30 to-cyan-500/30 rounded-2xl blur-md opacity-20 group-focus-within:opacity-50 transition-opacity pointer-events-none"></div>
             <div className="relative bg-[#0f121d] border border-white/10 rounded-2xl flex flex-col p-2 pb-0 sm:pb-2 focus-within:border-primary/50 transition-colors shadow-2xl">
                
-               {attachedFile && (
-                 <div className="px-3 pt-2 pb-1 flex items-center">
-                   <div className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 flex items-center gap-2 text-sm text-gray-300">
-                     <FileText size={14} className="text-cyan-400" />
-                     <span className="truncate max-w-[200px]">{attachedFile.name}</span>
-                     <button onClick={() => setAttachedFile(null)} className="text-gray-500 hover:text-red-400 transition-colors ml-1">
-                       <X size={14} />
-                     </button>
-                   </div>
-                 </div>
-               )}
-
                <div className="flex items-end flex-1">
-                 <input 
-                   type="file" 
-                   ref={fileInputRef} 
-                   className="hidden" 
-                   onChange={(e) => setAttachedFile(e.target.files?.[0] || null)} 
-                   accept=".pdf,.doc,.docx,.txt,.csv"
-                 />
-                 <div className="p-2 shrink-0 self-end mb-1">
-                   <button 
-                     onClick={() => fileInputRef.current?.click()}
-                     className="p-3 rounded-xl bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 transition-colors border border-transparent"
-                     title="Attach document"
-                   >
-                     <Plus className="w-5 h-5 opacity-80" />
-                   </button>
-                 </div>
-                 
                  <textarea
                    ref={textareaRef}
                    value={input}
@@ -517,7 +546,7 @@ export default function ChatPage() {
                    placeholder="Ask KFive AI anything..."
                    className="flex-1 bg-transparent text-white px-2 py-3 pb-4 resize-none max-h-48 min-h-[56px] focus:outline-none scrollbar-thin scrollbar-thumb-white/10 leading-relaxed text-[15px]"
                    style={{ height: '56px' }}
-                   disabled={isLoading}
+                   disabled={isLoading || !projectMutationsAllowed}
                  />
                
                <div className="p-2 shrink-0 self-end mb-1 flex items-center gap-2">
@@ -543,7 +572,7 @@ export default function ChatPage() {
                  ) : (
                     <button 
                       onClick={() => sendPayload(input)}
-                      disabled={!input.trim()}
+                     disabled={!input.trim() || !projectMutationsAllowed}
                       className="p-3 rounded-xl bg-gradient-to-br from-primary to-cyan-500 text-white disabled:opacity-50 transition-all hover:opacity-90 shadow-[0_0_15px_rgba(139,92,246,0.5)] disabled:shadow-none"
                     >
                       <Send className="w-5 h-5" />

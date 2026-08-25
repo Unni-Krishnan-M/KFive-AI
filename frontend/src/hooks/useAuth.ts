@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { authApi } from '@/services/api';
+import { registerAuthSessionObserver } from '@/services/authSession';
 
 interface User {
   _id: string;
@@ -90,7 +91,7 @@ export const useAuth = create<AuthState>()(
 
       logout: () => {
         // Call logout API in background
-        authApi.logout().catch(() => {
+        authApi.logout(get().refreshToken).catch(() => {
           // Ignore errors on logout
         });
         
@@ -124,14 +125,9 @@ export const useAuth = create<AuthState>()(
       },
 
       updateUser: async (userData: Partial<User>) => {
-        try {
-          // This would call the user API when implemented
-          const currentUser = get().user;
-          if (currentUser) {
-            set({ user: { ...currentUser, ...userData } });
-          }
-        } catch (error) {
-          throw error;
+        const currentUser = get().user;
+        if (currentUser) {
+          set({ user: { ...currentUser, ...userData } });
         }
       },
     }),
@@ -146,3 +142,17 @@ export const useAuth = create<AuthState>()(
     }
   )
 );
+
+registerAuthSessionObserver({
+  updateTokens: ({ accessToken, refreshToken }) => {
+    useAuth.setState({ accessToken, refreshToken });
+  },
+  clear: () => {
+    useAuth.setState({
+      user: null,
+      accessToken: null,
+      refreshToken: null,
+      isAuthenticated: false,
+    });
+  },
+});

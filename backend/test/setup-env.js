@@ -1,0 +1,9 @@
+process.env.NODE_ENV = 'test';
+process.env.KFIVE_MODE = 'local';
+process.env.AI_PROVIDER = 'ollama';
+process.env.MONGODB_URL = 'mongodb://127.0.0.1:27017/kfive_test';
+process.env.REDIS_URL = 'redis://127.0.0.1:6379';
+process.env.OLLAMA_BASE_URL = 'http://127.0.0.1:11434';
+process.env.JWT_SECRET = '01234567890123456789012345678901';
+process.env.JWT_REFRESH_SECRET = 'abcdefghijklmnopqrstuvwxyz123456';
+process.env.CORS_ORIGIN = 'http://localhost:3000';

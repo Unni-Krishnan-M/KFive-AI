@@ -96,9 +96,7 @@ export default defineConfig({
         manualChunks: {
           vendor: ['react', 'react-dom'],
           router: ['react-router-dom'],
-          ui: ['framer-motion', 'lucide-react'],
-          editor: ['@monaco-editor/react'],
-          charts: ['recharts']
+          ui: ['framer-motion', 'lucide-react']
         }
       }
     }

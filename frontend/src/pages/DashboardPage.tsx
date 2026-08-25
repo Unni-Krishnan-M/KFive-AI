@@ -8,18 +8,18 @@ import {
   Zap, 
   Clock,
   Activity,
-  ArrowUpRight,
-  ArrowDownRight,
   ChevronRight,
   Bot
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { userApi, chatApi, ollamaApi } from '@/services/api';
 import { SkeletonLoader } from '@/components/ui/SkeletonLoader';
+import { useSocket } from '@/components/providers/SocketProvider';
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { isConnected } = useSocket();
   const [loading, setLoading] = useState(true);
   const [ollamaStatus, setOllamaStatus] = useState<any>(null);
   const [recentConversations, setRecentConversations] = useState<any[]>([]);
@@ -46,11 +46,11 @@ export default function DashboardPage() {
         if (actRes.status === 'fulfilled' && actRes.value.data?.success) {
           setRecentActivity(actRes.value.data.data);
         }
-        if (chatRes.status === 'fulfilled' && chatRes.value.data?.data?.conversations) {
-          setRecentConversations(chatRes.value.data.data.conversations.slice(0, 3));
+        if (chatRes.status === 'fulfilled' && Array.isArray(chatRes.value.data?.data)) {
+          setRecentConversations(chatRes.value.data.data.slice(0, 3));
         }
-        if (healthRes.status === 'fulfilled' && healthRes.value.data) {
-          setOllamaStatus(healthRes.value.data);
+        if (healthRes.status === 'fulfilled' && healthRes.value.data?.data) {
+          setOllamaStatus(healthRes.value.data.data);
         } else {
           setOllamaStatus({ status: 'offline' });
         }
@@ -67,30 +67,20 @@ export default function DashboardPage() {
     {
       name: 'AI Conversations',
       value: usageData.conversationsCount.toString(),
-      change: 'Active',
-      changeType: usageData.conversationsCount > 0 ? 'positive' : 'neutral',
+      detail: 'Recorded for this account',
       icon: MessageSquare,
     },
     {
-      name: 'Documents Processed',
+      name: 'Documents Uploaded',
       value: usageData.documentsUploaded.toString(),
-      change: 'Active',
-      changeType: usageData.documentsUploaded > 0 ? 'positive' : 'neutral',
+      detail: 'Recorded for this account',
       icon: FileText,
     },
     {
       name: 'Tokens Used',
       value: usageData.tokensUsed.toString(),
-      change: 'Active',
-      changeType: usageData.tokensUsed > 0 ? 'positive' : 'neutral',
+      detail: 'Reported by supported providers',
       icon: Brain,
-    },
-    {
-      name: 'Response Time',
-      value: 'Live',
-      change: 'Optimized',
-      changeType: 'positive',
-      icon: Zap,
     },
   ];
 
@@ -112,8 +102,8 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, index) => (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {stats.map((stat) => (
           <div key={stat.name} className="bg-white/5 border border-white/10 p-6 rounded-2xl glass-card relative overflow-hidden group">
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
             <div className="flex items-center justify-between relative z-10">
@@ -130,17 +120,7 @@ export default function DashboardPage() {
               </div>
             </div>
             {!loading && (
-              <div className="mt-4 flex items-center relative z-10">
-                {stat.changeType === 'positive' && <ArrowUpRight className="w-4 h-4 text-green-500 mr-1" />}
-                {stat.changeType === 'negative' && <ArrowDownRight className="w-4 h-4 text-red-500 mr-1" />}
-                <span className={`text-sm font-medium ${
-                  stat.changeType === 'positive' ? 'text-green-500' : 
-                  stat.changeType === 'negative' ? 'text-red-500' : 'text-gray-500'
-                }`}>
-                  {stat.change}
-                </span>
-                <span className="text-sm text-gray-500 ml-2">from last week</span>
-              </div>
+              <p className="relative z-10 mt-4 text-sm text-gray-500">{stat.detail}</p>
             )}
           </div>
         ))}
@@ -209,7 +189,7 @@ export default function DashboardPage() {
             >
               <FileText className="w-6 h-6 text-cyan-500 mb-3 group-hover:scale-110 transition-transform" />
               <p className="font-medium text-gray-200">Upload Doc</p>
-              <p className="text-xs text-gray-400 mt-1">Process document</p>
+              <p className="text-xs text-gray-400 mt-1">Store a document</p>
             </button>
             <button 
               onClick={() => navigate('/app/agents')}
@@ -282,9 +262,9 @@ export default function DashboardPage() {
              <SkeletonLoader className="w-32 h-6" />
           ) : (
             <div className="flex items-center space-x-2 bg-black/20 px-3 py-1.5 rounded-full border border-white/5">
-              <div className={`w-2 h-2 rounded-full ${ollamaStatus?.status === 'offline' ? 'bg-red-500 animate-pulse' : 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]'}`}></div>
+              <div className={`w-2 h-2 rounded-full ${ollamaStatus?.status !== 'healthy' ? 'bg-red-500 animate-pulse' : 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]'}`}></div>
               <span className="text-xs font-medium text-gray-300">
-                {ollamaStatus?.status === 'offline' ? 'Systems Offline' : 'Systems Operational'}
+                {ollamaStatus?.status === 'healthy' ? 'AI Provider Online' : 'AI Provider Unavailable'}
               </span>
             </div>
           )}
@@ -294,28 +274,30 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-gray-300">Ollama Models</span>
               {loading ? <SkeletonLoader className="w-10 h-4" /> : (
-                <span className={`text-xs font-medium px-2 py-0.5 rounded ${ollamaStatus?.status === 'offline' ? 'bg-red-500/10 text-red-400' : 'bg-green-500/10 text-green-400'}`}>
-                  {ollamaStatus?.status === 'offline' ? 'Offline' : 'Online'}
+                <span className={`text-xs font-medium px-2 py-0.5 rounded ${ollamaStatus?.status !== 'healthy' ? 'bg-red-500/10 text-red-400' : 'bg-green-500/10 text-green-400'}`}>
+                  {ollamaStatus?.status === 'healthy' ? 'Online' : 'Offline'}
                 </span>
               )}
             </div>
             <p className="text-xs text-gray-500" title={ollamaStatus?.version}>
-              {ollamaStatus?.status === 'offline' ? 'Connection failed' : `Ollama ${ollamaStatus?.version || 'Active'}`}
+              {ollamaStatus?.status === 'healthy' ? 'Configured Ollama provider responded' : 'Ollama connection failed'}
             </p>
           </div>
           <div className="p-4 bg-black/20 border border-white/5 rounded-xl">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-gray-300">Vector Database</span>
-              <span className="text-xs font-medium px-2 py-0.5 rounded bg-green-500/10 text-green-400">Connected</span>
+              <span className="text-xs font-medium px-2 py-0.5 rounded bg-gray-500/10 text-gray-400">Not checked</span>
             </div>
-            <p className="text-xs text-gray-500">ChromaDB operational</p>
+            <p className="text-xs text-gray-500">See backend readiness for dependency status</p>
           </div>
           <div className="p-4 bg-black/20 border border-white/5 rounded-xl">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-gray-300">Real-time Sync</span>
-              <span className="text-xs font-medium px-2 py-0.5 rounded bg-green-500/10 text-green-400">Active</span>
+              <span className={`text-xs font-medium px-2 py-0.5 rounded ${isConnected ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                {isConnected ? 'Active' : 'Offline'}
+              </span>
             </div>
-            <p className="text-xs text-gray-500">WebSocket connected</p>
+            <p className="text-xs text-gray-500">{isConnected ? 'WebSocket connected' : 'WebSocket unavailable'}</p>
           </div>
         </div>
       </div>

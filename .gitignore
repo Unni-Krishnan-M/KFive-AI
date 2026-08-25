@@ -8,6 +8,9 @@ lerna-debug.log*
 
 # Environment variables
 .env
+.env.*
+!.env.example
+!**/.env.example
 .env.local
 .env.development.local
 .env.test.local
@@ -209,15 +212,12 @@ backend/logs/*
 frontend/dist/
 frontend/build/
 
-# Docker
-.dockerignore
-
 # Database
 *.sqlite
 *.db
 
-# AI Models (if stored locally)
-models/
+# AI model weights stored at the repository root (do not ignore source model code)
+/models/
 *.gguf
 *.bin
 

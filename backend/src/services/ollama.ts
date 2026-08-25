@@ -1,5 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 import { logger } from '@/utils/logger';
+import { getEnvironment } from '@/config/environment';
+import { NdjsonParser } from '@/utils/ndjson';
 
 export interface OllamaModel {
   name: string;
@@ -86,12 +88,65 @@ export interface OllamaEmbeddingResponse {
   embedding: number[];
 }
 
+function consumeOllamaStream<T extends { done: boolean }>(
+  stream: NodeJS.ReadableStream,
+  onChunk: (chunk: T) => void,
+  label: string
+): Promise<void> {
+  const parser = new NdjsonParser<T>();
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+
+    const consume = (records: T[]): void => {
+      for (const record of records) {
+        onChunk(record);
+        if (record.done) {
+          settled = true;
+          resolve();
+          return;
+        }
+      }
+    };
+
+    stream.on('data', (chunk: Buffer | string) => {
+      if (settled) return;
+      try {
+        consume(parser.push(chunk));
+      } catch {
+        settled = true;
+        reject(new Error(`${label} returned malformed streaming data`));
+      }
+    });
+
+    stream.on('error', (error: Error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    });
+
+    stream.on('end', () => {
+      if (settled) return;
+      try {
+        consume(parser.finish());
+        if (!settled) {
+          settled = true;
+          reject(new Error(`${label} stream ended before a completion record was received`));
+        }
+      } catch {
+        settled = true;
+        reject(new Error(`${label} returned malformed streaming data`));
+      }
+    });
+  });
+}
+
 class OllamaService {
   private client: AxiosInstance;
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+    this.baseUrl = getEnvironment().ollamaBaseUrl || '';
     this.client = axios.create({
       baseURL: this.baseUrl,
       timeout: parseInt(process.env.AI_TIMEOUT_MS || '30000'),
@@ -177,34 +232,7 @@ class OllamaService {
         { responseType: 'stream' }
       );
 
-      return new Promise((resolve, reject) => {
-        response.data.on('data', (chunk: Buffer) => {
-          const lines = chunk.toString().split('\n').filter(line => line.trim());
-          
-          for (const line of lines) {
-            try {
-              const data = JSON.parse(line);
-              onChunk(data);
-              
-              if (data.done) {
-                resolve();
-                return;
-              }
-            } catch (parseError) {
-              // Ignore parsing errors for incomplete chunks
-            }
-          }
-        });
-
-        response.data.on('error', (error: any) => {
-          logger.error('Ollama stream error:', error);
-          reject(error);
-        });
-
-        response.data.on('end', () => {
-          resolve();
-        });
-      });
+      return consumeOllamaStream<OllamaGenerateResponse>(response.data, onChunk, 'Ollama generate');
     } catch (error: any) {
       logger.error('Ollama generate stream error:', error);
       throw new Error(`Ollama streaming failed: ${error.response?.data?.error || error.message}`);
@@ -237,34 +265,7 @@ class OllamaService {
         { responseType: 'stream' }
       );
 
-      return new Promise((resolve, reject) => {
-        response.data.on('data', (chunk: Buffer) => {
-          const lines = chunk.toString().split('\n').filter(line => line.trim());
-          
-          for (const line of lines) {
-            try {
-              const data = JSON.parse(line);
-              onChunk(data);
-              
-              if (data.done) {
-                resolve();
-                return;
-              }
-            } catch (parseError) {
-              // Ignore parsing errors for incomplete chunks
-            }
-          }
-        });
-
-        response.data.on('error', (error: any) => {
-          logger.error('Ollama chat stream error:', error.message || error);
-          reject(error);
-        });
-
-        response.data.on('end', () => {
-          resolve();
-        });
-      });
+      return consumeOllamaStream<OllamaChatResponse>(response.data, onChunk, 'Ollama chat');
     } catch (error: any) {
       logger.error('Ollama chat stream error:', error.message || error);
       throw new Error(`Ollama chat streaming failed: ${error.response?.data?.error || error.message}`);

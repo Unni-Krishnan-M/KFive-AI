@@ -1,151 +1,128 @@
-import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import cors from 'cors';
-import helmet from 'helmet';
-import compression from 'compression';
-import rateLimit from 'express-rate-limit';
-import dotenv from 'dotenv';
+import { createApp } from './app';
+import { connectDatabase, disconnectDatabase } from './config/database';
+import { getEnvironment } from './config/environment';
+import { closeQueues, initializeQueues } from './config/queues';
+import { connectRedis, disconnectRedis } from './config/redis';
+import { setupSocketHandlers } from './socket';
+import { logger } from './utils/logger';
+import { validateEnvironment } from './utils/validation';
+import { agentRunService } from './services/agentRunService';
+import { workflowRunService } from './services/workflowRunService';
 
-import { connectDatabase } from '@/config/database';
-import { connectRedis } from '@/config/redis';
-import { initializeQueues } from '@/config/queues';
-import { setupRoutes } from '@/routes';
-import { setupSocketHandlers } from '@/socket';
-import { errorHandler } from '@/middleware/errorHandler';
-import { logger } from '@/utils/logger';
-import { validateEnvironment } from '@/utils/validation';
-
-// Load environment variables
-dotenv.config();
-
-// Validate environment
+const config = getEnvironment();
 validateEnvironment();
 
-const app = express();
+const app = createApp(config);
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.CORS_ORIGIN || "http://localhost:3000",
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    credentials: true
-  }
-});
-
-const PORT = process.env.PORT || 5000;
-
-// Security middleware
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
-    },
+    origin: config.corsOrigins,
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true,
   },
-}));
-
-// CORS configuration
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || origin.includes('localhost') || origin.includes('127.0.0.1')) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-refresh-token']
-}));
-
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
-  message: 'Too many requests from this IP, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-app.use('/api/', limiter);
-
-// Body parsing middleware
-app.use(compression());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    environment: process.env.NODE_ENV
-  });
 });
 
-// API routes
-setupRoutes(app);
-
-// Socket.IO handlers
 setupSocketHandlers(io);
 
-// Error handling middleware (must be last)
-app.use(errorHandler);
+let shuttingDown = false;
+let recoveringAgentRuns = false;
+let agentRunRecoveryTimer: NodeJS.Timeout | undefined;
+let recoveringWorkflowRuns = false;
+let workflowRunRecoveryTimer: NodeJS.Timeout | undefined;
 
-// 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'Route not found',
-    path: req.originalUrl
-  });
-});
-
-// Graceful shutdown
-process.on('SIGTERM', gracefulShutdown);
-process.on('SIGINT', gracefulShutdown);
-
-async function gracefulShutdown(signal: string) {
-  logger.info(`Received ${signal}. Starting graceful shutdown...`);
-  
-  server.close(() => {
-    logger.info('HTTP server closed');
-    process.exit(0);
-  });
-
-  // Force close after 10 seconds
-  setTimeout(() => {
-    logger.error('Could not close connections in time, forcefully shutting down');
-    process.exit(1);
-  }, 10000);
+function startAgentRunRecoveryLoop(): void {
+  agentRunRecoveryTimer = setInterval(() => {
+    if (recoveringAgentRuns || shuttingDown) return;
+    recoveringAgentRuns = true;
+    void agentRunService.recoverInterrupted()
+      .then((count) => {
+        if (count > 0) logger.warn('Recovered interrupted agent runs', { count });
+      })
+      .catch(() => logger.error('Agent run recovery check failed'))
+      .finally(() => { recoveringAgentRuns = false; });
+  }, 30_000);
+  agentRunRecoveryTimer.unref();
 }
 
-// Start server
-async function startServer() {
+function startWorkflowRunRecoveryLoop(): void {
+  workflowRunRecoveryTimer = setInterval(() => {
+    if (recoveringWorkflowRuns || shuttingDown) return;
+    recoveringWorkflowRuns = true;
+    void workflowRunService.recoverInterrupted()
+      .then((count) => {
+        if (count > 0) logger.warn('Recovered interrupted workflow runs', { count });
+      })
+      .catch(() => logger.error('Workflow run recovery check failed'))
+      .finally(() => { recoveringWorkflowRuns = false; });
+  }, 30_000);
+  workflowRunRecoveryTimer.unref();
+}
+
+async function gracefulShutdown(signal: string): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info('Graceful shutdown started', { signal });
+
+  const forceTimer = setTimeout(() => {
+    logger.error('Graceful shutdown timed out');
+    process.exit(1);
+  }, 10_000);
+  forceTimer.unref();
+
   try {
-    // Connect to databases
-    await connectDatabase();
-    await connectRedis();
-    
-    // Initialize background queues
-    await initializeQueues();
-    
-    // Start HTTP server
-    server.listen(PORT, () => {
-      logger.info(`🚀 KFive AI Backend running on port ${PORT}`);
-      logger.info(`📊 Environment: ${process.env.NODE_ENV}`);
-      logger.info(`🔗 API URL: http://localhost:${PORT}/api/v1`);
-      logger.info(`🔌 WebSocket URL: ws://localhost:${PORT}`);
-    });
-    
+    if (agentRunRecoveryTimer) clearInterval(agentRunRecoveryTimer);
+    if (workflowRunRecoveryTimer) clearInterval(workflowRunRecoveryTimer);
+    await new Promise<void>((resolve) => io.close(() => resolve()));
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    await closeQueues();
+    await disconnectRedis();
+    await disconnectDatabase();
+    clearTimeout(forceTimer);
+    logger.info('Graceful shutdown completed');
+    process.exit(0);
   } catch (error) {
-    logger.error('Failed to start server:', error);
+    logger.error('Graceful shutdown failed', { error });
     process.exit(1);
   }
 }
 
-startServer();
+process.once('SIGTERM', () => void gracefulShutdown('SIGTERM'));
+process.once('SIGINT', () => void gracefulShutdown('SIGINT'));
+process.once('unhandledRejection', (reason) => {
+  logger.error('Unhandled rejection', { reason });
+  void gracefulShutdown('unhandledRejection');
+});
+process.once('uncaughtException', (error) => {
+  logger.error('Uncaught exception', { error });
+  void gracefulShutdown('uncaughtException');
+});
 
-export { app, io };
+async function startServer(): Promise<void> {
+  try {
+    await connectDatabase();
+    const interruptedAgentRuns = await agentRunService.recoverInterrupted();
+    if (interruptedAgentRuns > 0) logger.warn('Recovered interrupted agent runs', { count: interruptedAgentRuns });
+    const interruptedWorkflowRuns = await workflowRunService.recoverInterrupted();
+    if (interruptedWorkflowRuns > 0) logger.warn('Recovered interrupted workflow runs', { count: interruptedWorkflowRuns });
+    await connectRedis();
+    await initializeQueues();
+    startAgentRunRecoveryLoop();
+    startWorkflowRunRecoveryLoop();
+    server.listen(config.port, () => {
+      logger.info('KFive AI backend started', {
+        port: config.port,
+        mode: config.kfiveMode,
+        provider: config.aiProvider,
+      });
+    });
+  } catch (error) {
+    logger.error('Failed to start server', { error });
+    await gracefulShutdown('startup-failure');
+  }
+}
+
+void startServer();
+
+export { app, io, server };

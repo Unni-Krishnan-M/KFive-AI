@@ -1,20 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { 
-  FileText, Upload, Search, Filter, Grid, 
-  MoreVertical, File as FileIcon, X, UploadCloud, CheckCircle, Database 
+  Upload, Search, File as FileIcon, UploadCloud, CheckCircle, Database, FolderKanban, FolderOpen, X
 } from 'lucide-react';
 import { documentApi } from '@/services/api';
 import toast from 'react-hot-toast';
 import { SlideOver } from '@/components/ui/SlideOver';
 import { useNavigate } from 'react-router-dom';
+import { PROJECT_ARCHIVED_MESSAGE } from '@/services/projectContext';
+import { useProjectContext } from '@/hooks/useProjectContext';
+import { readableApiError } from '@/services/runtimeSettings';
 
 interface Document {
   _id: string;
   originalName: string;
   size: number;
   mimeType: string;
-  status: 'processing' | 'ready' | 'error';
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  errorMessage?: string;
   createdAt: string;
 }
 
@@ -23,32 +26,40 @@ export default function DocumentsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   
   const [previewDoc, setPreviewDoc] = useState<Document | null>(null);
   const [isSlideOverOpen, setIsSlideOverOpen] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const { requested: projectRequested, context: projectContext, loading: projectLoading, error: projectError } = useProjectContext();
+  const projectId = projectContext?.projectId;
+  const projectScopeReady = !projectRequested || Boolean(projectContext);
+  const uploadAllowed = projectScopeReady && projectContext?.status !== 'archived';
 
   useEffect(() => {
+    if (!projectScopeReady) {
+      setDocuments([]);
+      return;
+    }
     fetchDocuments();
-  }, []);
+  }, [projectId, projectScopeReady]);
 
   const fetchDocuments = async () => {
     try {
-      const res = await documentApi.getDocuments();
+      const res = await documentApi.getDocuments(projectId);
       if (res.data.success) {
         setDocuments(res.data.data);
       }
     } catch (error) {
-      toast.error('Failed to fetch documents');
+      toast.error(readableApiError(error, 'Failed to fetch documents.'));
     }
   };
 
   // Drag and drop handlers
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+    if (!uploadAllowed) return;
     setIsDragging(true);
   };
 
@@ -72,27 +83,23 @@ export default function DocumentsPage() {
   };
 
   const handleFileUpload = async (file: File) => {
+    if (!uploadAllowed) {
+      toast.error(projectError || PROJECT_ARCHIVED_MESSAGE);
+      return;
+    }
     const formData = new FormData();
     formData.append('document', file);
     
     setIsUploading(true);
-    setUploadProgress(0);
-    
-    // Simulate progress 
-    const interval = setInterval(() => {
-      setUploadProgress(p => p >= 90 ? 90 : p + 10);
-    }, 200);
 
     try {
-      await documentApi.uploadDocument(formData);
-      toast.success('Document uploaded successfully');
-      setUploadProgress(100);
-      setTimeout(() => fetchDocuments(), 500);
+      await documentApi.uploadDocument(formData, projectId);
+      toast.success(projectContext ? `Document added to ${projectContext.projectName}` : 'Document uploaded successfully');
+      await fetchDocuments();
     } catch (error) {
-      toast.error('Failed to upload document');
+      toast.error(readableApiError(error, 'Failed to upload document.'));
     } finally {
-      clearInterval(interval);
-      setTimeout(() => setIsUploading(false), 500);
+      setIsUploading(false);
     }
   };
 
@@ -125,17 +132,28 @@ export default function DocumentsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
             <Database className="w-8 h-8 text-cyan-400" />
-            Knowledge Base
+            Documents
           </h1>
-          <p className="text-gray-400 mt-1">Upload documents to expand your AI's context.</p>
+          <p className="text-gray-400 mt-1">Upload documents and track their actual processing status.</p>
         </div>
+        <button onClick={() => navigate('/app/files')} className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-gray-200 hover:border-primary/40 hover:text-white">
+          <FolderOpen className="h-4 w-4 text-primary" />
+          Open PDF Utilities
+        </button>
       </div>
+
+      <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-gray-400">PDF Utilities run locally in your browser. Select the source files again there; stored Documents are not passed to the utility or overwritten.</p>
+
+      {projectLoading ? <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-gray-400">Verifying project context…</div> : null}
+      {projectError ? <div role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">{projectError} Project-scoped actions are disabled.</div> : null}
+      {projectContext?.status === 'archived' ? <div role="alert" className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">{PROJECT_ARCHIVED_MESSAGE}</div> : null}
+      {projectContext ? <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3"><div className="flex min-w-0 items-center gap-3"><FolderKanban className="h-5 w-5 shrink-0 text-primary" /><div className="min-w-0"><p className="text-xs uppercase tracking-wide text-gray-500">Project documents</p><p className="truncate font-medium text-white">{projectContext.projectName} <span className="text-xs capitalize text-gray-500">({projectContext.status})</span></p></div></div><button onClick={() => navigate('/app/documents', { replace: true, state: null })} className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-gray-300 hover:text-white"><X className="h-3.5 w-3.5" />Show all documents</button></div> : null}
 
       {/* Upload Zone */}
       <div 
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
+          onDrop={handleDrop}
         className={`relative w-full rounded-2xl border-2 border-dashed flex flex-col items-center justify-center p-12 transition-all overflow-hidden ${
           isDragging 
             ? 'border-cyan-500 bg-cyan-500/5' 
@@ -148,6 +166,7 @@ export default function DocumentsPage() {
           type="file" 
           ref={fileInputRef} 
           onChange={handleFileInput} 
+          disabled={!uploadAllowed || isUploading}
           className="hidden" 
           accept=".pdf,.doc,.docx,.txt,.csv"
         />
@@ -155,24 +174,22 @@ export default function DocumentsPage() {
         {isUploading ? (
           <div className="flex flex-col items-center z-10 w-full max-w-sm">
             <UploadCloud className="w-12 h-12 text-cyan-400 mb-4 animate-bounce" />
-            <p className="text-white font-medium mb-3">Uploading & Processing...</p>
-            <div className="w-full bg-black/40 h-2.5 rounded-full overflow-hidden border border-white/10">
-              <div className="bg-gradient-to-r from-cyan-500 to-blue-500 h-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
-            </div>
-            <p className="text-xs text-center mt-2 text-gray-500">{uploadProgress}% Complete</p>
+            <p className="text-white font-medium mb-2">Uploading file…</p>
+            <p className="text-xs text-center text-gray-500">Waiting for the upload request to finish. Processing status will appear in the document list.</p>
           </div>
         ) : (
           <div className="flex flex-col items-center z-10 text-center">
-            <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4 group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+            <div className={`w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4 group ${uploadAllowed ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`} onClick={() => uploadAllowed && fileInputRef.current?.click()}>
               <Upload className="w-8 h-8 text-cyan-400 group-hover:scale-110 transition-transform" />
             </div>
             <h3 className="text-lg font-medium text-white mb-2">Drag & Drop files here</h3>
             <p className="text-sm text-gray-400 mb-6 max-w-md">
-              Upload PDFs, Word docs, CSVs, or text files to train your AI on specific knowledge domains. Max 50MB per file.
+              Store supported PDFs, Word documents, CSVs, or text files. Maximum 50 MB per file.
             </p>
             <button 
               onClick={() => fileInputRef.current?.click()}
-              className="px-6 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl font-medium transition-colors border border-white/5"
+              disabled={!uploadAllowed}
+              className="px-6 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl font-medium transition-colors border border-white/5 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Browse Files
             </button>
@@ -193,15 +210,6 @@ export default function DocumentsPage() {
           />
         </div>
         
-        <div className="flex items-center gap-2 pr-2">
-          <button className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors" aria-label="Filter documents">
-            <Filter size={18} />
-          </button>
-          <div className="w-px h-6 bg-white/10"></div>
-          <button className="p-2 text-cyan-400 bg-cyan-400/10 rounded-lg transition-colors" aria-label="Grid view">
-            <Grid size={18} />
-          </button>
-        </div>
       </div>
 
       {/* Document Grid */}
@@ -223,12 +231,6 @@ export default function DocumentsPage() {
                 }}
                 className="bg-black/20 border border-white/10 p-5 rounded-2xl cursor-pointer hover:bg-black/40 hover:border-white/20 transition-all group relative"
               >
-                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button className="p-1 text-gray-400 hover:text-white bg-black/40 rounded-lg" aria-label="More options">
-                    <MoreVertical size={16} />
-                  </button>
-                </div>
-                
                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${iconStyle.bg}`}>
                   <FileIcon className={`w-6 h-6 ${iconStyle.color}`} />
                 </div>
@@ -239,16 +241,25 @@ export default function DocumentsPage() {
                 
                 <div className="flex items-center justify-between text-xs text-gray-500 mt-4">
                   <span>{formatSize(doc.size)}</span>
-                  {doc.status === 'ready' ? (
+                  {doc.status === 'completed' ? (
                     <span className="flex items-center gap-1 text-green-500 bg-green-500/10 px-2 py-0.5 rounded">
                       <CheckCircle size={12} /> Ready
                     </span>
+                  ) : doc.status === 'failed' ? (
+                    <span title={doc.errorMessage} className="flex items-center gap-1 text-red-500 bg-red-500/10 px-2 py-0.5 rounded">
+                      Failed
+                    </span>
+                  ) : doc.status === 'pending' ? (
+                    <span className="flex items-center gap-1 text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">
+                      Pending
+                    </span>
                   ) : (
                     <span className="flex items-center gap-1 text-yellow-500 bg-yellow-500/10 px-2 py-0.5 rounded animate-pulse">
-                      Processing...
+                      Processing…
                     </span>
                   )}
                 </div>
+                {doc.status === 'failed' && doc.errorMessage ? <p role="alert" className="mt-3 text-xs text-red-300">{doc.errorMessage}</p> : null}
               </motion.div>
             );
           })
@@ -282,28 +293,15 @@ export default function DocumentsPage() {
               </div>
               
               <div className="bg-white/5 p-4 rounded-xl border border-white/10">
-                <p className="text-sm text-gray-400 mb-1">Vectorization Status</p>
+                <p className="text-sm text-gray-400 mb-1">Processing status</p>
                 <div className="flex items-center gap-2 mt-1">
-                  <div className={`w-2 h-2 rounded-full ${previewDoc.status === 'ready' ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`}></div>
+                  <div className={`w-2 h-2 rounded-full ${previewDoc.status === 'completed' ? 'bg-green-500' : previewDoc.status === 'failed' ? 'bg-red-500' : 'bg-yellow-500 animate-pulse'}`}></div>
                   <p className="text-white font-medium capitalize flex-1">{previewDoc.status}</p>
                 </div>
+                {previewDoc.status === 'failed' && previewDoc.errorMessage ? <p role="alert" className="mt-2 text-sm text-red-300">{previewDoc.errorMessage}</p> : null}
               </div>
             </div>
             
-            <div className="mt-auto pt-6">
-              <button
-                onClick={() => {
-                  setIsSlideOverOpen(false);
-                  // Pass the document context to ChatPage via state
-                  navigate('/app/chat', { state: { documentId: previewDoc._id } });
-                }}
-                disabled={previewDoc.status !== 'ready'}
-                className="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-[#09090B] rounded-xl font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(6,182,212,0.3)]"
-              >
-                <Search size={18} />
-                Chat about this document
-              </button>
-            </div>
           </div>
         )}
       </SlideOver>

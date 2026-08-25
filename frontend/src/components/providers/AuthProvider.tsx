@@ -8,12 +8,12 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({});
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, refreshAuth } = useAuth();
+  const { refreshAuth } = useAuth();
 
   useEffect(() => {
     // Try to refresh auth on app start if we have tokens
     const refreshToken = useAuth.getState().refreshToken;
-    if (refreshToken && !isAuthenticated) {
+    if (refreshToken) {
       refreshAuth().catch(() => {
         // Refresh failed, user will need to login again
         useAuth.getState().logout();

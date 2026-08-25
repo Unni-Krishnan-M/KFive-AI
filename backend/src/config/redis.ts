@@ -1,15 +1,12 @@
 import { createClient, RedisClientType } from 'redis';
 import { logger } from '@/utils/logger';
+import { getEnvironment } from './environment';
 
 let redisClient: RedisClientType;
 
 export async function connectRedis(): Promise<RedisClientType> {
   try {
-    const redisUrl = process.env.REDIS_URL;
-    
-    if (!redisUrl) {
-      throw new Error('REDIS_URL environment variable is not defined');
-    }
+    const redisUrl = getEnvironment().redisUrl;
 
     redisClient = createClient({
       url: redisUrl,
@@ -49,6 +46,10 @@ export function getRedisClient(): RedisClientType {
     throw new Error('Redis client not initialized. Call connectRedis() first.');
   }
   return redisClient;
+}
+
+export function isRedisReady(): boolean {
+  return Boolean(redisClient?.isReady);
 }
 
 export async function disconnectRedis(): Promise<void> {

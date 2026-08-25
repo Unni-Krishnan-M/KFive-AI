@@ -1,100 +1,157 @@
-version: '3.8'
+name: kfive-ai
 
 services:
-  # MongoDB Database
   mongodb:
     image: mongo:7.0
-    container_name: kfive-mongodb
-    restart: unless-stopped
-    ports:
-      - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: kfive
-      MONGO_INITDB_ROOT_PASSWORD: kfive123
-      MONGO_INITDB_DATABASE: kfive_ai
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:?Set MONGO_ROOT_USERNAME in .env}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?Set MONGO_ROOT_PASSWORD in .env}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-kfive_ai}
     volumes:
       - mongodb_data:/data/db
-      - ./backend/scripts/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
-    networks:
-      - kfive-network
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --username \"$$MONGO_INITDB_ROOT_USERNAME\" --password \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --eval 'db.adminCommand({ping:1})' >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks: [kfive-network]
+    security_opt: [no-new-privileges:true]
 
-  # Redis Cache
   redis:
     image: redis:7.2-alpine
-    container_name: kfive-redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    command: redis-server --appendonly yes --requirepass kfive123
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}"]
     volumes:
       - redis_data:/data
-    networks:
-      - kfive-network
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [kfive-network]
+    security_opt: [no-new-privileges:true]
 
-  # ChromaDB Vector Database
   chromadb:
-    image: chromadb/chroma:latest
-    container_name: kfive-chromadb
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
+    image: chromadb/chroma:0.4.24
     environment:
-      - CHROMA_SERVER_HOST=0.0.0.0
-      - CHROMA_SERVER_HTTP_PORT=8000
+      CHROMA_SERVER_HOST: 0.0.0.0
+      CHROMA_SERVER_HTTP_PORT: 8000
+      ANONYMIZED_TELEMETRY: "false"
     volumes:
       - chromadb_data:/chroma/chroma
-    networks:
-      - kfive-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/heartbeat', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+    networks: [kfive-network]
+    security_opt: [no-new-privileges:true]
 
-  # Backend API
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: kfive-backend
-    restart: unless-stopped
-    ports:
-      - "5000:5000"
+      context: .
+      dockerfile: backend/Dockerfile
     environment:
       NODE_ENV: production
       PORT: 5000
-      MONGODB_URI: mongodb://kfive:kfive123@mongodb:27017/kfive_ai?authSource=admin
-      REDIS_URL: redis://:kfive123@redis:6379
+      API_VERSION: v1
+      KFIVE_MODE: ${KFIVE_MODE:-local}
+      AI_PROVIDER: ${AI_PROVIDER:-ollama}
+      AI_DEFAULT_MODEL: ${AI_DEFAULT_MODEL:-phi3}
+      AI_EMBEDDING_MODEL: ${AI_EMBEDDING_MODEL:-}
+      AI_MAX_OUTPUT_TOKENS: ${AI_MAX_OUTPUT_TOKENS:-2048}
+      AI_TIMEOUT_MS: ${AI_TIMEOUT_MS:-30000}
+      MONGODB_URL: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017/${MONGO_DATABASE:-kfive_ai}?authSource=admin
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       CHROMA_URL: http://chromadb:8000
-      JWT_SECRET: your-super-secret-jwt-key-change-in-production
-      JWT_REFRESH_SECRET: your-super-secret-refresh-key-change-in-production
-      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Set JWT_REFRESH_SECRET in .env}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_COMPATIBLE_SUPPORTS_EMBEDDINGS: ${OPENAI_COMPATIBLE_SUPPORTS_EMBEDDINGS:-false}
+      OPENAI_COMPATIBLE_SUPPORTS_STRUCTURED_OUTPUT: ${OPENAI_COMPATIBLE_SUPPORTS_STRUCTURED_OUTPUT:-false}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-https://api.anthropic.com}
+      CUSTOM_LLM_BASE_URL: ${CUSTOM_LLM_BASE_URL:-}
+      CUSTOM_LLM_API_KEY: ${CUSTOM_LLM_API_KEY:-}
+      CUSTOM_LLM_SUPPORTS_EMBEDDINGS: ${CUSTOM_LLM_SUPPORTS_EMBEDDINGS:-false}
+      CUSTOM_LLM_SUPPORTS_STRUCTURED_OUTPUT: ${CUSTOM_LLM_SUPPORTS_STRUCTURED_OUTPUT:-false}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:3000}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      CODE_RUNNER_MODE: ${CODE_RUNNER_MODE:-disabled}
+      DOCUMENT_PROCESSOR_URL: ${DOCUMENT_PROCESSOR_URL:-}
+      OCR_SERVICE_URL: ${OCR_SERVICE_URL:-}
+      LOG_FILE: /app/logs/app.log
+      QUEUE_CONCURRENCY: ${QUEUE_CONCURRENCY:-2}
+    extra_hosts:
+      - host.docker.internal:host-gateway
     depends_on:
-      - mongodb
-      - redis
-      - chromadb
+      mongodb: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      chromadb: { condition: service_healthy }
     volumes:
-      - ./backend/uploads:/app/uploads
-      - ./backend/logs:/app/logs
-    networks:
-      - kfive-network
+      - backend_uploads:/app/uploads
+      - backend_logs:/app/logs
+    ports:
+      - ${BACKEND_BIND_ADDRESS:-127.0.0.1}:5000:5000
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks: [kfive-network]
+    security_opt: [no-new-privileges:true]
+    init: true
 
-  # Frontend Web App
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: kfive-frontend
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    environment:
-      VITE_API_URL: http://localhost:5000
-      VITE_WS_URL: ws://localhost:5000
+      context: .
+      dockerfile: frontend/Dockerfile
     depends_on:
-      - backend
-    networks:
-      - kfive-network
+      backend: { condition: service_healthy }
+    ports:
+      - ${FRONTEND_BIND_ADDRESS:-127.0.0.1}:${FRONTEND_PORT:-3000}:8080
+    networks: [kfive-network]
+    security_opt: [no-new-privileges:true]
+
+  code-runner:
+    profiles: [code-lab]
+    build:
+      context: .
+      dockerfile: services/code-runner/Dockerfile
+    environment:
+      REDIS_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}@redis:6379
+      CODE_RUNNER_CONCURRENCY: ${CODE_RUNNER_CONCURRENCY:-2}
+    depends_on:
+      redis: { condition: service_healthy }
+    volumes:
+      - type: bind
+        source: ${CODE_RUNNER_DOCKER_SOCKET:-/var/run/docker.sock}
+        target: /var/run/docker.sock
+    group_add:
+      - ${CODE_RUNNER_DOCKER_GID:-replace-with-docker-socket-group-id}
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m
+    cpus: 0.50
+    mem_limit: 256m
+    pids_limit: 64
+    networks: [kfive-network]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    init: true
 
 volumes:
   mongodb_data:
   redis_data:
   chromadb_data:
+  backend_uploads:
+  backend_logs:
 
 networks:
   kfive-network:

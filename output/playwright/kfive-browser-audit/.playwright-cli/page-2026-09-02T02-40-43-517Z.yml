@@ -1,0 +1,127 @@
+- generic [ref=f2e2]:
+  - generic [ref=f2e4]:
+    - complementary [ref=f2e5]:
+      - generic [ref=f2e6]:
+        - generic [ref=f2e7]: KFive AI
+        - button "Collapse sidebar" [ref=f2e13] [cursor=pointer]
+      - generic [ref=f2e17]:
+        - generic [ref=f2e18] [cursor=pointer]:
+          - generic [ref=f2e19]: Search
+          - generic [ref=f2e24]:
+            - generic [ref=f2e25]: ⌘
+            - generic [ref=f2e26]: K
+        - navigation [ref=f2e27]:
+          - link "Dashboard" [ref=f2e203] [cursor=pointer]:
+            - /url: /app/dashboard
+          - link "AI Chat" [ref=f2e211] [cursor=pointer]:
+            - /url: /app/chat
+          - link "Code Lab" [ref=f2e216] [cursor=pointer]:
+            - /url: /app/code
+          - link "Agents" [ref=f2e223] [cursor=pointer]:
+            - /url: /app/agents
+          - link "Documents" [ref=f2e229] [cursor=pointer]:
+            - /url: /app/documents
+          - link "Knowledge / RAG" [ref=f2e235] [cursor=pointer]:
+            - /url: /app/knowledge
+          - link "Repository Analyzer" [ref=f2e241] [cursor=pointer]:
+            - /url: /app/repositories
+          - link "Workflows" [ref=f2e248] [cursor=pointer]:
+            - /url: /app/workflows
+          - link "Dataset Lab" [ref=f2e256] [cursor=pointer]:
+            - /url: /app/datasets
+          - link "Model Benchmarks" [ref=f2e263] [cursor=pointer]:
+            - /url: /app/benchmarks
+          - link "Notebooks" [ref=f2e269] [cursor=pointer]:
+            - /url: /app/notebooks
+          - link "Voice Assistant" [ref=f2e276] [cursor=pointer]:
+            - /url: /app/voice
+          - link "Models" [ref=f2e282] [cursor=pointer]:
+            - /url: /app/models
+          - link "Projects" [ref=f2e295] [cursor=pointer]:
+            - /url: /app/projects
+          - link "Workspace" [ref=f2e300] [cursor=pointer]:
+            - /url: /app/workspace
+          - link "PDF Utilities" [ref=f2e306] [cursor=pointer]:
+            - /url: /app/files
+      - generic [ref=f2e136]:
+        - generic [ref=f2e137]:
+          - generic [ref=f2e138]: B
+          - generic [ref=f2e140]:
+            - paragraph [ref=f2e141]: Browser Audit
+            - paragraph [ref=f2e142]: kfive-browser-20260902-0211@example.test
+        - generic [ref=f2e143]:
+          - link "Profile" [ref=f2e144] [cursor=pointer]:
+            - /url: /app/profile
+          - link "Settings" [ref=f2e148] [cursor=pointer]:
+            - /url: /app/settings
+          - button "Toggle theme" [ref=f2e152] [cursor=pointer]
+          - button "Sign out" [ref=f2e159] [cursor=pointer]
+    - main [ref=f2e163]:
+      - generic [ref=f2e165]:
+        - generic [ref=f2e166]:
+          - generic [ref=f2e167]:
+            - generic [ref=f2e168]: Notebook Mode
+            - heading "Persistent notebook documents" [level=1] [ref=f2e172]
+            - paragraph [ref=f2e173]: Edit bounded Python and Markdown cells without exposing a shell or Jupyter server.
+          - button "New notebook" [ref=f2e174] [cursor=pointer]
+        - status [ref=f2e178]:
+          - generic [ref=f2e181]:
+            - strong [ref=f2e182]: Isolated execution available
+            - paragraph [ref=f2e183]: Notebook execution is available through the isolated broker and verifier.
+        - generic [ref=f2e184]:
+          - complementary [ref=f2e185]:
+            - generic [ref=f2e186]:
+              - heading "Workspace notebooks" [level=2] [ref=f2e187]
+              - generic [ref=f2e188]: 1/100
+            - button "Browser execution audit 1 cells · revision 2" [ref=f2e378] [cursor=pointer]:
+              - generic [ref=f2e317]: Browser execution audit
+              - generic [ref=f2e318]: 1 cells · revision 2
+            - generic [ref=f2e192]:
+              - button "Previous" [disabled] [ref=f2e193]
+              - generic [ref=f2e194]: Page 1 / 1
+              - button "Next" [disabled] [ref=f2e195]
+          - main [ref=f2e196]:
+            - generic [ref=f2e197]:
+              - generic [ref=f2e198]:
+                - generic [ref=f2e319]:
+                  - text: Title
+                  - textbox "Title" [ref=f2e320]: Browser execution audit
+                - generic [ref=f2e321]:
+                  - text: Cell timeout
+                  - spinbutton "Cell timeout" [ref=f2e322]: "10"
+                - generic [ref=f2e323]:
+                  - button "Delete notebook" [ref=f2e324] [cursor=pointer]
+                  - button "Stop" [ref=f2e390] [cursor=pointer]
+                  - button "Save" [disabled] [ref=f2e331]
+              - generic [ref=f2e336]:
+                - generic [ref=f2e337]: Saved revision 2
+                - generic [ref=f2e338]: 1/32 cells
+              - generic [ref=f2e340]:
+                - generic [ref=f2e341]:
+                  - combobox "Cell 1 type" [ref=f2e342]:
+                    - option "Python" [selected]
+                    - option "Markdown"
+                  - generic [ref=f2e343]: Cell 1
+                  - button "Move cell 1 up" [disabled] [ref=f2e344]
+                  - button "Move cell 1 down" [disabled] [ref=f2e347]
+                  - button "Remove cell 1" [disabled] [ref=f2e350]
+                - textbox "Cell 1 code source" [ref=f2e354]:
+                  - /placeholder: print("Hello from KFive")
+                  - text: print("browser-notebook-result", 6 * 7)
+              - generic [ref=f2e355]:
+                - button "Python cell" [ref=f2e356] [cursor=pointer]
+                - button "Markdown cell" [ref=f2e361] [cursor=pointer]
+              - generic [ref=f2e366]:
+                - generic [ref=f2e368]:
+                  - heading "Execution history" [level=2] [ref=f2e369]
+                  - paragraph [ref=f2e370]: Saved revision snapshots only; untrusted HTML, SVG, and JavaScript outputs are never rendered.
+                - generic [ref=f2e393]:
+                  - button "queued revision 2 · 9/2/2026, 8:10:42 AM" [ref=f2e395] [cursor=pointer]:
+                    - generic [ref=f2e396]: queued
+                    - generic [ref=f2e397]: revision 2 · 9/2/2026, 8:10:42 AM
+                  - generic [ref=f2e398]:
+                    - generic [ref=f2e399]:
+                      - generic [ref=f2e400]: queued
+                      - generic [ref=f2e401]: snapshot a230874491a5…
+                    - button "Stop run" [ref=f2e402] [cursor=pointer]
+  - status [ref=f2e410]: Notebook run queued.

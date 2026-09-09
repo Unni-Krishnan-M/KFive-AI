@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'crypto';
 import { ProjectModel, ProjectActivityType, ProjectStatus } from '@/models/Project';
+import { projectMutationLease } from './projectMutationLease';
 
 export type ProjectErrorCode =
   | 'INVALID_PROJECT_ID'
@@ -245,39 +246,43 @@ export class ProjectService {
 
   async update(ownerId: string, projectIdValue: unknown, value: unknown): Promise<ProjectRecord> {
     const projectId = requireObjectId(projectIdValue, 'Project id');
-    const current = await this.get(ownerId, projectId);
-    const changes = validateProjectUpdateInput(value);
-    const timestamp = this.now();
-    const events: ProjectActivityInput[] = [];
-    if (changes.name !== undefined && changes.name !== current.name) {
-      events.push({ type: 'renamed', timestamp, actorId: ownerId, changes: { from: current.name, to: changes.name } });
-    }
-    if (changes.status !== undefined && changes.status !== current.status) {
-      events.push({ type: changes.status === 'archived' ? 'archived' : 'restored', timestamp, actorId: ownerId });
-    }
-    if (changes.description !== undefined || changes.tags !== undefined) {
-      events.push({
-        type: 'updated',
-        timestamp,
-        actorId: ownerId,
-        changes: {
-          ...(changes.description !== undefined ? { description: true } : {}),
-          ...(changes.tags !== undefined ? { tags: true } : {}),
-        },
-      });
-    }
-    if (!events.length) events.push({ type: 'updated', timestamp, actorId: ownerId, changes: { noEffectiveChange: true } });
-    const project = await this.repository.updateByOwnerAndId(ownerId, projectId, changes, events, timestamp);
-    if (!project) throw new ProjectError('Project not found.', 'PROJECT_NOT_FOUND', 404);
-    return project;
+    return projectMutationLease.run(projectId, async () => {
+      const current = await this.get(ownerId, projectId);
+      const changes = validateProjectUpdateInput(value);
+      const timestamp = this.now();
+      const events: ProjectActivityInput[] = [];
+      if (changes.name !== undefined && changes.name !== current.name) {
+        events.push({ type: 'renamed', timestamp, actorId: ownerId, changes: { from: current.name, to: changes.name } });
+      }
+      if (changes.status !== undefined && changes.status !== current.status) {
+        events.push({ type: changes.status === 'archived' ? 'archived' : 'restored', timestamp, actorId: ownerId });
+      }
+      if (changes.description !== undefined || changes.tags !== undefined) {
+        events.push({
+          type: 'updated',
+          timestamp,
+          actorId: ownerId,
+          changes: {
+            ...(changes.description !== undefined ? { description: true } : {}),
+            ...(changes.tags !== undefined ? { tags: true } : {}),
+          },
+        });
+      }
+      if (!events.length) events.push({ type: 'updated', timestamp, actorId: ownerId, changes: { noEffectiveChange: true } });
+      const project = await this.repository.updateByOwnerAndId(ownerId, projectId, changes, events, timestamp);
+      if (!project) throw new ProjectError('Project not found.', 'PROJECT_NOT_FOUND', 404);
+      return project;
+    });
   }
 
   async delete(ownerId: string, projectIdValue: unknown): Promise<ProjectRecord> {
     requireObjectId(ownerId, 'Owner id');
     const projectId = requireObjectId(projectIdValue, 'Project id');
-    const project = await this.repository.deleteByOwnerAndId(ownerId, projectId);
-    if (!project) throw new ProjectError('Project not found.', 'PROJECT_NOT_FOUND', 404);
-    return project;
+    return projectMutationLease.run(projectId, async () => {
+      const project = await this.repository.deleteByOwnerAndId(ownerId, projectId);
+      if (!project) throw new ProjectError('Project not found.', 'PROJECT_NOT_FOUND', 404);
+      return project;
+    });
   }
 }
 

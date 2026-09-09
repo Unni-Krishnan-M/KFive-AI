@@ -1,0 +1,164 @@
+- generic [ref=f7e16]:
+  - complementary [ref=f7e17]:
+    - generic [ref=f7e18]:
+      - generic [ref=f7e19]: KFive AI
+      - button "Collapse sidebar" [ref=f7e25] [cursor=pointer]
+    - generic [ref=f7e29]:
+      - generic [ref=f7e30] [cursor=pointer]:
+        - generic [ref=f7e31]: Search
+        - generic [ref=f7e36]:
+          - generic [ref=f7e37]: ⌘
+          - generic [ref=f7e38]: K
+      - navigation [ref=f7e39]:
+        - link "Dashboard" [ref=f7e40] [cursor=pointer]:
+          - /url: /app/dashboard
+        - link "AI Chat" [ref=f7e48] [cursor=pointer]:
+          - /url: /app/chat
+        - link "Code Lab" [ref=f7e53] [cursor=pointer]:
+          - /url: /app/code
+        - link "Agents" [ref=f7e60] [cursor=pointer]:
+          - /url: /app/agents
+        - link "Documents" [ref=f7e66] [cursor=pointer]:
+          - /url: /app/documents
+        - link "Knowledge / RAG" [ref=f7e72] [cursor=pointer]:
+          - /url: /app/knowledge
+        - link "Repository Analyzer" [ref=f7e78] [cursor=pointer]:
+          - /url: /app/repositories
+        - link "Workflows" [ref=f7e85] [cursor=pointer]:
+          - /url: /app/workflows
+        - link "Dataset Lab" [ref=f7e93] [cursor=pointer]:
+          - /url: /app/datasets
+        - link "Model Benchmarks" [ref=f7e100] [cursor=pointer]:
+          - /url: /app/benchmarks
+        - link "Notebooks" [ref=f7e107] [cursor=pointer]:
+          - /url: /app/notebooks
+        - link "Voice Assistant" [ref=f7e113] [cursor=pointer]:
+          - /url: /app/voice
+        - link "Models" [ref=f7e119] [cursor=pointer]:
+          - /url: /app/models
+        - link "Projects" [ref=f7e132] [cursor=pointer]:
+          - /url: /app/projects
+        - link "Workspace" [ref=f7e137] [cursor=pointer]:
+          - /url: /app/workspace
+        - link "PDF Utilities" [ref=f7e143] [cursor=pointer]:
+          - /url: /app/files
+    - generic [ref=f7e148]:
+      - generic [ref=f7e149]:
+        - generic [ref=f7e150]: b
+        - generic [ref=f7e152]:
+          - paragraph [ref=f7e153]: benchmarke2e
+          - paragraph [ref=f7e154]: kfive-benchmark-20260907@example.test
+      - generic [ref=f7e155]:
+        - link "Profile" [ref=f7e156] [cursor=pointer]:
+          - /url: /app/profile
+        - link "Settings" [ref=f7e160] [cursor=pointer]:
+          - /url: /app/settings
+        - button "Toggle theme" [ref=f7e164] [cursor=pointer]
+        - button "Sign out" [ref=f7e171] [cursor=pointer]
+  - main [ref=f7e175]:
+    - generic [ref=f7e177]:
+      - generic [ref=f7e178]:
+        - generic [ref=f7e179]:
+          - generic [ref=f7e180]:
+            - heading "Model Benchmarks" [level=1] [ref=f7e181]
+            - generic [ref=f7e185]: Experimental
+          - paragraph [ref=f7e186]: Measured, durable chat-model runs in the workspace or a verified project.
+        - button "Refresh benchmarks" [ref=f7e187] [cursor=pointer]
+      - note [ref=f7e193]: This is inference benchmarking, not ML training. The fixed suite runs 3 prompts twice, sequentially, through one durable shared benchmark worker. Submitted runs remain queued or running if this page disconnects; only Stop run requests cancellation. Remote providers may bill for six calls and receive the suite prompts; review their privacy terms before starting. GPU samples are before/after snapshots, not reliable peak VRAM measurements or exclusive attribution.
+      - generic [ref=f7e196]:
+        - generic [ref=f7e197]:
+          - generic [ref=f7e198]:
+            - text: Installed/configured model
+            - 'combobox "Installed/configured model Provider: ollama · catalog scope: installed" [disabled] [ref=f7e199]':
+              - option "Choose a model"
+              - option "phi3:latest — phi3:latest" [selected]
+            - generic [ref=f7e200]: "Provider: ollama · catalog scope: installed"
+          - generic [ref=f7e201]:
+            - paragraph [ref=f7e202]: Chat Core
+            - paragraph [ref=f7e203]: 3 prompts × 2 sequential repetitions · 6 calls
+            - paragraph [ref=f7e204]: Temperature 0 · max output 128 tokens · suite chat-core-v1
+          - button "Stop run" [active] [ref=f7e226] [cursor=pointer]
+        - paragraph [ref=f7e230]: 0 of 6 calls completed.
+      - generic [ref=f7e208]:
+        - complementary [ref=f7e209]:
+          - generic [ref=f7e210]:
+            - heading "Run history" [level=2] [ref=f7e211]
+            - generic [ref=f7e212]: "0"
+          - paragraph [ref=f7e213]: 25 per page · at most 10 pages shown · owner retention 100
+          - paragraph [ref=f7e215]: No benchmark runs in this scope.
+          - generic [ref=f7e216]:
+            - button "Previous" [disabled] [ref=f7e217]
+            - generic [ref=f7e218]: 1 / 1
+            - button "Next" [disabled] [ref=f7e219]
+        - main [ref=f7e220]:
+          - generic [ref=f7e221]:
+            - generic [ref=f7e222]:
+              - generic [ref=f7e233]:
+                - heading "Run detail" [level=2] [ref=f7e234]
+                - paragraph [ref=f7e235]: 6a9ef8db7a986eed32f6bf84
+              - generic [ref=f7e236]:
+                - button "Reconnect detail" [ref=f7e237] [cursor=pointer]
+                - button "Export JSON" [ref=f7e243] [cursor=pointer]
+            - generic [ref=f7e247]:
+              - generic [ref=f7e248]:
+                - paragraph [ref=f7e249]: Status
+                - paragraph [ref=f7e250]: queued
+              - generic [ref=f7e251]:
+                - paragraph [ref=f7e252]: Chosen provider
+                - paragraph [ref=f7e253]: ollama
+              - generic [ref=f7e254]:
+                - paragraph [ref=f7e255]: Requested model
+                - paragraph [ref=f7e256]: phi3:latest
+              - generic [ref=f7e257]:
+                - paragraph [ref=f7e258]: Actual model
+                - paragraph [ref=f7e259]: Pending
+              - generic [ref=f7e260]:
+                - paragraph [ref=f7e261]: Wall duration
+                - paragraph [ref=f7e262]: Not reported
+              - generic [ref=f7e263]:
+                - paragraph [ref=f7e264]: Passed
+                - paragraph [ref=f7e265]: 0 / 6
+              - generic [ref=f7e266]:
+                - paragraph [ref=f7e267]: Output
+                - paragraph [ref=f7e268]: 0 B
+              - generic [ref=f7e269]:
+                - paragraph [ref=f7e270]: Started
+                - paragraph [ref=f7e271]: Not reported
+          - generic [ref=f7e272]: No aggregate metrics were reported for this run.
+          - generic [ref=f7e274]:
+            - generic [ref=f7e275]:
+              - heading "Compare compatible completed run" [level=2] [ref=f7e276]
+              - paragraph [ref=f7e277]: Only succeeded runs from the same fixed suite version are eligible.
+            - combobox "Comparison run" [disabled] [ref=f7e278]:
+              - option "No comparison" [selected]
+          - generic [ref=f7e279]:
+            - generic [ref=f7e280]:
+              - heading "Sequential call results" [level=2] [ref=f7e281]
+              - paragraph [ref=f7e282]: Ordered call index is preserved. Output is rendered as inert text.
+            - table [ref=f7e284]:
+              - rowgroup [ref=f7e285]:
+                - row [ref=f7e286]:
+                  - columnheader "Call" [ref=f7e287]
+                  - columnheader "Prompt / repeat" [ref=f7e288]
+                  - columnheader "Result" [ref=f7e289]
+                  - columnheader "Duration" [ref=f7e290]
+                  - columnheader "TTFT" [ref=f7e291]
+                  - columnheader "Output" [ref=f7e292]
+                  - columnheader "Provider / model" [ref=f7e293]
+              - rowgroup [ref=f7e294]:
+                - row [ref=f7e295]:
+                  - cell "No completed calls were recorded." [ref=f7e296]
+          - generic [ref=f7e297]:
+            - article [ref=f7e298]:
+              - heading "GPU before" [level=2] [ref=f7e299]
+              - paragraph [ref=f7e303]: No snapshot was reported.
+            - article [ref=f7e304]:
+              - heading "GPU after" [level=2] [ref=f7e305]
+              - paragraph [ref=f7e309]: No snapshot was reported.
+          - generic [ref=f7e310]:
+            - heading "Timeline" [level=2] [ref=f7e311]
+            - list [ref=f7e312]:
+              - listitem [ref=f7e313]:
+                - generic [ref=f7e317]:
+                  - paragraph [ref=f7e318]: created
+                  - paragraph [ref=f7e319]: 9/7/2026, 11:18:11 PM

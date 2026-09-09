@@ -2,6 +2,8 @@
 
 The repaired Compose file uses multi-stage non-root frontend/backend images, internal-only databases, health-gated dependencies, and named persistent volumes. Browser API/WebSocket traffic is proxied same-origin by the frontend Nginx container.
 
+The default stack also runs a dedicated portless Model Benchmarks worker from the backend image. Its inherited HTTP healthcheck is disabled because it serves no HTTP; API status uses a credential-free Redis TTL heartbeat instead. The worker has a read-only root filesystem, bounded CPU/RAM/PIDs, no API JWT signing keys, no Docker socket, and no GPU grant. BullMQ transports opaque run ids, while MongoDB remains canonical and a fenced Redis lease limits benchmark execution.
+
 The default stack deliberately excludes the Code Lab runner:
 
 ```bash
@@ -46,11 +48,27 @@ Mounting a Docker socket gives the trusted broker control of that daemon and is 
 
 The upstream runtime tags are mutable. Pin and verify image digests before non-development use.
 
+## Opt-in Notebook profile
+
+Notebook execution is also excluded from normal startup. Its dedicated portless broker receives the configured Docker socket, while the UID-10001 runtime and distinct UID-10002 verifier never receive the socket or any host mount. The startup script validates the socket/group, requires Docker seccomp, requires AppArmor by default, builds both image targets, rejects identical resolved image IDs, and starts the worker only through the `notebook` profile. The worker must complete a real runtime/removal/verifier canary before it publishes an availability heartbeat.
+
+```bash
+stat -c '%g' /var/run/docker.sock
+# Set NOTEBOOK_DOCKER_GID to that numeric value in .env.
+./scripts/kfive-up.sh --with-notebook
+./scripts/kfive-status.sh --with-notebook
+./scripts/kfive-logs.sh --with-notebook notebook-worker
+./scripts/kfive-down.sh --with-notebook
+```
+
+`NOTEBOOK_REQUIRE_APPARMOR=false` is an explicit reduced-isolation development override. It was required for the verified CachyOS host because Docker reported seccomp but not AppArmor. Do not treat that functional result as production isolation proof. See [Notebook Mode](NOTEBOOKS.md) and [Security](../SECURITY.md).
+
 ## Configuration-only verification
 
 ```bash
 docker compose --env-file .env.example config --quiet
 env CODE_RUNNER_MODE=container docker compose --env-file .env.example --profile code-lab config --quiet
+env NOTEBOOK_EXECUTION_ENABLED=true NOTEBOOK_DOCKER_GID=999 docker compose --env-file .env.example --profile notebook config --quiet
 ```
 
 Compose configuration validation does not prove that images build, services become healthy, or isolation works. Live Docker and host-isolation verification must still be executed on the target daemon before Code Lab is treated as production-ready.

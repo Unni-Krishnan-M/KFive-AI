@@ -274,13 +274,20 @@ export class WorkflowService {
   async update(ownerIdValue: unknown, workflowIdValue: unknown, value: unknown): Promise<PublicWorkflow> {
     const ownerId = requireObjectId(ownerIdValue, 'Owner id');
     const workflowId = requireObjectId(workflowIdValue, 'Workflow id');
-    const current = await this.getActiveRecord(ownerId, workflowId);
-    const changes = validateWorkflowUpdateInput(value, current.projectId);
-    let updated: WorkflowRecord | null;
-    try { updated = await this.repository.updateByOwnerAndId(ownerId, workflowId, changes); }
-    catch { throw new WorkflowError('Workflow storage is unavailable.', 'WORKFLOW_STORAGE_UNAVAILABLE', 503); }
-    if (!updated) throw new WorkflowError('Workflow not found.', 'WORKFLOW_NOT_FOUND', 404);
-    return serializeWorkflow(updated);
+    if (!tryAcquireWorkflowExecutionLease(ownerId, workflowId)) {
+      throw new WorkflowError('Cancel the active workflow run before editing this workflow.', 'WORKFLOW_HAS_ACTIVE_RUNS', 409);
+    }
+    try {
+      const current = await this.getActiveRecord(ownerId, workflowId);
+      const changes = validateWorkflowUpdateInput(value, current.projectId);
+      let updated: WorkflowRecord | null;
+      try { updated = await this.repository.updateByOwnerAndId(ownerId, workflowId, changes); }
+      catch { throw new WorkflowError('Workflow storage is unavailable.', 'WORKFLOW_STORAGE_UNAVAILABLE', 503); }
+      if (!updated) throw new WorkflowError('Workflow not found.', 'WORKFLOW_NOT_FOUND', 404);
+      return serializeWorkflow(updated);
+    } finally {
+      releaseWorkflowExecutionLease(ownerId, workflowId);
+    }
   }
 
   async delete(ownerIdValue: unknown, workflowIdValue: unknown): Promise<{ workflowId: string; deleted: true }> {

@@ -1,0 +1,296 @@
+{
+  "id": "6a9effddc340ccfb9b42d0e4",
+  "revision": 16,
+  "status": "succeeded",
+  "suite": {
+    "id": "chat-core-v1",
+    "version": 1,
+    "promptCount": 3,
+    "repetitions": 2,
+    "totalCalls": 6
+  },
+  "provider": "ollama",
+  "model": {
+    "requested": {
+      "id": "phi3:latest",
+      "digest": "4f222292793889a9a40a020799cfd28d53f3e01af25d48e06c5e708610fc47e9",
+      "sizeBytes": 2176178913,
+      "contextWindow": 131072
+    },
+    "actual": {
+      "id": "phi3:latest"
+    }
+  },
+  "completedCalls": 6,
+  "passedCalls": 6,
+  "outputBytes": 1758,
+  "wallDurationMs": 85259,
+  "aggregate": {
+    "passCount": 6,
+    "totalCalls": 6,
+    "medianDurationMs": 7101,
+    "medianOutputBytes": 159,
+    "medianTtftMs": 288.5,
+    "outputTokens": 382,
+    "outputTokensPerSecond": 4.48
+  },
+  "queuedAt": "2026-09-07T18:18:05.091Z",
+  "startedAt": "2026-09-07T18:18:05.108Z",
+  "completedAt": "2026-09-07T18:19:30.367Z",
+  "createdAt": "2026-09-07T18:18:05.096Z",
+  "updatedAt": "2026-09-07T18:19:30.367Z",
+  "results": [
+    {
+      "callIndex": 0,
+      "promptIndex": 0,
+      "repetition": 1,
+      "promptLength": 76,
+      "passed": true,
+      "output": "Clear variable names enhance software maintenance by improving code readability, making it easier for developers to understand, debug, and modify the codebase.",
+      "outputBytes": 159,
+      "durationMs": 6752,
+      "ttftMs": 301,
+      "usage": {
+        "inputTokens": 22,
+        "outputTokens": 31,
+        "totalTokens": 53,
+        "totalDurationMs": 6747,
+        "loadDurationMs": 1
+      },
+      "finishReason": "stop",
+      "provider": "ollama",
+      "model": "phi3:latest"
+    },
+    {
+      "callIndex": 1,
+      "promptIndex": 0,
+      "repetition": 2,
+      "promptLength": 76,
+      "passed": true,
+      "output": "Clear variable names enhance software maintenance by improving code readability, making it easier for developers to understand, debug, and modify the codebase.",
+      "outputBytes": 159,
+      "durationMs": 6836,
+      "ttftMs": 276,
+      "usage": {
+        "inputTokens": 22,
+        "outputTokens": 31,
+        "totalTokens": 53,
+        "totalDurationMs": 6830,
+        "loadDurationMs": 0
+      },
+      "finishReason": "stop",
+      "provider": "ollama",
+      "model": "phi3:latest"
+    },
+    {
+      "callIndex": 2,
+      "promptIndex": 1,
+      "repetition": 1,
+      "promptLength": 64,
+      "passed": true,
+      "output": "1. Set a clear agenda: Before the meeting, create a detailed agenda that outlines the topics to be discussed, the objectives of the meeting, and the expected outcomes. Share the agenda with all participants ahead of time so they can come prepared. This helps to keep the meeting focused and on track, ensuring that all important points are covered within the allotted time.\n\n2. Encourage active participation: Make sure everyone has an opportunity to contribute to the discussion. Encourage team members to share their ideas, opinions, and feedback. This can be done by asking open-ended questions,",
+      "outputBytes": 598,
+      "durationMs": 28741,
+      "ttftMs": 373,
+      "usage": {
+        "inputTokens": 21,
+        "outputTokens": 128,
+        "totalTokens": 149,
+        "totalDurationMs": 28736,
+        "loadDurationMs": 1
+      },
+      "finishReason": "length",
+      "provider": "ollama",
+      "model": "phi3:latest"
+    },
+    {
+      "callIndex": 3,
+      "promptIndex": 1,
+      "repetition": 2,
+      "promptLength": 64,
+      "passed": true,
+      "output": "1. Set a clear agenda: Before the meeting, create a detailed agenda that outlines the topics to be discussed, the objectives of the meeting, and the expected outcomes. Share the agenda with all participants ahead of time so they can come prepared. This helps to keep the meeting focused and on track, ensuring that all important points are covered within the allotted time.\n\n2. Encourage active participation: Make sure everyone has an opportunity to contribute to the discussion. Encourage team members to share their ideas, opinions, and feedback. This can be done by asking open-ended questions,",
+      "outputBytes": 598,
+      "durationMs": 28758,
+      "ttftMs": 229,
+      "usage": {
+        "inputTokens": 21,
+        "outputTokens": 128,
+        "totalTokens": 149,
+        "totalDurationMs": 28754,
+        "loadDurationMs": 1
+      },
+      "finishReason": "length",
+      "provider": "ollama",
+      "model": "phi3:latest"
+    },
+    {
+      "callIndex": 4,
+      "promptIndex": 2,
+      "repetition": 1,
+      "promptLength": 69,
+      "passed": true,
+      "output": "Hey there! Just a gentle nudge to grab a glass of water and stay hydrated throughout the day – your body will thank you!",
+      "outputBytes": 122,
+      "durationMs": 6687,
+      "ttftMs": 354,
+      "usage": {
+        "inputTokens": 25,
+        "outputTokens": 32,
+        "totalTokens": 57,
+        "totalDurationMs": 6684,
+        "loadDurationMs": 1
+      },
+      "finishReason": "stop",
+      "provider": "ollama",
+      "model": "phi3:latest"
+    },
+    {
+      "callIndex": 5,
+      "promptIndex": 2,
+      "repetition": 2,
+      "promptLength": 69,
+      "passed": true,
+      "output": "Hey there! Just a gentle nudge to grab a glass of water and stay hydrated throughout the day – your body will thank you!",
+      "outputBytes": 122,
+      "durationMs": 7366,
+      "ttftMs": 267,
+      "usage": {
+        "inputTokens": 25,
+        "outputTokens": 32,
+        "totalTokens": 57,
+        "totalDurationMs": 7362,
+        "loadDurationMs": 1
+      },
+      "finishReason": "stop",
+      "provider": "ollama",
+      "model": "phi3:latest"
+    }
+  ],
+  "gpu": {
+    "before": {
+      "available": false,
+      "reason": "nvidia-smi-not-found",
+      "sampledAt": "2026-09-07T18:18:05.114Z",
+      "devices": []
+    },
+    "after": {
+      "available": false,
+      "reason": "nvidia-smi-not-found",
+      "sampledAt": "2026-09-07T18:19:30.367Z",
+      "devices": []
+    }
+  },
+  "timeline": [
+    {
+      "sequence": 1,
+      "revision": 1,
+      "type": "created",
+      "timestamp": "2026-09-07T18:18:05.091Z"
+    },
+    {
+      "sequence": 2,
+      "revision": 2,
+      "type": "started",
+      "timestamp": "2026-09-07T18:18:05.108Z"
+    },
+    {
+      "sequence": 3,
+      "revision": 2,
+      "type": "provider_selected",
+      "timestamp": "2026-09-07T18:18:05.108Z",
+      "provider": "ollama",
+      "model": "phi3:latest"
+    },
+    {
+      "sequence": 4,
+      "revision": 4,
+      "type": "call_started",
+      "timestamp": "2026-09-07T18:18:05.118Z",
+      "callIndex": 0
+    },
+    {
+      "sequence": 5,
+      "revision": 5,
+      "type": "call_completed",
+      "timestamp": "2026-09-07T18:18:11.878Z",
+      "callIndex": 0
+    },
+    {
+      "sequence": 6,
+      "revision": 6,
+      "type": "call_started",
+      "timestamp": "2026-09-07T18:18:11.891Z",
+      "callIndex": 1
+    },
+    {
+      "sequence": 7,
+      "revision": 7,
+      "type": "call_completed",
+      "timestamp": "2026-09-07T18:18:18.735Z",
+      "callIndex": 1
+    },
+    {
+      "sequence": 8,
+      "revision": 8,
+      "type": "call_started",
+      "timestamp": "2026-09-07T18:18:18.748Z",
+      "callIndex": 2
+    },
+    {
+      "sequence": 9,
+      "revision": 9,
+      "type": "call_completed",
+      "timestamp": "2026-09-07T18:18:47.499Z",
+      "callIndex": 2
+    },
+    {
+      "sequence": 10,
+      "revision": 10,
+      "type": "call_started",
+      "timestamp": "2026-09-07T18:18:47.510Z",
+      "callIndex": 3
+    },
+    {
+      "sequence": 11,
+      "revision": 11,
+      "type": "call_completed",
+      "timestamp": "2026-09-07T18:19:16.275Z",
+      "callIndex": 3
+    },
+    {
+      "sequence": 12,
+      "revision": 12,
+      "type": "call_started",
+      "timestamp": "2026-09-07T18:19:16.281Z",
+      "callIndex": 4
+    },
+    {
+      "sequence": 13,
+      "revision": 13,
+      "type": "call_completed",
+      "timestamp": "2026-09-07T18:19:22.975Z",
+      "callIndex": 4
+    },
+    {
+      "sequence": 14,
+      "revision": 14,
+      "type": "call_started",
+      "timestamp": "2026-09-07T18:19:22.983Z",
+      "callIndex": 5
+    },
+    {
+      "sequence": 15,
+      "revision": 15,
+      "type": "call_completed",
+      "timestamp": "2026-09-07T18:19:30.357Z",
+      "callIndex": 5
+    },
+    {
+      "sequence": 50,
+      "revision": 16,
+      "type": "completed",
+      "timestamp": "2026-09-07T18:19:30.367Z"
+    }
+  ]
+}

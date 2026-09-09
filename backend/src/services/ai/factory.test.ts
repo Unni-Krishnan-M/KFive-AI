@@ -5,6 +5,7 @@ import { OpenAiCompatibleProvider } from './providers/openAiCompatibleProvider';
 import { AnthropicProvider } from './providers/anthropicProvider';
 
 const baseConfig: EnvironmentConfig = {
+  processKind: 'api',
   nodeEnv: 'test',
   port: 5000,
   apiVersion: 'v1',
@@ -25,6 +26,7 @@ const baseConfig: EnvironmentConfig = {
   jwtSecret: '01234567890123456789012345678901',
   jwtRefreshSecret: 'abcdefghijklmnopqrstuvwxyz123456',
   codeRunnerMode: 'disabled',
+  notebookExecutionEnabled: false,
 };
 
 describe('createAiProvider', () => {

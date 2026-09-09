@@ -1,0 +1,88 @@
+- generic [ref=e326]:
+  - complementary [ref=e327]:
+    - generic [ref=e328]:
+      - generic [ref=e329]: KFive AI
+      - button "Collapse sidebar" [ref=e335] [cursor=pointer]
+    - generic [ref=e339]:
+      - generic [ref=e340] [cursor=pointer]:
+        - generic [ref=e341]: Search
+        - generic [ref=e346]:
+          - generic [ref=e347]: ⌘
+          - generic [ref=e348]: K
+      - navigation [ref=e349]:
+        - link "Dashboard" [ref=e868] [cursor=pointer]:
+          - /url: /app/dashboard
+        - link "AI Chat" [ref=e876] [cursor=pointer]:
+          - /url: /app/chat
+        - link "Code Lab" [ref=e881] [cursor=pointer]:
+          - /url: /app/code
+        - link "Agents" [ref=e888] [cursor=pointer]:
+          - /url: /app/agents
+        - link "Documents" [ref=e894] [cursor=pointer]:
+          - /url: /app/documents
+        - link "Knowledge / RAG" [ref=e900] [cursor=pointer]:
+          - /url: /app/knowledge
+        - link "Repository Analyzer" [ref=e906] [cursor=pointer]:
+          - /url: /app/repositories
+        - link "Workflows" [ref=e913] [cursor=pointer]:
+          - /url: /app/workflows
+        - link "Dataset Lab" [ref=e921] [cursor=pointer]:
+          - /url: /app/datasets
+        - link "Model Benchmarks" [ref=e928] [cursor=pointer]:
+          - /url: /app/benchmarks
+        - link "Notebooks" [ref=e934] [cursor=pointer]:
+          - /url: /app/notebooks
+        - link "Voice Assistant" [ref=e940] [cursor=pointer]:
+          - /url: /app/voice
+        - link "Models" [ref=e946] [cursor=pointer]:
+          - /url: /app/models
+        - link "Projects" [ref=e959] [cursor=pointer]:
+          - /url: /app/projects
+        - link "Workspace" [ref=e964] [cursor=pointer]:
+          - /url: /app/workspace
+        - link "PDF Utilities" [ref=e970] [cursor=pointer]:
+          - /url: /app/files
+    - generic [ref=e458]:
+      - generic [ref=e459]:
+        - generic [ref=e460]: P
+        - generic [ref=e462]:
+          - paragraph [ref=e463]: PDF Smoke
+          - paragraph [ref=e464]: kfive-pdf-20260902@example.test
+      - generic [ref=e465]:
+        - link "Profile" [ref=e466] [cursor=pointer]:
+          - /url: /app/profile
+        - link "Settings" [ref=e470] [cursor=pointer]:
+          - /url: /app/settings
+        - button "Toggle theme" [ref=e474] [cursor=pointer]
+        - button "Sign out" [ref=e481] [cursor=pointer]
+  - main [ref=e485]:
+    - generic [ref=e976]:
+      - button "Back to PDF Utilities" [ref=e977] [cursor=pointer]
+      - generic [ref=e980]:
+        - generic [ref=e989]:
+          - heading "Extract Pages" [level=1] [ref=e990]
+          - paragraph [ref=e991]: Create a new PDF from selected pages of one PDF.
+          - paragraph [ref=e992]: Processed locally. The output is not added to your KFive document library.
+        - generic [ref=e993]:
+          - generic [ref=e994]:
+            - paragraph [ref=e998]: Drop a PDF file here
+            - paragraph [ref=e999]: or choose files from this device
+            - button "Choose PDF" [active] [ref=e1000] [cursor=pointer]
+          - generic [ref=e1004]:
+            - heading "Selected files (1)" [level=2] [ref=e1006]
+            - generic [ref=e1007]:
+              - generic [ref=e1011]:
+                - paragraph [ref=e1012]: kfive-pdf-pages.pdf
+                - paragraph [ref=e1013]: 0.00 MB
+              - button "Remove kfive-pdf-pages.pdf" [ref=e1014] [cursor=pointer]
+          - generic [ref=e1018]:
+            - generic [ref=e1019]:
+              - text: Pages
+              - textbox "Pages Use all or a list such as 1-3,5." [ref=e1020]:
+                - /placeholder: all or 1-3,5
+                - text: all
+              - generic [ref=e1021]: Use all or a list such as 1-3,5.
+            - generic [ref=e1022]: The selected pages are copied into one new PDF in the specified order.
+          - generic [ref=e1001]:
+            - button "Reset" [ref=e1002] [cursor=pointer]
+            - button "Extract Pages" [ref=e1003] [cursor=pointer]

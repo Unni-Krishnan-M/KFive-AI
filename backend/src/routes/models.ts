@@ -4,6 +4,7 @@ import { getAuthenticatedUserId } from '@/middleware/auth';
 import { asyncHandler } from '@/middleware/errorHandler';
 import { AiProviderClient, getAiProvider } from '@/services/aiProvider';
 import { AiProviderError } from '@/services/ai/errors';
+import { withProviderDiscoveryDeadline } from '@/services/ai/providerDeadline';
 import { AiTaskType, ModelRoutingError, routeModel } from '@/services/ai/modelRouter';
 import { getGpuStatus, GpuStatus } from '@/services/gpuStatus';
 import {
@@ -84,7 +85,7 @@ export function createModelsRouter(
   const listHandler = asyncHandler(async (_req, res) => {
     const provider = resolveProvider();
     try {
-      const models = await provider.listModels();
+      const models = await withProviderDiscoveryDeadline(provider.id, (options) => provider.listModels(options));
       res.json({ success: true, data: { provider: providerMetadata(provider), models } });
     } catch (error) {
       if (!managementError(res, error)) throw error;

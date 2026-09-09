@@ -15,6 +15,7 @@ describe('parseEnvironment', () => {
   it('parses local Ollama configuration', () => {
     const config = parseEnvironment(baseEnvironment);
     expect(config.kfiveMode).toBe('local');
+    expect(config.processKind).toBe('api');
     expect(config.aiProvider).toBe('ollama');
     expect(config.mongodbUrl).toBe(baseEnvironment.MONGODB_URL);
     expect(config.aiDefaultModel).toBe('phi3');
@@ -62,6 +63,30 @@ describe('parseEnvironment', () => {
     })).toThrow(/must not contain embedded credentials/);
   });
 
+  it('requires the public browser origin to be allowed by CORS', () => {
+    expect(() => parseEnvironment({
+      ...baseEnvironment,
+      PUBLIC_BASE_URL: 'http://localhost:3002/app',
+      CORS_ORIGIN: 'http://localhost:3000,http://127.0.0.1:3002',
+    })).toThrow(/CORS_ORIGIN must include.*http:\/\/localhost:3002/);
+
+    const config = parseEnvironment({
+      ...baseEnvironment,
+      PUBLIC_BASE_URL: 'http://localhost:3002/app',
+      CORS_ORIGIN: 'http://localhost:3002,http://127.0.0.1:3002',
+    });
+    expect(config.corsOrigins).toEqual(['http://localhost:3002', 'http://127.0.0.1:3002']);
+  });
+
+  it('normalizes root slashes and rejects non-origin CORS entries', () => {
+    const config = parseEnvironment({ ...baseEnvironment, CORS_ORIGIN: 'http://localhost:3000/' });
+    expect(config.corsOrigins).toEqual(['http://localhost:3000']);
+    expect(() => parseEnvironment({ ...baseEnvironment, CORS_ORIGIN: 'http://localhost:3000/app' }))
+      .toThrow(/without credentials, paths, queries, or fragments/);
+    expect(() => parseEnvironment({ ...baseEnvironment, CORS_ORIGIN: 'http://user:secret@localhost:3000' }))
+      .toThrow(/without credentials, paths, queries, or fragments/);
+  });
+
   it('accepts the deprecated MongoDB URI alias during migration', () => {
     const { MONGODB_URL: _removed, ...legacyEnvironment } = baseEnvironment;
     const config = parseEnvironment({ ...legacyEnvironment, MONGODB_URI: baseEnvironment.MONGODB_URL });
@@ -79,5 +104,31 @@ describe('parseEnvironment', () => {
       NODE_ENV: 'production',
       JWT_SECRET: 'replace-this-example-secret-123456789',
     })).toThrow(/Production JWT secrets/);
+  });
+
+  it('does not require API signing secrets in the portless benchmark worker', () => {
+    const { JWT_SECRET: _jwt, JWT_REFRESH_SECRET: _refresh, ...workerEnvironment } = baseEnvironment;
+    const config = parseEnvironment({ ...workerEnvironment, NODE_ENV: 'production', KFIVE_PROCESS: 'benchmark-worker' });
+    expect(config.processKind).toBe('benchmark-worker');
+    expect(config.jwtSecret).toBe('kfive-worker-no-http-authentication-00000001');
+    expect(config.jwtRefreshSecret).toBe('kfive-worker-no-refresh-authentication-0001');
+  });
+
+  it('requires distinct configured images before notebook execution can be enabled', () => {
+    expect(() => parseEnvironment({ ...baseEnvironment, NOTEBOOK_EXECUTION_ENABLED: 'true' }))
+      .toThrow(/NOTEBOOK_RUNTIME_IMAGE and NOTEBOOK_VERIFIER_IMAGE/);
+    expect(() => parseEnvironment({ ...baseEnvironment, NOTEBOOK_EXECUTION_ENABLED: 'true',
+      NOTEBOOK_RUNTIME_IMAGE: 'same:image', NOTEBOOK_VERIFIER_IMAGE: 'same:image' })).toThrow(/must be distinct/);
+    const config = parseEnvironment({ ...baseEnvironment, KFIVE_PROCESS: 'notebook-worker',
+      NOTEBOOK_EXECUTION_ENABLED: 'true', NOTEBOOK_RUNTIME_IMAGE: 'runtime:test', NOTEBOOK_VERIFIER_IMAGE: 'verifier:test' });
+    expect(config).toMatchObject({ processKind: 'notebook-worker', notebookExecutionEnabled: true,
+      notebookRuntimeImage: 'runtime:test', notebookVerifierImage: 'verifier:test' });
+  });
+
+  it('does not require API signing secrets in the portless notebook worker', () => {
+    const { JWT_SECRET: _jwt, JWT_REFRESH_SECRET: _refresh, ...workerEnvironment } = baseEnvironment;
+    const config = parseEnvironment({ ...workerEnvironment, NODE_ENV: 'production', KFIVE_PROCESS: 'notebook-worker',
+      NOTEBOOK_EXECUTION_ENABLED: 'true', NOTEBOOK_RUNTIME_IMAGE: 'runtime:test', NOTEBOOK_VERIFIER_IMAGE: 'verifier:test' });
+    expect(config.jwtSecret).toBe('kfive-worker-no-http-authentication-00000001');
   });
 });

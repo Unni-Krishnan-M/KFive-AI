@@ -6,7 +6,8 @@ import {
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  PdfInput, PdfToolError, extractPdfPages, mergePdfs, rotatePdfPages,
+  MAX_PDF_PAGE_SELECTION_CHARS, extractPdfPages, mergePdfs, pdfOutputFilename,
+  publicPdfToolError, readBrowserPdfInputs, rotatePdfPages,
 } from '@/services/pdfTools';
 
 type ToolId = 'merge' | 'extract' | 'rotate';
@@ -31,19 +32,6 @@ const TOOLS: Tool[] = [
   { id: 'extract', name: 'Extract Pages', description: 'Create a new PDF from selected pages of one PDF.', icon: Scissors, multiple: false },
   { id: 'rotate', name: 'Rotate Pages', description: 'Rotate selected pages by 90, 180, or 270 degrees.', icon: RotateCw, multiple: false },
 ];
-
-const outputFilename = (tool: ToolId, input?: File): string => {
-  const base = input?.name.replace(/\.pdf$/i, '') || 'document';
-  if (tool === 'merge') return 'kfive-merged.pdf';
-  if (tool === 'extract') return `${base}-extracted.pdf`;
-  return `${base}-rotated.pdf`;
-};
-
-const readPdfInput = async (file: File): Promise<PdfInput> => ({
-  name: file.name,
-  mimeType: file.type,
-  bytes: new Uint8Array(await file.arrayBuffer()),
-});
 
 export default function FileActionsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -151,7 +139,7 @@ export default function FileActionsPage() {
     const operationId = operationIdRef.current + 1;
     operationIdRef.current = operationId;
     try {
-      const inputs = await Promise.all(files.map(readPdfInput));
+      const inputs = await readBrowserPdfInputs(files, activeTool.id === 'merge' ? 'merge' : 'single');
       const output = activeTool.id === 'merge'
         ? await mergePdfs(inputs)
         : activeTool.id === 'extract'
@@ -161,14 +149,10 @@ export default function FileActionsPage() {
       const bytes = new Uint8Array(output.bytes);
       const url = URL.createObjectURL(new Blob([bytes.buffer], { type: 'application/pdf' }));
       resultUrlRef.current = url;
-      setResult({ filename: outputFilename(activeTool.id, files[0]), pageCount: output.pageCount, url });
+      setResult({ filename: pdfOutputFilename(activeTool.id, files[0]?.name), pageCount: output.pageCount, url });
     } catch (processingError) {
       if (operationIdRef.current !== operationId) return;
-      setError(processingError instanceof PdfToolError
-        ? processingError.message
-        : processingError instanceof Error
-          ? processingError.message
-          : 'The PDF operation could not be completed.');
+      setError(publicPdfToolError(processingError));
     } finally {
       if (operationIdRef.current === operationId) setProcessing(false);
     }
@@ -176,7 +160,8 @@ export default function FileActionsPage() {
 
   const canProcess = activeTool?.id === 'merge'
     ? files.length >= 2 && files.length <= 10
-    : files.length === 1 && Boolean(pageSelection.trim());
+    : files.length === 1 && Boolean(pageSelection.trim())
+      && pageSelection.length <= MAX_PDF_PAGE_SELECTION_CHARS;
 
   return (
     <div className="flex h-full flex-col overflow-hidden p-6 md:p-8">
@@ -186,6 +171,7 @@ export default function FileActionsPage() {
             <header>
               <h1 className="flex items-center gap-3 text-3xl font-bold text-white"><FolderOpen className="h-8 w-8 text-primary" />PDF Utilities</h1>
               <p className="mt-2 text-gray-400">These three operations run locally in this browser. Inputs are not uploaded, and results are downloads—not saved to Documents or Projects.</p>
+              <p className="mt-2 max-w-3xl text-sm text-amber-300">Structural PDF changes do not sanitize links, actions, attachments, or other active content. Treat every generated PDF as untrusted.</p>
             </header>
             <div className="grid gap-5 md:grid-cols-3">
               {TOOLS.map((tool) => (
@@ -234,7 +220,7 @@ export default function FileActionsPage() {
 
                   {activeTool.id !== 'merge' && files.length === 1 ? (
                     <div className="grid gap-4 rounded-xl border border-white/10 bg-black/20 p-4 sm:grid-cols-2">
-                      <label className="text-sm font-medium text-gray-300">Pages<input value={pageSelection} onChange={(event) => { setPageSelection(event.target.value); setError(undefined); }} placeholder="all or 1-3,5" className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-primary/50" /><span className="mt-1 block text-xs font-normal text-gray-500">Use all or a list such as 1-3,5.</span></label>
+                      <label className="text-sm font-medium text-gray-300">Pages<input maxLength={MAX_PDF_PAGE_SELECTION_CHARS} value={pageSelection} onChange={(event) => { setPageSelection(event.target.value); setError(undefined); }} placeholder="all or 1-3,5" className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-primary/50" /><span className="mt-1 block text-xs font-normal text-gray-500">Use all or a list such as 1-3,5 (maximum 4096 characters).</span></label>
                       {activeTool.id === 'rotate' ? <label className="text-sm font-medium text-gray-300">Rotation<select value={rotationAngle} onChange={(event) => setRotationAngle(Number(event.target.value) as RotationAngle)} className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-primary/50"><option value={90}>90° clockwise</option><option value={180}>180°</option><option value={270}>270° clockwise</option></select></label> : <div className="text-sm text-gray-500 sm:pt-7">The selected pages are copied into one new PDF in the specified order.</div>}
                     </div>
                   ) : null}
@@ -245,7 +231,7 @@ export default function FileActionsPage() {
               ) : null}
 
               {processing ? <div className="flex min-h-80 flex-col items-center justify-center text-center"><Loader2 className="h-12 w-12 animate-spin text-primary" /><h2 className="mt-5 text-xl font-semibold text-white">Processing locally…</h2><p className="mt-2 max-w-md text-sm text-gray-400">Keep this tab open while the browser reads and writes the PDF. No percentage is available.</p></div> : null}
-              {result ? <div className="flex min-h-80 flex-col items-center justify-center text-center"><div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10"><CheckCircle className="h-8 w-8 text-emerald-400" /></div><h2 className="mt-5 text-2xl font-bold text-white">PDF ready</h2><p className="mt-2 text-gray-400">The result contains {result.pageCount} {result.pageCount === 1 ? 'page' : 'pages'} and has not been saved to Documents or Projects.</p><div className="mt-7 flex flex-wrap justify-center gap-3"><a href={result.url} download={result.filename} className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 font-medium text-white"><Download className="h-5 w-5" />Download {result.filename}</a><button onClick={resetState} className="rounded-xl border border-white/10 px-6 py-3 font-medium text-gray-300 hover:text-white">Start over</button></div></div> : null}
+              {result ? <div className="flex min-h-80 flex-col items-center justify-center text-center"><div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10"><CheckCircle className="h-8 w-8 text-emerald-400" /></div><h2 className="mt-5 text-2xl font-bold text-white">PDF ready</h2><p className="mt-2 text-gray-400">The result contains {result.pageCount} {result.pageCount === 1 ? 'page' : 'pages'} and has not been saved to Documents or Projects.</p><p className="mt-2 max-w-lg text-sm text-amber-300">This structural operation is not sanitization. Keep treating the downloaded PDF as untrusted.</p><div className="mt-7 flex flex-wrap justify-center gap-3"><a href={result.url} download={result.filename} className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 font-medium text-white"><Download className="h-5 w-5" />Download {result.filename}</a><button onClick={resetState} className="rounded-xl border border-white/10 px-6 py-3 font-medium text-gray-300 hover:text-white">Start over</button></div></div> : null}
             </section>
           </motion.div>
         )}

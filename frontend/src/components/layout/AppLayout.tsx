@@ -26,6 +26,9 @@ import {
   BookOpen,
   GitBranch,
   Network,
+  Database,
+  Gauge,
+  BookMarked,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -42,6 +45,9 @@ const navigation = [
   { name: 'Knowledge / RAG', href: '/app/knowledge', icon: BookOpen },
   { name: 'Repository Analyzer', href: '/app/repositories', icon: GitBranch },
   { name: 'Workflows', href: '/app/workflows', icon: Network },
+  { name: 'Dataset Lab', href: '/app/datasets', icon: Database },
+  { name: 'Model Benchmarks', href: '/app/benchmarks', icon: Gauge },
+  { name: 'Notebooks', href: '/app/notebooks', icon: BookMarked },
   { name: 'Voice Assistant', href: '/app/voice', icon: Mic2 },
   { name: 'Models', href: '/app/models', icon: Boxes },
   { name: 'Projects', href: '/app/projects', icon: FolderKanban },

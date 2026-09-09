@@ -22,6 +22,9 @@ const CodeLabPage = lazy(() => import('@/pages/CodeLabPage'));
 const KnowledgePage = lazy(() => import('@/pages/KnowledgePage'));
 const RepositoryAnalyzerPage = lazy(() => import('@/pages/RepositoryAnalyzerPage'));
 const WorkflowsPage = lazy(() => import('@/pages/WorkflowsPage'));
+const DatasetLabPage = lazy(() => import('@/pages/DatasetLabPage'));
+const BenchmarksPage = lazy(() => import('@/pages/BenchmarksPage'));
+const NotebookPage = lazy(() => import('@/pages/NotebookPage'));
 
 // Components
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
@@ -29,16 +32,8 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 
-// Hooks
-import { useAuth } from '@/hooks/useAuth';
-
 function App() {
   const location = useLocation();
-  const { isLoading } = useAuth();
-
-  if (isLoading) {
-    return <LoadingScreen />;
-  }
 
   return (
     <ErrorBoundary>
@@ -76,6 +71,9 @@ function App() {
                         <Route path="knowledge" element={<KnowledgePage />} />
                         <Route path="repositories" element={<RepositoryAnalyzerPage />} />
                         <Route path="workflows" element={<WorkflowsPage />} />
+                        <Route path="datasets" element={<DatasetLabPage />} />
+                        <Route path="benchmarks" element={<BenchmarksPage />} />
+                        <Route path="notebooks" element={<NotebookPage />} />
                         <Route path="*" element={<Navigate to="/not-found" replace />} />
                       </Routes>
                     </AnimatePresence>

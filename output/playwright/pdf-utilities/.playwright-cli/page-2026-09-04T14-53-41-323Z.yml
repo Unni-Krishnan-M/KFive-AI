@@ -1,0 +1,93 @@
+- generic [ref=e326]:
+  - complementary [ref=e327]:
+    - generic [ref=e328]:
+      - generic [ref=e329]: KFive AI
+      - button "Collapse sidebar" [ref=e335] [cursor=pointer]
+    - generic [ref=e339]:
+      - generic [ref=e340] [cursor=pointer]:
+        - generic [ref=e341]: Search
+        - generic [ref=e346]:
+          - generic [ref=e347]: ⌘
+          - generic [ref=e348]: K
+      - navigation [ref=e349]:
+        - link "Dashboard" [ref=e529] [cursor=pointer]:
+          - /url: /app/dashboard
+        - link "AI Chat" [ref=e537] [cursor=pointer]:
+          - /url: /app/chat
+        - link "Code Lab" [ref=e542] [cursor=pointer]:
+          - /url: /app/code
+        - link "Agents" [ref=e549] [cursor=pointer]:
+          - /url: /app/agents
+        - link "Documents" [ref=e555] [cursor=pointer]:
+          - /url: /app/documents
+        - link "Knowledge / RAG" [ref=e561] [cursor=pointer]:
+          - /url: /app/knowledge
+        - link "Repository Analyzer" [ref=e567] [cursor=pointer]:
+          - /url: /app/repositories
+        - link "Workflows" [ref=e574] [cursor=pointer]:
+          - /url: /app/workflows
+        - link "Dataset Lab" [ref=e582] [cursor=pointer]:
+          - /url: /app/datasets
+        - link "Model Benchmarks" [ref=e589] [cursor=pointer]:
+          - /url: /app/benchmarks
+        - link "Notebooks" [ref=e595] [cursor=pointer]:
+          - /url: /app/notebooks
+        - link "Voice Assistant" [ref=e601] [cursor=pointer]:
+          - /url: /app/voice
+        - link "Models" [ref=e607] [cursor=pointer]:
+          - /url: /app/models
+        - link "Projects" [ref=e620] [cursor=pointer]:
+          - /url: /app/projects
+        - link "Workspace" [ref=e625] [cursor=pointer]:
+          - /url: /app/workspace
+        - link "PDF Utilities" [ref=e631] [cursor=pointer]:
+          - /url: /app/files
+    - generic [ref=e458]:
+      - generic [ref=e459]:
+        - generic [ref=e460]: P
+        - generic [ref=e462]:
+          - paragraph [ref=e463]: PDF Smoke
+          - paragraph [ref=e464]: kfive-pdf-20260902@example.test
+      - generic [ref=e465]:
+        - link "Profile" [ref=e466] [cursor=pointer]:
+          - /url: /app/profile
+        - link "Settings" [ref=e470] [cursor=pointer]:
+          - /url: /app/settings
+        - button "Toggle theme" [ref=e474] [cursor=pointer]
+        - button "Sign out" [ref=e481] [cursor=pointer]
+  - main [ref=e485]:
+    - generic [ref=e637]:
+      - button "Back to PDF Utilities" [ref=e638] [cursor=pointer]
+      - generic [ref=e641]:
+        - generic [ref=e651]:
+          - heading "Merge PDF" [level=1] [ref=e652]
+          - paragraph [ref=e653]: Combine 2–10 PDFs in the order you choose.
+          - paragraph [ref=e654]: Processed locally. The output is not added to your KFive document library.
+        - generic [ref=e655]:
+          - generic [ref=e656]:
+            - paragraph [ref=e660]: Drop PDF files here
+            - paragraph [ref=e661]: or choose files from this device
+            - button "Choose PDFs" [active] [ref=e662] [cursor=pointer]
+          - generic [ref=e666]:
+            - generic [ref=e667]:
+              - heading "Selected files (2/10)" [level=2] [ref=e668]
+              - button "Add PDFs" [ref=e669] [cursor=pointer]
+            - generic [ref=e670]:
+              - generic [ref=e674]:
+                - paragraph [ref=e675]: kfive-pdf-first.pdf
+                - paragraph [ref=e676]: 0.00 MB
+              - generic [ref=e677]:
+                - button "Move kfive-pdf-first.pdf up" [disabled] [ref=e678]
+                - button "Move kfive-pdf-first.pdf down" [ref=e681] [cursor=pointer]
+              - button "Remove kfive-pdf-first.pdf" [ref=e684] [cursor=pointer]
+            - generic [ref=e688]:
+              - generic [ref=e692]:
+                - paragraph [ref=e693]: kfive-pdf-second.pdf
+                - paragraph [ref=e694]: 0.00 MB
+              - generic [ref=e695]:
+                - button "Move kfive-pdf-second.pdf up" [ref=e696] [cursor=pointer]
+                - button "Move kfive-pdf-second.pdf down" [disabled] [ref=e699]
+              - button "Remove kfive-pdf-second.pdf" [ref=e702] [cursor=pointer]
+          - generic [ref=e663]:
+            - button "Reset" [ref=e664] [cursor=pointer]
+            - button "Merge PDF" [ref=e665] [cursor=pointer]

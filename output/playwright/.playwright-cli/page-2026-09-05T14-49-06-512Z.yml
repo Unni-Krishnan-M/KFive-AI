@@ -1,0 +1,114 @@
+- generic [ref=f1e4]:
+  - complementary [ref=f1e5]:
+    - generic [ref=f1e6]:
+      - generic [ref=f1e7]: KFive AI
+      - button "Collapse sidebar" [ref=f1e13] [cursor=pointer]
+    - generic [ref=f1e17]:
+      - generic [ref=f1e18] [cursor=pointer]:
+        - generic [ref=f1e19]: Search
+        - generic [ref=f1e24]:
+          - generic [ref=f1e25]: ⌘
+          - generic [ref=f1e26]: K
+      - navigation [ref=f1e27]:
+        - link "Dashboard" [ref=f1e579] [cursor=pointer]:
+          - /url: /app/dashboard
+        - link "AI Chat" [ref=f1e587] [cursor=pointer]:
+          - /url: /app/chat
+        - link "Code Lab" [ref=f1e592] [cursor=pointer]:
+          - /url: /app/code
+        - link "Agents" [ref=f1e599] [cursor=pointer]:
+          - /url: /app/agents
+        - link "Documents" [ref=f1e605] [cursor=pointer]:
+          - /url: /app/documents
+        - link "Knowledge / RAG" [ref=f1e611] [cursor=pointer]:
+          - /url: /app/knowledge
+        - link "Repository Analyzer" [ref=f1e617] [cursor=pointer]:
+          - /url: /app/repositories
+        - link "Workflows" [ref=f1e624] [cursor=pointer]:
+          - /url: /app/workflows
+        - link "Dataset Lab" [ref=f1e632] [cursor=pointer]:
+          - /url: /app/datasets
+        - link "Model Benchmarks" [ref=f1e640] [cursor=pointer]:
+          - /url: /app/benchmarks
+        - link "Notebooks" [ref=f1e646] [cursor=pointer]:
+          - /url: /app/notebooks
+        - link "Voice Assistant" [ref=f1e652] [cursor=pointer]:
+          - /url: /app/voice
+        - link "Models" [ref=f1e658] [cursor=pointer]:
+          - /url: /app/models
+        - link "Projects" [ref=f1e671] [cursor=pointer]:
+          - /url: /app/projects
+        - link "Workspace" [ref=f1e676] [cursor=pointer]:
+          - /url: /app/workspace
+        - link "PDF Utilities" [ref=f1e682] [cursor=pointer]:
+          - /url: /app/files
+    - generic [ref=f1e136]:
+      - generic [ref=f1e137]:
+        - generic [ref=f1e138]: D
+        - generic [ref=f1e140]:
+          - paragraph [ref=f1e141]: Dataset Owner
+          - paragraph [ref=f1e142]: kfive-dataset-owner-20260905@example.test
+      - generic [ref=f1e143]:
+        - link "Profile" [ref=f1e144] [cursor=pointer]:
+          - /url: /app/profile
+        - link "Settings" [ref=f1e148] [cursor=pointer]:
+          - /url: /app/settings
+        - button "Toggle theme" [ref=f1e152] [cursor=pointer]
+        - button "Sign out" [ref=f1e159] [cursor=pointer]
+  - main [ref=f1e163]:
+    - generic [ref=f1e165]:
+      - generic [ref=f1e166]:
+        - generic [ref=f1e167]:
+          - generic [ref=f1e168]:
+            - heading "Dataset Lab" [level=1] [ref=f1e169]
+            - generic [ref=f1e174]: Experimental
+          - paragraph [ref=f1e175]: Inspect bounded CSV or JSON datasets and create deterministic cleaned copies.
+        - button "Refresh" [ref=f1e176] [cursor=pointer]
+      - note [ref=f1e182]: Analysis is deterministic and bounded. Dataset Lab does not execute dataset content, start notebooks, train models, run benchmarks, or submit GPU jobs.
+      - alert [ref=f1e186]: Uploaded and derived dataset content is persisted for later download. Do not upload passwords, access tokens, or data you are not authorized to store.
+      - region [ref=f1e201]:
+        - generic [ref=f1e202]:
+          - generic [ref=f1e203]:
+            - heading "Dataset service" [level=2] [ref=f1e204]
+            - paragraph [ref=f1e205]: Backend-advertised availability and enforced limits.
+          - generic [ref=f1e687]: Available
+        - generic [ref=f1e688]:
+          - generic [ref=f1e689]:
+            - term [ref=f1e690]: Upload
+            - definition [ref=f1e691]: 5.00 MiB
+          - generic [ref=f1e692]:
+            - term [ref=f1e693]: Derived file
+            - definition [ref=f1e694]: 10.0 MiB
+          - generic [ref=f1e695]:
+            - term [ref=f1e696]: Rows
+            - definition [ref=f1e697]: 10,000
+          - generic [ref=f1e698]:
+            - term [ref=f1e699]: Columns
+            - definition [ref=f1e700]: "100"
+          - generic [ref=f1e701]:
+            - term [ref=f1e702]: Preview rows
+            - definition [ref=f1e703]: "50"
+          - generic [ref=f1e704]:
+            - term [ref=f1e705]: Saved
+            - definition [ref=f1e706]: 2 / 100
+      - generic [ref=f1e226]:
+        - complementary [ref=f1e227]:
+          - region [ref=f1e228]:
+            - heading "Upload dataset" [level=2] [ref=f1e229]
+            - paragraph [ref=f1e230]: One UTF-8 CSV or flat-object JSON file, up to 5.00 MiB.
+            - button "Choose CSV or JSON" [active] [ref=f1e231] [cursor=pointer]
+            - generic [ref=f1e713]:
+              - paragraph [ref=f1e714]:
+                - text: dataset-e2e.csv
+                - generic [ref=f1e715]: (38 B)
+              - generic [ref=f1e716]:
+                - text: Dataset name
+                - textbox "Dataset name" [ref=f1e717]: dataset-e2e
+              - button "Upload and analyze" [ref=f1e718] [cursor=pointer]
+          - region [ref=f1e235]:
+            - generic [ref=f1e236]:
+              - heading "Saved datasets" [level=2] [ref=f1e237]
+              - generic [ref=f1e238]: "0"
+            - paragraph [ref=f1e707]: No saved datasets in this scope.
+        - main [ref=f1e241]:
+          - paragraph [ref=f1e712]: Select a saved dataset or upload a new one.

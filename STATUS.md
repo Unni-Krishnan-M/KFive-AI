@@ -1,6 +1,6 @@
 # KFive AI Status
 
-Documentation updated: 2026-08-26. Phase 9 source verification and the in-progress Phase 10 scope are included below; live-environment gaps remain explicit.
+Documentation updated: 2026-09-09. Phase 9, Phase 10, and Phase 11 source verification plus live local Notebook Mode, Chat durability, Project Rooms, browser PDF, Dataset Lab, and Model Benchmark slices are included below; remaining gaps stay explicit.
 
 ## Phase 0 result
 
@@ -13,7 +13,7 @@ Completed in this slice:
 - Restored frontend and backend builds.
 - Added User, Conversation, Document, and Agent models.
 - Added typed local/hybrid/remote environment validation and canonical `MONGODB_URL` support.
-- Added shared AI provider selection with explicit no-fallback errors; Ollama is the only installed adapter.
+- Added shared AI provider selection with explicit no-fallback errors; Ollama was the initial adapter and Phase 2 records the current provider set.
 - Added request IDs, exact CORS allowlisting, liveness, readiness, and dependency-specific states.
 - Fixed Redis/BullMQ URL handling and graceful queue/database shutdown paths.
 - Added owner scoping to chat/agent HTTP and Socket.IO paths.
@@ -29,22 +29,22 @@ Completed in this slice:
 | Command/check | Result |
 | --- | --- |
 | `npm run build` | Passed |
-| `npm test` | Passed: 294 checks total (52 frontend, 236 backend, 6 Code Runner tests) |
+| `npm test` | Passed: 605 checks plus 3 intentional host-only skips (100 frontend, 434 backend, 6 Code Runner, 65 passed/3 skipped notebook-runtime checks) |
 | `npm run lint` | Passed |
 | `bash -n setup.sh scripts/*.sh test-auth.sh` | Passed |
 | `docker compose --env-file .env.example config --quiet` | Passed |
 | Production backend module load | Passed with test environment |
 | `npm audit` | 37 total advisories remain: 2 critical, 16 high, 17 moderate, 2 low; the two critical findings are in development tooling |
 | `npm audit --omit=dev` | 22 production-tree advisories remain: 7 high, 14 moderate, 1 low, 0 critical |
-| Docker image build | Passed on the user host for frontend and backend |
-| Full Compose health/persistence | Blocked by an older MongoDB volume initialized with different credentials; recovery identified but not yet re-run |
+| Docker image build | Passed on the user host for frontend, backend, benchmark/notebook workers, and both notebook image targets; the image test stage runs all 68 runtime checks |
+| Local Compose health/persistence | Frontend, backend, MongoDB, Redis, ChromaDB, and benchmark worker rebuilt and started; Notebook run/history, Chat timeout/Stop records, Project/document/Dataset data, and a completed Benchmark passed restart/reload persistence checks |
 | GPU access | Failed capability check; driver unavailable to this environment |
 
 ## Known limitations
 
-Authentication, MongoDB persistence, Redis connectivity, Ollama streaming, Socket.IO, container images, browser PDF download, and the future isolated document processor still require live integration/E2E execution before being called complete. The test baseline does not yet satisfy the master platform test matrix.
+The Notebook Mode authenticated MongoDB/Redis/Docker path is live-verified through both its API and real browser UI. Chat's strict input boundary, provider-timeout persistence, explicit Stop/cancellation, safe terminal messages, provider/model/latency display, and Mongo-backed reload path also passed in a real browser. The Project Room core lifecycle, second-user ownership boundary, project-document archive/restore behavior, restart persistence, and guarded deletion passed against the production Compose frontend/backend/MongoDB path. All three currently exposed browser PDF operations produced downloaded files whose bytes were independently reopened and checked. Dataset Lab's core CSV lifecycle and boundaries passed the same live stack. Model Benchmarks now has one successful real browser/provider/Redis/worker/Mongo six-call run plus cancellation, export, completed-run restart persistence, scope separation, and archive-guard evidence. Successful Chat token streaming through the standard host listener, the full login/refresh/expiry/revocation and Socket.IO matrices, Code Lab host isolation, hostile Dataset resource tests, the remaining Project/Document/Dataset features, and a future isolated document processor still require their own complete integration/E2E execution. The test baseline does not yet satisfy the master platform test matrix.
 
-Next live prerequisites: recreate the stale MongoDB volume with the current `.env`, execute the repaired local Compose/auth/chat/project persistence path, then run the mandatory Code Lab normal/timeout/cancellation/output/memory/network/filesystem isolation suite against the target Docker daemon.
+Next live priorities: make host Ollama reachable to Docker and execute successful Chat token streaming, complete the login/refresh matrix, immutable-lock and harden Notebook Mode on an AppArmor-capable host, complete the remaining Benchmark GPU/remote/second-user/active-recovery paths, and run the mandatory Code Lab normal/timeout/cancellation/output/memory/network/filesystem paths against its real worker.
 
 ## Phase 2 runtime/provider slice
 
@@ -56,7 +56,7 @@ Completed and locally verified in this slice:
 - Removed fake Settings persistence/delete actions and hard-coded Settings model data.
 - Added exact configuration-missing messages for Code Runner, Document Processor, OCR, and ChromaDB.
 - Buffered Ollama NDJSON across arbitrary network chunks and made malformed/truncated streams fail explicitly.
-- Made unimplemented document jobs fail in BullMQ rather than appear completed.
+- Removed the API-process document-job stub. Uploads now persist one fixed processor-unavailable terminal state, and runtime topology never claims that an unused endpoint setting makes the missing adapter operational.
 
 The provider-neutral request/stream contract, default-model/resource controls, cancellation, Ollama, OpenAI Chat Completions, Anthropic Messages, OpenAI-compatible, and custom-compatible adapters are implemented and unit-tested. Still required before Phase 2 is complete: schema-bearing structured-output contracts, safe live switching/persistence, external-provider opt-in smoke tests, and the live local Ollama Compose E2E. No provider fallback is performed.
 
@@ -71,8 +71,11 @@ Completed and locally verified in this slice:
 - Added deterministic smart routing for chat, coding, reasoning, document, RAG, repository, extraction, and workflow tasks.
 - Smart routing stays within the configured provider, honors an installed preference, applies a conservative VRAM budget when measurements exist, and returns selection reasons.
 - Added the Models page, live provider model choices in Chat, task selection, smart-routing controls, and visible provider/model decisions.
+- Replaced Chat's whole-document, success-only save with an atomic request-id lease: the user turn is durable before inference and the assistant terminal record captures success, safe provider failure, timeout, output limit, cancellation, or stale-process interruption.
+- Added exact 4,000-character/16-KiB prompt validation, a 1-MiB recent-context cap, 256-KiB output cap, 64-message document boundary, bounded summary pagination, actual provider/model/usage/timing metadata, safe errors, named SSE events, explicit Stop, and startup/periodic stale-generation recovery.
+- Hardened the browser stream state machine against malformed JSON, event reordering, identity changes, duplicate/missing terminal events, early EOF, stale navigation, and old-request state races. Voice Assistant and Workspace now consume the same strict contract.
 
-Known limitation: model list/pull/delete, GPU measurement, and Chat routing are unit/integration tested with injected adapters, but their target-host end-to-end path is pending healthy Compose startup. Model benchmark history is not yet a routing input because the benchmark subsystem remains planned.
+Focused Chat verification passes 21 service/model tests, 10 route tests, and 16 frontend DTO/SSE parser tests. A disposable real-browser account verified the 4,001-character rejection, direct provider timeout, explicit Stop, fixed safe messages, actual provider/model/latency display, Mongo persistence, reload persistence, and zero console errors; its account and conversation were removed afterward. Successful output tokens remain unverified because host Ollama is still bound to `127.0.0.1:11434`, which the backend container cannot reach. Model list/pull/delete, GPU measurement, successful Chat routing/streaming, and fixed-suite model benchmarks still need their target-host provider/GPU paths. Benchmark history is not yet a Smart Router input.
 
 ## Phase 4 Project Rooms slice
 
@@ -86,8 +89,10 @@ Completed and locally verified in this slice:
 - Added project-filtered compound indexes for conversations, documents, and agents.
 - Replaced the legacy mocked Agent edit with an owner-scoped validated API and replaced simulated Agent execution with the real authenticated SSE stream and cancellation.
 - Added `PATCH` to the exact CORS method policy used by project and agent edits.
+- Reconciled the selected Project Room from canonical reload results, and added accessible names to icon-only lifecycle controls.
+- Serialized project-document deletion with project archive/restore mutations. Archived document deletion returns `PROJECT_ARCHIVED` before storage or Mongo mutation; retained orphan documents remain cleanable after a non-cascading project deletion.
 
-Automated verification covers schema validation, ownership boundaries, archived behavior, deletion token expiry/reuse, project filtering, upload cleanup, agent updates, frontend context parsing, CORS policy, builds, and lint. The browser/MongoDB persistence path is still pending recovery of the host's stale credential volume, so Project Rooms remain **Experimental** rather than Implemented.
+Automated verification covers schema validation, ownership boundaries, archived behavior, deletion token expiry/reuse, project filtering, upload cleanup, agent updates, frontend context parsing, CORS policy, builds, and lint. A production-Compose real-browser path additionally passed create/edit/tag/activity, selected-room reconciliation, project-document upload/list, application restart persistence, archive read-only/delete rejection, restore/delete, guarded project deletion/reload, one-use confirmation replay rejection, and direct plus forged-scope rejection for a second authenticated user. Project Rooms remain **Experimental** because export/import, cascade/orphan policy across every associated resource, and the complete associated-feature matrix are not implemented or live-verified.
 
 ## Phase 5 Code Lab slice
 
@@ -100,7 +105,7 @@ Completed and locally source-verified in this slice:
 - Added the disabled-by-default `code-lab` Compose profile. Startup validates the exact socket group and refuses to pull runtime images during a request.
 - Removed fabricated Workspace AI output, fake document upload progress/context actions, unsupported social-login controls, and false demo credential guidance.
 
-Code Lab remains **Experimental**. The frontend/backend/broker builds, current 294 automated checks, default/profile Compose rendering, shell syntax, and diff checks pass, but this environment cannot access the host Docker socket. The target-host isolation suite and immutable runtime digest selection remain mandatory before calling the critical path complete. Broker access to a Docker daemon is privileged infrastructure access; a dedicated or rootless daemon is recommended.
+Code Lab remains **Experimental**. The frontend/backend/broker builds, current 600 passed automated checks plus three notebook-runtime host skips, default/profile Compose rendering, shell syntax, and diff checks pass, but its separate target-host isolation suite and immutable runtime digest selection remain mandatory before calling the critical path complete. Broker access to a Docker daemon is privileged infrastructure access; a dedicated or rootless daemon is recommended.
 
 ## Phase 6 Document Studio slice
 
@@ -110,11 +115,13 @@ Completed and locally source-verified in this slice:
 - Added strict PDF filename/media/signature checks; 25 MiB per-file, 75 MiB aggregate, 10-file, 500-page, and 100 MiB output limits; encrypted/malformed handling; ordered page-expression parsing; and stable actionable error codes.
 - Tests generate real PDFs, execute each operation, reload every output with `pdf-lib`, and verify page order/count/rotation, caller-byte immutability, selection rules, and limit/error branches.
 - PDF inputs remain in the browser and results download locally. The UI states that outputs are not persisted to Documents or Projects, uses indeterminate processing rather than invented percentages, and revokes result object URLs.
+- File metadata, type, count, and per-file/aggregate byte bounds are checked before any content read; inputs are read sequentially. Page expressions are length/token bounded, unexpected failures map to a fixed public error, and download names are normalized and stripped of path/control characters.
+- The UI explicitly warns that structural transformations do not sanitize active PDF content and that generated files remain untrusted.
 - Removed unsupported Office/image conversion tiles, search entries, and the disconnected Resume Actions route from shipped navigation.
 - Disabled native LibreOffice/Poppler execution in the backend API. `/api/v1/documents/convert` now returns authenticated `503 DOCUMENT_PROCESSOR_UNAVAILABLE` without multipart/native parser middleware.
-- Document upload/list responses no longer expose internal paths, filenames, content, user IDs, or raw processor errors. Failed DB creation cleans uploaded files; queue failure becomes an explicit failed state; deletion is owner-scoped, blocks active processing, validates upload-root containment, and uses asynchronous cleanup.
+- Document upload/list responses no longer expose internal paths, filenames, content, user IDs, or raw processor errors. Failed DB creation cleans uploaded files; uploads become an explicit processor-unavailable failed state without an in-process fake worker; deletion is owner-scoped, blocks active processing, validates upload-root containment, and uses asynchronous cleanup.
 
-The PDF utility slice remains **Experimental** until its actual browser select/process/download path is smoke-tested. Server-side conversion, PDF preview/thumbnails, compression, images, page reordering/deletion/duplication, watermark/page numbers, batch jobs, OCR, and Office conversion remain Planned. A future native Document Processor must be a separate constrained service; untrusted documents will not be parsed inside the backend process.
+The current three-operation PDF utility surface is **Implemented**: a production-Compose real-auth browser run selected local fixtures, downloaded merge/extract/rotate outputs through their real Blob links, and independently verified `%PDF-` bytes, page count/order/dimensions, and rotation. Overall Document Studio remains **Experimental**. Server-side processing/conversion, PDF preview/thumbnails, compression, images, page reordering/deletion/duplication, watermark/page numbers, batch jobs, OCR, and Office conversion remain Planned. A future native Document Processor must be a separate constrained service; untrusted documents will not be parsed inside the backend process.
 
 ## Phase 7 Knowledge / RAG slice
 
@@ -160,7 +167,7 @@ Run detail intentionally persists and returns the normalized prompt and generate
 
 ## Phase 10 Experimental Workflow slice
 
-Implementation is in progress for this deliberately fixed workflow:
+Implemented and source-verified as this deliberately fixed workflow:
 
 ```text
 Input -> Prompt -> LLM -> Output
@@ -177,4 +184,49 @@ The Phase 10 contract is limited to:
 
 This is not a general workflow or automation engine. Tool, shell, code-runner, agent, RAG, Knowledge, document, PDF, OCR, repository, action, branching, loop, and arbitrary-node execution are outside this slice. Inputs, outputs, prompt templates, and system prompts are retained as application-readable plaintext, and each run snapshots the full definition including its template and system prompt; they must not contain secrets or regulated data.
 
-Phase 10 remains **Experimental and in progress**. Do not treat the fixed graph as complete until the source integration finishes and the target-host browser/authenticated API/configured-provider SSE/MongoDB persistence path, including archived behavior, cancellation, bounds, history/detail, and terminal deletion, is exercised. See [docs/WORKFLOWS.md](docs/WORKFLOWS.md).
+Focused Phase 10 verification passes 30 backend tests and 7 frontend contract tests. The current complete repository gate passes 605 checks with three host-only notebook-runtime checks skipped, all lint targets, and frontend/backend/Code Runner production builds.
+
+Phase 10 remains **Experimental**. Do not call its critical path complete until the target-host browser/authenticated API/configured-provider SSE/MongoDB persistence path, including archived behavior, cancellation, bounds, history/detail, and terminal deletion, is exercised. See [docs/WORKFLOWS.md](docs/WORKFLOWS.md).
+
+## Phase 11 Dataset Lab slice
+
+Implemented in this source slice:
+
+- Added authenticated, owner-scoped workspace/project CSV and flat-object JSON ingestion with server-validated immutable project association.
+- Enforced 5 MiB source, separate 10 MiB derived-input/output, 10,000-row, 100-column, and 16 KiB UTF-8-cell limits, plus at most 50 preview rows and 500 characters per previewed string. The derived bound accounts for serialization and formula-escaping expansion.
+- Added deterministic schema/type, missing-cell, duplicate-row, numeric, bounded category, IQR outlier, and bounded correlation analysis. Uploaded data is not sent to Python, a model, or another AI service.
+- Persisted immutable originals in the backend uploads volume and owner/project metadata, analysis, bounded preview, checksums, and derivation relationships in MongoDB. API responses and private attachment downloads do not expose internal paths or generated filenames.
+- Added explicit derived copies for string trimming, duplicate-row removal, missing-row removal, and CSV spreadsheet-formula escaping. Derivation never overwrites its parent; JSON scalar types are retained, and a parent with derived children cannot be deleted first.
+- Enforced archived-project history behavior: datasets remain readable/downloadable, while upload, derivation, and deletion require an active project.
+- Added a 100-record owner retention cap plus process-local upload admission and rate controls. The count-then-create quota is not atomic across concurrent requests or backend replicas.
+- Fixed the Mongo workspace list filter so project records cannot leak into the workspace view, and made fresh backend project status override stale page context for mutation controls.
+- Added proper accessible dialog semantics to the shared confirmation component used by Dataset deletion and other destructive flows.
+
+Focused Phase 11 Dataset Lab verification passes 45 backend model/parser/service/route/project-mutation tests and 8 frontend contract tests.
+
+Dataset Lab remains **Experimental**, but its core target-host path passed on 2026-09-05. Two real browser users exercised UI upload, deterministic analysis, exact original download, all four CSV transforms, independently hashed derived output, immutable parent/child lineage, parent deletion rejection, disjoint workspace/project lists, MongoDB/backend/frontend restart persistence, archived read/download with disabled UI mutations, direct `PROJECT_ARCHIVED` enforcement, second-user forged-scope plus direct record/download/derive/delete rejection, restore, dependency-ordered UI deletion, and project cleanup. Partial-write cleanup, disk-full behavior, exact live byte/row/column/cell/quota boundaries, hostile-input CPU/RAM behavior, JSON browser upload, charts, target selection, and ML task recommendations remain unverified or Planned. Original files, derived files, previews, and category values are application-readable to service, database, filesystem, and backup operators; deletion is not secure erasure and cannot remove prior backups. See [docs/DATASETS.md](docs/DATASETS.md).
+
+## Phase 11 Model Benchmarks slice
+
+Implemented in this source slice:
+
+- Added authenticated workspace/project benchmark execution for immutable `chat-core-v1`: three fixed benign prompts, two sequential repetitions, six calls, and fixed generation parameters against the explicitly selected listed chat model.
+- Added reconnectable provider-neutral SSE, explicit Mongo-first cancellation, bounded persistence, startup reconciliation, archived/deleted-project handling, and strict owner-scoped history/detail/deletion APIs. Disconnecting a browser does not cancel a durable run.
+- Recorded measured per-call wall time, TTFT when observable, output bytes, provider-reported usage only, aggregate medians, total wall time, actual provider/model identity, and sanitized before/after GPU snapshots without UUIDs.
+- Added a browser page with scope/archive awareness, model selection, six-call progress, stop/reconnect behavior, paged history, detail, compatible comparison, confirmed deletion, dependency-specific errors, and JSON export.
+- Added a dedicated portless BullMQ worker with opaque-id jobs, attempts-one delivery, checkpointed calls, retained-job recovery, worker heartbeat, graceful shutdown, and a fenced renewable Redis global lease. Mongo revision/fence/owner compare-and-swap prevents stale mutations, and a partial unique Mongo index enforces one active run per owner.
+- Enforced 16 KiB per call, 128 KiB per run, 180-second timeout, 100 retained runs per owner, 25 records per page over at most ten pages, and a 50-event timeline. Uncertain in-flight provider calls are interrupted rather than retried.
+
+Focused Model Benchmarks verification passes 40 backend model/queue/lease/executor/worker/service/route tests and 6 frontend strict-contract tests. Provider-discovery deadlines add three separately focused backend tests. The current repository gate passes 605 checks plus three intentional host-only notebook runtime skips (100 frontend, 434 backend, 6 Code Runner, and 65 passed/3 skipped notebook-runtime checks), every lint target, and frontend/backend/Code Runner production builds. The frontend build retains the pre-existing large-chunk warning, and the backend Jest gate reports one worker teardown warning despite exiting successfully.
+
+Model Benchmarks remains **Experimental**. On 2026-09-07 a real production-Compose browser run used listed `phi3:latest` through a temporary internal CPU-only Ollama service and completed 6/6 calls in 85.26 seconds. Redis dispatch, the dedicated worker, Mongo checkpoints/history, provider/model identity, six ordered results, TTFT/duration/output/token aggregates, a 16-event timeline, JSON export (SHA-256 `5cb45e272ac236dfbd7fe303201580477b21a3de088362bd6a164f1c9a0bf6bb`), and completed-run backend/worker restart persistence passed. A running workspace run cancelled at 0/6, a project run cancelled at 2/6, workspace and project histories stayed disjoint, and fresh archived-project status kept history readable while disabling creation/deletion. The default worker correctly reported GPU unavailable because it had no GPU grant. Standard host-Ollama reachability, two-success comparison, active queued/checkpoint/in-flight restart recovery, timeout/output-limit live paths, remote billing/cancellation, target-host GPU samples, cross-user isolation, retention limits, and multi-replica races remain unverified. Passing means operational completion, not answer correctness or model quality. Raw outputs and metadata remain application-readable and may persist in backups. See [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+
+## Phase 11 Notebook Mode
+
+The authenticated owner/project editor now connects to a durable run path. The browser exposes Run/Stop, dependency-specific availability, progress polling, verified inline output, bounded run history/detail, and confirmed terminal-run deletion. MongoDB owns immutable snapshots and lifecycle state; BullMQ carries opaque attempts-one jobs; a partial unique index allows one active notebook run per owner.
+
+The opt-in portless broker alone receives Docker-daemon access. It creates a bounded network-disabled UID-10001 runtime, streams strict hash-checked input/output envelopes without host mounts, force-removes the runtime, and only then creates a distinct UID-10002 verifier that executes no notebook code and independently reconstructs canonical inert output, metrics, and artifacts. The worker has an expiring Redis lease/heartbeat, canonical cancellation polling, stale-transition compare-and-swap, label-scoped recovery, and a real two-stage startup canary. Lease/heartbeat loss interrupts rather than completes the current run.
+
+Verification on 2026-09-02 passed all 68 runtime tests inside the image, 65/68 on the host with three image-only skips, focused worker lease-loss and missed-notification tests, and the then-current repository gate. The current repository gate has since grown to 605 passing checks plus the same three skips. A disposable authenticated API test through frontend port 3002 passed execution with exact stdout, distinct runtime/verifier image IDs, immutable snapshot identity, running-job cancellation, two-record history, backend-restart persistence, and cleanup. A separate Playwright browser test passed registration from `127.0.0.1:3002`, navigation, blank-notebook creation, edit/save to revision 2, isolated execution with `browser-notebook-result 42`, reload persistence, run deletion, notebook deletion, sign-out, and scoped account cleanup. MongoDB, Redis, ChromaDB, backend, frontend, and both workers were healthy afterward with no disposable notebook container left behind.
+
+Notebook Mode remains **Experimental**, not production-certified. The CachyOS daemon reports seccomp but no AppArmor, so the live functional test explicitly used `NOTEBOOK_REQUIRE_APPARMOR=false`; the repository default remains fail-closed with AppArmor required. Runtime transitive dependencies/local tags are not digest-locked, artifact downloads and age-based retention are absent, only one worker is supported, and remote/Kubernetes/multi-tenant hardening is unverified. ML experiments, model training, Python/AI dataset transformations, and a general shared GPU queue remain Planned. See [docs/NOTEBOOKS.md](docs/NOTEBOOKS.md).

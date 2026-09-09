@@ -1,0 +1,115 @@
+- generic [ref=f1e4]:
+  - complementary [ref=f1e5]:
+    - generic [ref=f1e6]:
+      - generic [ref=f1e7]: KFive AI
+      - button "Collapse sidebar" [ref=f1e12] [cursor=pointer]
+    - generic [ref=f1e16]:
+      - generic [ref=f1e17] [cursor=pointer]:
+        - generic [ref=f1e18]: Search
+        - generic [ref=f1e23]:
+          - generic [ref=f1e24]: ⌘
+          - generic [ref=f1e25]: K
+      - navigation [ref=f1e26]:
+        - link "Dashboard" [ref=f1e27] [cursor=pointer]:
+          - /url: /app/dashboard
+        - link "AI Chat" [ref=f1e35] [cursor=pointer]:
+          - /url: /app/chat
+        - link "Code Lab" [ref=f1e40] [cursor=pointer]:
+          - /url: /app/code
+        - link "Agents" [ref=f1e47] [cursor=pointer]:
+          - /url: /app/agents
+        - link "Documents" [ref=f1e53] [cursor=pointer]:
+          - /url: /app/documents
+        - link "Knowledge / RAG" [ref=f1e59] [cursor=pointer]:
+          - /url: /app/knowledge
+        - link "Repository Analyzer" [ref=f1e65] [cursor=pointer]:
+          - /url: /app/repositories
+        - link "Workflows" [ref=f1e72] [cursor=pointer]:
+          - /url: /app/workflows
+        - link "Dataset Lab" [ref=f1e80] [cursor=pointer]:
+          - /url: /app/datasets
+        - link "Model Benchmarks" [ref=f1e87] [cursor=pointer]:
+          - /url: /app/benchmarks
+        - link "Notebooks" [ref=f1e93] [cursor=pointer]:
+          - /url: /app/notebooks
+        - link "Voice Assistant" [ref=f1e99] [cursor=pointer]:
+          - /url: /app/voice
+        - link "Models" [ref=f1e105] [cursor=pointer]:
+          - /url: /app/models
+        - link "Projects" [ref=f1e118] [cursor=pointer]:
+          - /url: /app/projects
+        - link "Workspace" [ref=f1e123] [cursor=pointer]:
+          - /url: /app/workspace
+        - link "PDF Utilities" [ref=f1e129] [cursor=pointer]:
+          - /url: /app/files
+    - generic [ref=f1e134]:
+      - generic [ref=f1e135]:
+        - generic [ref=f1e136]: b
+        - generic [ref=f1e138]:
+          - paragraph [ref=f1e139]: benchmarke2e
+          - paragraph [ref=f1e140]: kfive-benchmark-20260907@example.test
+      - generic [ref=f1e141]:
+        - link "Profile" [ref=f1e142] [cursor=pointer]:
+          - /url: /app/profile
+        - link "Settings" [ref=f1e146] [cursor=pointer]:
+          - /url: /app/settings
+        - button "Toggle theme" [ref=f1e150] [cursor=pointer]
+        - button "Sign out" [ref=f1e157] [cursor=pointer]
+  - main [ref=f1e161]:
+    - generic [ref=f1e163]:
+      - generic [ref=f1e164]:
+        - generic [ref=f1e165]:
+          - heading "Runtime settings" [level=1] [ref=f1e166]
+          - paragraph [ref=f1e170]: Live deployment and dependency information reported by the KFive backend. Secrets are never displayed here.
+        - button "Refresh" [disabled] [ref=f1e171]
+      - generic [ref=f1e177]:
+        - generic [ref=f1e178]:
+          - heading "local mode" [level=2] [ref=f1e182]
+          - paragraph [ref=f1e183]: Services are hosted on this machine.
+        - generic [ref=f1e184]:
+          - heading "hybrid mode" [level=2] [ref=f1e191]
+          - paragraph [ref=f1e192]: Local and remote services are combined.
+        - generic [ref=f1e193]:
+          - heading "remote mode" [level=2] [ref=f1e197]
+          - paragraph [ref=f1e198]: Services run independently of this machine.
+      - generic [ref=f1e199]:
+        - generic [ref=f1e200]:
+          - generic [ref=f1e206]:
+            - generic [ref=f1e207]:
+              - heading "AI provider" [level=2] [ref=f1e208]
+              - generic [ref=f1e209]: unknown
+            - paragraph [ref=f1e212]: The backend-selected provider; no silent fallback is performed.
+          - button "Test connection" [disabled] [ref=f1e213]
+        - generic [ref=f1e219]:
+          - generic [ref=f1e220]:
+            - term [ref=f1e221]: Provider
+            - definition [ref=f1e222]: Unknown
+          - generic [ref=f1e223]:
+            - term [ref=f1e224]: Location
+            - definition [ref=f1e225]:
+              - generic [ref=f1e226]: disabled
+          - generic [ref=f1e232]:
+            - term [ref=f1e233]: Endpoint
+            - definition [ref=f1e234]: Not reported by backend
+          - generic [ref=f1e235]:
+            - term [ref=f1e236]: Configuration changes
+            - definition [ref=f1e237]: Backend-controlled
+        - generic [ref=f1e238]:
+          - generic [ref=f1e239]:
+            - heading "Available models" [level=3] [ref=f1e240]
+            - generic [ref=f1e241]: Reported by Unknown
+          - paragraph [ref=f1e242]: No models were reported. Check the provider connection and model installation.
+      - generic [ref=f1e243]:
+        - generic [ref=f1e248]:
+          - heading "Service topology" [level=2] [ref=f1e249]
+          - paragraph [ref=f1e250]: Configured infrastructure and whether each service is local or remote.
+        - paragraph [ref=f1e251]: The backend did not report any service topology.
+      - alert [ref=f1e252]:
+        - generic [ref=f1e256]:
+          - heading "Unavailable dependencies" [level=2] [ref=f1e257]
+          - paragraph [ref=f1e258]: "Features remain unavailable until these exact dependencies are configured:"
+          - list [ref=f1e259]:
+            - listitem [ref=f1e260]: • Unknown is not configured.
+      - generic [ref=f1e266]:
+        - heading "Configuration source of truth" [level=2] [ref=f1e267]
+        - paragraph [ref=f1e268]: Runtime infrastructure is read from server environment variables. This page does not pretend to save server settings or reveal credentials.

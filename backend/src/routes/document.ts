@@ -5,11 +5,11 @@ import fs from 'fs';
 import { asyncHandler } from '@/middleware/errorHandler';
 import { DocumentModel } from '@/models/Document';
 import { AppError } from '@/middleware/errorHandler';
-import { getDocumentProcessingQueue } from '@/config/queues';
 import { getAuthenticatedUserId } from '@/middleware/auth';
 import { randomUUID } from 'crypto';
 import { isAllowedDocumentMime, matchesFileSignature, sanitizeOriginalFilename } from '@/utils/documentSecurity';
-import { ProjectRecord, projectService } from '@/services/projectService';
+import { ProjectError, ProjectRecord, projectService } from '@/services/projectService';
+import { projectMutationLease } from '@/services/projectMutationLease';
 import { logger } from '@/utils/logger';
 
 const router = Router();
@@ -108,6 +108,7 @@ interface ProcessableDocument {
 
 interface DeletableDocument {
   _id: unknown;
+  projectId?: unknown;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   path: string;
   deleteOne(): Promise<unknown>;
@@ -147,23 +148,11 @@ export async function persistUploadedDocument(
   }
 }
 
-export async function enqueueDocumentProcessing(
-  document: ProcessableDocument,
-  resolveQueue: typeof getDocumentProcessingQueue = getDocumentProcessingQueue
-): Promise<void> {
-  try {
-    const documentId = String(document._id);
-    const queue = resolveQueue();
-    await queue.add('process-document', { documentId: document._id }, { jobId: documentId });
-    document.status = 'processing';
-    document.errorMessage = undefined;
-    await document.save();
-  } catch {
-    document.status = 'failed';
-    document.errorMessage = DOCUMENT_PROCESSOR_UNAVAILABLE_MESSAGE;
-    await document.save();
-    logger.warn('Document processing queue unavailable', { documentId: String(document._id) });
-  }
+export async function markDocumentProcessorUnavailable(document: ProcessableDocument): Promise<void> {
+  document.status = 'failed';
+  document.errorMessage = DOCUMENT_PROCESSOR_UNAVAILABLE_MESSAGE;
+  await document.save();
+  logger.warn('Document processor unavailable', { documentId: String(document._id) });
 }
 
 export function resolveDocumentStoragePath(storedPath: unknown, rootDirectory = uploadDir): string {
@@ -210,7 +199,9 @@ router.post('/', upload.single('document'), asyncHandler(async (req, res) => {
   const project = await resolveUploadedProjectContext(userId, req.body.projectId, req.file.path);
 
   const doc = await persistUploadedDocument(userId, req.file, project);
-  await enqueueDocumentProcessing(doc);
+  // The API process is intentionally producer/storage-only for untrusted documents.
+  // Do not claim processing until the separate constrained processor contract exists.
+  await markDocumentProcessorUnavailable(doc);
 
   res.status(201).json({ success: true, data: publicDocumentRecord(doc) });
 }));
@@ -238,19 +229,36 @@ router.get('/', asyncHandler(async (req, res) => {
 router.delete('/:id', asyncHandler(async (req, res) => {
   const userId = getAuthenticatedUserId(req);
   const doc = await DocumentModel.findOne({ _id: req.params.id, userId }) as unknown as DeletableDocument | null;
-  
+
   if (!doc) throw new DocumentRouteError('Document not found', 'DOCUMENT_NOT_FOUND', 404);
-  if (doc.status === 'processing') {
-    throw new DocumentRouteError(
-      'Document cannot be deleted while processing is active',
-      'DOCUMENT_PROCESSING_ACTIVE',
-      409
-    );
+
+  const deleteRecord = async () => {
+    if (doc.projectId) {
+      try {
+        await projectService.resolveActiveProject(userId, String(doc.projectId));
+      } catch (error) {
+        // Project deletion intentionally does not cascade. Retained orphaned documents
+        // must remain removable, while an existing archived Project stays read-only.
+        if (!(error instanceof ProjectError) || error.code !== 'PROJECT_NOT_FOUND') throw error;
+      }
+    }
+    if (doc.status === 'processing') {
+      throw new DocumentRouteError(
+        'Document cannot be deleted while processing is active',
+        'DOCUMENT_PROCESSING_ACTIVE',
+        409
+      );
+    }
+
+    await removeDocumentStorageFile(doc.path);
+    await doc.deleteOne();
+  };
+
+  if (doc.projectId) {
+    await projectMutationLease.run(String(doc.projectId), deleteRecord);
+  } else {
+    await deleteRecord();
   }
-
-  await removeDocumentStorageFile(doc.path);
-
-  await doc.deleteOne();
 
   res.json({ success: true, message: 'Deleted' });
 }));

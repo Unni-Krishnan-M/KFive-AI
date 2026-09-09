@@ -1,7 +1,8 @@
 import { WorkflowDefinition } from '@/models/Workflow';
 import { AiProviderClient, AiStreamEvent } from '@/services/ai/types';
 import { AiProviderUnavailableError } from '@/services/ai/errors';
-import { WorkflowRecord } from './workflowService';
+import { WorkflowError, WorkflowRecord } from './workflowService';
+import { ProjectError } from './projectService';
 import { resetWorkflowExecutionLeasesForTests } from './workflowExecutionLease';
 import {
   WORKFLOW_RUN_LIMITS, WorkflowRunRecord, WorkflowRunRepository, WorkflowRunService, validateWorkflowRunInput,
@@ -151,6 +152,21 @@ describe('WorkflowRunService', () => {
     expect(create).not.toHaveBeenCalled();
   });
 
+  it('preserves retryable storage failures during the pre-run revalidation', async () => {
+    const access = workflows();
+    access.getActiveRecord.mockResolvedValueOnce(workflow).mockRejectedValueOnce(
+      new WorkflowError('Workflow storage is unavailable.', 'WORKFLOW_STORAGE_UNAVAILABLE', 503)
+    );
+    const service = new WorkflowRunService(
+      statefulRepository(), access as any, () => provider(async () => undefined), 30_000, () => now
+    );
+    const prepared = await service.prepare(ownerId, workflowId, { input: 'notes' });
+    await expect(service.execute(prepared, () => undefined)).rejects.toMatchObject({
+      code: 'WORKFLOW_RUN_STORAGE_UNAVAILABLE', statusCode: 503,
+    });
+    await expect(service.prepare(ownerId, workflowId, { input: 'again' })).resolves.toMatchObject({ ownerId });
+  });
+
   it('enforces owner retention before persistence', async () => {
     const create = jest.fn();
     const service = new WorkflowRunService(
@@ -184,6 +200,22 @@ describe('WorkflowRunService', () => {
     expect(JSON.stringify(stored)).not.toContain('secret token');
   });
 
+  it('bounds usage and rejects unsafe provider/model labels before persistence', async () => {
+    const ai = provider(async (emit) => {
+      emit({ type: 'start', provider: 'bad\u200Bprovider', model: 'x'.repeat(201) });
+      emit({ type: 'usage', provider: 'bad\u200Bprovider', model: 'x'.repeat(201), usage: {
+        inputTokens: 150_000_000, outputTokens: 160_000_000, totalTokens: 400_000_000,
+        totalDurationMs: 100_000_000, loadDurationMs: 100_000_000,
+      } });
+    });
+    const service = new WorkflowRunService(statefulRepository(), workflows() as any, () => ai, 30_000, () => now);
+    await expect(service.execute(await service.prepare(ownerId, workflowId, { input: 'notes' }), () => undefined))
+      .resolves.toMatchObject({ provider: 'ollama', model: 'phi3', usage: {
+        inputTokens: 100_000_000, outputTokens: 100_000_000, totalTokens: 200_000_000,
+        totalDurationMs: 86_400_000, loadDurationMs: 86_400_000,
+      } });
+  });
+
   it('cancels an active run and returns idempotent terminal cancellation', async () => {
     const ai = provider((_emit, signal) => new Promise<void>((_resolve, reject) => {
       signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
@@ -202,6 +234,20 @@ describe('WorkflowRunService', () => {
     await expect(service.execute(await service.prepare(ownerId, workflowId, { input: 'notes' }), () => undefined))
       .rejects.toMatchObject({ code: 'WORKFLOW_TIMEOUT' });
     await expect(service.prepare(ownerId, workflowId, { input: 'again' })).resolves.toMatchObject({ ownerId });
+  });
+
+  it('enforces one active workflow run per owner', async () => {
+    const ai = provider((_emit, signal) => new Promise<void>((_resolve, reject) => {
+      signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+    }));
+    const service = new WorkflowRunService(statefulRepository(), workflows() as any, () => ai, 30_000, () => now);
+    const execution = service.execute(await service.prepare(ownerId, workflowId, { input: 'first' }), () => undefined);
+    await Promise.resolve(); await Promise.resolve();
+    await expect(service.prepare(ownerId, workflowId, { input: 'second' })).rejects.toMatchObject({
+      code: 'WORKFLOW_RUN_BUSY', statusCode: 429,
+    });
+    await service.cancel(ownerId, workflowId, runId);
+    await expect(execution).rejects.toMatchObject({ code: 'WORKFLOW_RUN_CONFLICT' });
   });
 
   it('paginates summaries without private input/output/timeline/snapshot and owner-scopes details', async () => {
@@ -229,5 +275,23 @@ describe('WorkflowRunService', () => {
     const recovery = new WorkflowRunService(statefulRepository({ interruptActive }), workflows() as any, () => provider(async () => undefined), 30_000, () => now);
     await expect(recovery.recoverInterrupted()).resolves.toBe(2);
     expect(interruptActive).toHaveBeenCalledWith(new Date(now.getTime() - 60_000), now);
+  });
+
+  it('blocks active and archived-project run deletion while preserving cancellation as safe shutdown', async () => {
+    const ai = provider((_emit, signal) => new Promise<void>((_resolve, reject) => {
+      signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+    }));
+    const access = workflows();
+    const service = new WorkflowRunService(statefulRepository(), access as any, () => ai, 30_000, () => now);
+    const execution = service.execute(await service.prepare(ownerId, workflowId, { input: 'notes' }), () => undefined);
+    await Promise.resolve(); await Promise.resolve();
+    await expect(service.delete(ownerId, workflowId, runId)).rejects.toMatchObject({ code: 'WORKFLOW_RUN_CONFLICT' });
+    await expect(service.cancel(ownerId, workflowId, runId)).resolves.toMatchObject({ run: { status: 'cancel-requested' } });
+    await expect(execution).rejects.toMatchObject({ code: 'WORKFLOW_RUN_CONFLICT' });
+
+    access.getDeletableRecord.mockRejectedValueOnce(
+      new ProjectError('Project is archived.', 'PROJECT_ARCHIVED', 409)
+    );
+    await expect(service.delete(ownerId, workflowId, runId)).rejects.toMatchObject({ code: 'PROJECT_ARCHIVED' });
   });
 });

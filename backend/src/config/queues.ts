@@ -4,15 +4,16 @@ import { getEnvironment } from './environment';
 import { attachCodeRunQueueEvents, CodeRunReconciler } from '@/services/codeRunReconciler';
 
 let aiProcessingQueue: Queue;
-let documentProcessingQueue: Queue;
 let codeRunsQueue: Queue;
 let codeRunQueueEvents: QueueEvents;
+let benchmarkRunsQueue: Queue;
+let notebookRunsQueue: Queue;
 let codeRunReconciliationTimer: NodeJS.Timeout | undefined;
 let codeRunReconciliationInProgress = false;
 const workers: Worker[] = [];
 const CODE_RUN_RECONCILIATION_INTERVAL_MS = 10_000;
 
-function getQueueConnection(): ConnectionOptions {
+export function getQueueConnection(): ConnectionOptions {
   const parsed = new URL(process.env.QUEUE_REDIS_URL || getEnvironment().redisUrl);
   return {
     host: parsed.hostname,
@@ -42,22 +43,26 @@ export async function initializeQueues(codeRunReconciler: CodeRunReconciler = ne
       },
     });
 
-    // Document Processing Queue
-    documentProcessingQueue = new Queue('document-processing', {
-      connection,
-      defaultJobOptions: {
-        removeOnComplete: 50,
-        removeOnFail: 25,
-        attempts: 2,
-        backoff: {
-          type: 'exponential',
-          delay: 1000,
-        },
-      },
-    });
-
     // Producer-only queue. Code execution workers run in the isolated code-runner service.
     codeRunsQueue = new Queue('code-runs', {
+      connection,
+      defaultJobOptions: {
+        attempts: 1,
+        removeOnComplete: 100,
+        removeOnFail: 100,
+      },
+    });
+    // Producer only. A dedicated benchmark-worker process owns provider execution.
+    benchmarkRunsQueue = new Queue('benchmark-runs', {
+      connection,
+      defaultJobOptions: {
+        attempts: 1,
+        removeOnComplete: 100,
+        removeOnFail: 100,
+      },
+    });
+    // Producer only. Notebook code is never executed by the API process.
+    notebookRunsQueue = new Queue('notebook-runs', {
       connection,
       defaultJobOptions: {
         attempts: 1,
@@ -105,51 +110,9 @@ function initializeWorkers(connection: ConnectionOptions): void {
     concurrency: parseInt(process.env.QUEUE_CONCURRENCY || '5'),
   });
 
-  // Document Processing Worker
-  const documentWorker = new Worker('document-processing', async (job) => {
-    // To avoid cyclical dependencies in prompt setup we dynamically require Mongoose
-    const mongoose = require('mongoose');
-    const DocumentModel = mongoose.model('Document');
-    
-    // Fallback extraction for direct job matches or legacy structure
-    const docId = job.data?.documentId;
-    if (!docId) {
-      throw new Error('Document processing job is missing documentId');
-    }
-
-    try {
-      const doc = await DocumentModel.findById(docId);
-      if (!doc) {
-        throw new Error(`Document ${docId} no longer exists`);
-      }
-
-      doc.status = 'processing';
-      await doc.save();
-
-      const fs = require('fs');
-      if (fs.existsSync(doc.path)) {
-        doc.status = 'failed';
-        doc.errorMessage = 'Document processor is not configured';
-      } else {
-        doc.status = 'failed';
-        doc.errorMessage = 'File not found on disk';
-      }
-
-      await doc.save();
-      throw new Error(doc.errorMessage);
-    } catch (e: any) {
-      logger.error('Document processing job failed', { documentId: docId, error: e.message });
-      if (docId) {
-        await DocumentModel.findByIdAndUpdate(docId, { status: 'failed', errorMessage: e.message });
-      }
-      throw e;
-    }
-  }, {
-    connection,
-    concurrency: 3,
-  });
-
-  workers.push(aiWorker, documentWorker);
+  // Document processing must run only in a separate constrained service. The API
+  // process deliberately owns no document worker while that service is unavailable.
+  workers.push(aiWorker);
 }
 
 export async function closeQueues(): Promise<void> {
@@ -159,8 +122,9 @@ export async function closeQueues(): Promise<void> {
   await Promise.all(workers.splice(0).map((worker) => worker.close()));
   await Promise.all([
     aiProcessingQueue?.close(),
-    documentProcessingQueue?.close(),
     codeRunsQueue?.close(),
+    benchmarkRunsQueue?.close(),
+    notebookRunsQueue?.close(),
     codeRunQueueEvents?.close(),
   ].filter((operation): operation is Promise<void> => Boolean(operation)));
 }
@@ -172,16 +136,19 @@ export function getAiProcessingQueue(): Queue {
   return aiProcessingQueue;
 }
 
-export function getDocumentProcessingQueue(): Queue {
-  if (!documentProcessingQueue) {
-    throw new Error('Document processing queue not initialized');
-  }
-  return documentProcessingQueue;
-}
-
 export function getCodeRunsQueue(): Queue {
   if (!codeRunsQueue) {
     throw new Error('Code runs queue not initialized');
   }
   return codeRunsQueue;
+}
+
+export function getBenchmarkRunsQueue(): Queue {
+  if (!benchmarkRunsQueue) throw new Error('Benchmark runs queue not initialized');
+  return benchmarkRunsQueue;
+}
+
+export function getNotebookRunsQueue(): Queue {
+  if (!notebookRunsQueue) throw new Error('Notebook runs queue not initialized');
+  return notebookRunsQueue;
 }

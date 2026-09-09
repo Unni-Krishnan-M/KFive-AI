@@ -1,10 +1,12 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
-import toast from 'react-hot-toast';
 import { getToken } from '@/utils/getToken';
 import { apiBaseUrl } from '@/config/runtime';
 import { publishClearedAuthSession, publishRefreshedAuthTokens } from './authSession';
 import type { AgentPayload, AgentRunDeletion, AgentRunDetail, AgentRunPage, AgentView } from './agentModel';
 import type { WorkflowPayload, WorkflowRunDeletion, WorkflowRunDetail, WorkflowRunPage, WorkflowView } from './workflowModel';
+import type { BenchmarkRunDeletion, BenchmarkRunDetail, BenchmarkRunPage, BenchmarkStatus, BenchmarkSuite } from './benchmarkModel';
+import type { NotebookCreatePayload, NotebookPage, NotebookRunPage, NotebookRunView, NotebookStatus, NotebookUpdatePayload, NotebookView } from './notebookModel';
+import type { ChatConversation } from './chatModel';
 
 interface ApiEnvelope<T> {
   success: boolean;
@@ -85,20 +87,8 @@ apiClient.interceptors.response.use(
       }
     }
 
-    if (error.response?.status && error.response.status >= 500) {
-      const settings = localStorage.getItem('kfive-settings');
-      let showToast = true;
-      if (settings) {
-        try {
-          const { toastsEnabled } = JSON.parse(settings);
-          if (toastsEnabled === false) showToast = false;
-        } catch(e) {}
-      }
-      if (showToast) {
-        toast.error('Server error occurred. Please try again later.');
-      }
-    }
-
+    // Feature callers own operational error presentation so dependency-specific
+    // messages are not obscured or duplicated by a generic global 5xx toast.
     return Promise.reject(error);
   }
 );
@@ -120,22 +110,22 @@ export const authApi = {
 
 export const chatApi = {
   getConversations: (page = 1, limit = 20, projectId?: string) =>
-    apiClient.get('/chat/conversations', { params: { page, limit, ...(projectId ? { projectId } : {}) } }),
+    apiClient.get<ApiEnvelope<ChatConversation[]> & { meta: { page: number; limit: number; total: number; pages: number } }>(
+      '/chat/conversations',
+      { params: { page, limit, ...(projectId ? { projectId } : {}) } }
+    ),
   
   getConversation: (id: string) =>
-    apiClient.get(`/chat/conversations/${id}`),
+    apiClient.get<ApiEnvelope<ChatConversation>>(`/chat/conversations/${id}`),
   
-  createConversation: (data: any) =>
-    apiClient.post('/chat/conversations', data),
-  
-  updateConversation: (id: string, data: any) =>
-    apiClient.put(`/chat/conversations/${id}`, data),
-  
-  deleteConversation: (id: string) =>
-    apiClient.delete(`/chat/conversations/${id}`),
-  
-  sendMessage: (conversationId: string, message: any) =>
-    apiClient.post(`/chat/conversations/${conversationId}/messages`, message),
+  createConversation: (data: { title?: string; projectId?: string }) =>
+    apiClient.post<ApiEnvelope<ChatConversation>>('/chat/conversations', data),
+
+  cancelGeneration: (conversationId: string, requestId: string) =>
+    apiClient.post<ApiEnvelope<{ requestId: string; cancelRequested: true }>>(
+      `/chat/conversations/${conversationId}/generation/cancel`,
+      { requestId }
+    ),
 };
 
 export const agentApi = {
@@ -248,6 +238,32 @@ export const repositoryApi = {
   },
 };
 
+export const datasetApi = {
+  getStatus: (projectId?: string) =>
+    apiClient.get('/datasets/status', { params: projectId ? { projectId } : undefined }),
+  list: (projectId?: string) =>
+    apiClient.get('/datasets', { params: projectId ? { projectId } : undefined }),
+  upload: (dataset: File, options: { name: string; projectId?: string }) => {
+    const data = new FormData();
+    data.append('dataset', dataset);
+    data.append('name', options.name);
+    if (options.projectId) data.append('projectId', options.projectId);
+    return apiClient.post('/datasets', data, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
+  get: (id: string) => apiClient.get(`/datasets/${id}`),
+  download: (id: string) => apiClient.get(`/datasets/${id}/download`, { responseType: 'blob' }),
+  derive: (id: string, data: {
+    name: string;
+    transform: {
+      trimStrings: boolean;
+      dropDuplicateRows: boolean;
+      dropRowsWithMissingValues: boolean;
+      escapeSpreadsheetFormulas: boolean;
+    };
+  }) => apiClient.post(`/datasets/${id}/derive`, data),
+  delete: (id: string) => apiClient.delete(`/datasets/${id}`),
+};
+
 export const codeApi = {
   getRuntimes: () => apiClient.get('/code/runtimes'),
   createRun: (data: { language: 'python' | 'javascript'; source: string; stdin: string; projectId?: string }) =>
@@ -267,4 +283,37 @@ export const workflowApi = {
   getRun: (id: string, runId: string) => apiClient.get<ApiEnvelope<{ run: WorkflowRunDetail }>>(`/workflows/${id}/runs/${runId}`),
   cancelRun: (id: string, runId: string) => apiClient.post<ApiEnvelope<{ run: WorkflowRunDetail; idempotent: boolean }>>(`/workflows/${id}/runs/${runId}/cancel`),
   deleteRun: (id: string, runId: string) => apiClient.delete<ApiEnvelope<WorkflowRunDeletion>>(`/workflows/${id}/runs/${runId}`),
+};
+
+export const benchmarkApi = {
+  getStatus: (projectId?: string) => apiClient.get<ApiEnvelope<BenchmarkStatus>>('/benchmarks/status', { params: projectId ? { projectId } : undefined }),
+  getSuites: () => apiClient.get<ApiEnvelope<{ suites: BenchmarkSuite[] }>>('/benchmarks/suites'),
+  getRuns: (page = 1, projectId?: string) => apiClient.get<ApiEnvelope<BenchmarkRunPage>>('/benchmarks/runs', { params: { page, ...(projectId ? { projectId } : {}) } }),
+  getRun: (id: string) => apiClient.get<ApiEnvelope<{ run: BenchmarkRunDetail }>>(`/benchmarks/runs/${id}`),
+  cancelRun: (id: string) => apiClient.post<ApiEnvelope<{ run: BenchmarkRunDetail; idempotent: boolean }>>(`/benchmarks/runs/${id}/cancel`),
+  deleteRun: (id: string) => apiClient.delete<ApiEnvelope<BenchmarkRunDeletion>>(`/benchmarks/runs/${id}`),
+};
+
+export const notebookApi = {
+  getStatus: () => apiClient.get<ApiEnvelope<NotebookStatus>>('/notebooks/status'),
+  list: (page = 1, projectId?: string) => apiClient.get<ApiEnvelope<NotebookPage>>('/notebooks', {
+    params: { page, ...(projectId ? { projectId } : {}) },
+  }),
+  create: (data: NotebookCreatePayload) => apiClient.post<ApiEnvelope<{ notebook: NotebookView }>>('/notebooks', data),
+  get: (id: string) => apiClient.get<ApiEnvelope<{ notebook: NotebookView }>>(`/notebooks/${id}`),
+  update: (id: string, data: NotebookUpdatePayload) => apiClient.patch<ApiEnvelope<{ notebook: NotebookView }>>(`/notebooks/${id}`, data),
+  delete: (id: string, expectedRevision: number) => apiClient.delete<ApiEnvelope<{ notebookId: string; deleted: true }>>(`/notebooks/${id}`, {
+    data: { expectedRevision },
+  }),
+  listRuns: (id: string, page = 1) => apiClient.get<ApiEnvelope<NotebookRunPage>>(`/notebooks/${id}/runs`, { params: { page } }),
+  startRun: (id: string, expectedRevision: number) => apiClient.post<ApiEnvelope<{ run: NotebookRunView }>>(`/notebooks/${id}/runs`, {
+    expectedRevision,
+  }),
+  getRun: (id: string, runId: string) => apiClient.get<ApiEnvelope<{ run: NotebookRunView }>>(`/notebooks/${id}/runs/${runId}`),
+  cancelRun: (id: string, runId: string) => apiClient.post<ApiEnvelope<{ run: NotebookRunView; idempotent: boolean }>>(
+    `/notebooks/${id}/runs/${runId}/cancel`
+  ),
+  deleteRun: (id: string, runId: string) => apiClient.delete<ApiEnvelope<{ runId: string; deleted: true }>>(
+    `/notebooks/${id}/runs/${runId}`
+  ),
 };

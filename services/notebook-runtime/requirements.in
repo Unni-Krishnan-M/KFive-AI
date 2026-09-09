@@ -1,0 +1,12 @@
+# Direct runtime surface. Every exposed package is pinned; pip resolves its
+# transitive dependencies during the image build until a reviewed hash lock is added.
+ipykernel==6.29.5
+joblib==1.4.2
+matplotlib==3.9.3
+nbclient==0.10.2
+nbformat==5.10.4
+numpy==2.1.3
+pandas==2.2.3
+pillow==11.0.0
+scikit-learn==1.6.0
+scipy==1.14.1

@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
+import { useId } from 'react';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -22,6 +23,9 @@ export function ConfirmDialog({
   onCancel,
   isDestructive = false,
 }: ConfirmDialogProps) {
+  const titleId = useId();
+  const descriptionId = useId();
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -34,14 +38,19 @@ export function ConfirmDialog({
             onClick={onCancel}
           />
           <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            aria-describedby={descriptionId}
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-[#09090B] border border-white/10 rounded-xl shadow-2xl p-6 z-50 backdrop-blur-xl"
           >
             <div className="flex justify-between items-start mb-4">
-              <h2 className="text-xl font-semibold text-white">{title}</h2>
+              <h2 id={titleId} className="text-xl font-semibold text-white">{title}</h2>
               <button
+                type="button"
                 onClick={onCancel}
                 className="text-gray-400 hover:text-white transition-colors"
                 aria-label="Close dialog"
@@ -49,15 +58,17 @@ export function ConfirmDialog({
                 <X size={20} />
               </button>
             </div>
-            <p className="text-gray-300 mb-6">{message}</p>
+            <p id={descriptionId} className="text-gray-300 mb-6">{message}</p>
             <div className="flex justify-end gap-3">
               <button
+                type="button"
                 onClick={onCancel}
                 className="px-4 py-2 rounded-lg font-medium text-gray-300 hover:text-white hover:bg-white/5 transition-colors focus-visible:ring-2 focus-visible:ring-primary/50"
               >
                 {cancelText}
               </button>
               <button
+                type="button"
                 onClick={onConfirm}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#09090B] ${
                   isDestructive

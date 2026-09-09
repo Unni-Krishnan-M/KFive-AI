@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Brain, Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'react-hot-toast';
+import { readableAuthError } from '@/services/authError';
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -14,10 +15,12 @@ export default function RegisterPage() {
     password: ''
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const { register } = useAuth();
   const navigate = useNavigate();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSubmitError(null);
     setFormData(prev => ({
       ...prev,
       [e.target.name]: e.target.value
@@ -28,18 +31,23 @@ export default function RegisterPage() {
     e.preventDefault();
     
     if (!formData.email || !formData.username || !formData.password) {
-      toast.error('Please fill in all required fields');
+      const message = 'Please fill in all required fields';
+      setSubmitError(message);
+      toast.error(message);
       return;
     }
 
     setIsLoading(true);
+    setSubmitError(null);
     
     try {
       await register(formData);
       toast.success('Welcome to KFive AI!');
       navigate('/app/dashboard');
-    } catch (error: any) {
-      toast.error(error.response?.data?.error?.message || 'Registration failed');
+    } catch (error: unknown) {
+      const message = readableAuthError(error, 'registration');
+      setSubmitError(message);
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -62,6 +70,11 @@ export default function RegisterPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {submitError && (
+              <div role="alert" aria-live="assertive" className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                {submitError}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-2">First Name</label>

@@ -1,0 +1,85 @@
+- generic [ref=f1e2]:
+  - generic [ref=f1e313]:
+    - complementary [ref=f1e314]:
+      - generic [ref=f1e315]:
+        - generic [ref=f1e316]: KFive AI
+        - button "Collapse sidebar" [ref=f1e322] [cursor=pointer]
+      - generic [ref=f1e326]:
+        - generic [ref=f1e327] [cursor=pointer]:
+          - generic [ref=f1e328]: Search
+          - generic [ref=f1e333]:
+            - generic [ref=f1e334]: ⌘
+            - generic [ref=f1e335]: K
+        - navigation [ref=f1e336]:
+          - link "Dashboard" [ref=f1e337] [cursor=pointer]:
+            - /url: /app/dashboard
+          - link "AI Chat" [ref=f1e345] [cursor=pointer]:
+            - /url: /app/chat
+          - link "Code Lab" [ref=f1e350] [cursor=pointer]:
+            - /url: /app/code
+          - link "Agents" [ref=f1e357] [cursor=pointer]:
+            - /url: /app/agents
+          - link "Documents" [ref=f1e363] [cursor=pointer]:
+            - /url: /app/documents
+          - link "Knowledge / RAG" [ref=f1e369] [cursor=pointer]:
+            - /url: /app/knowledge
+          - link "Repository Analyzer" [ref=f1e375] [cursor=pointer]:
+            - /url: /app/repositories
+          - link "Workflows" [ref=f1e382] [cursor=pointer]:
+            - /url: /app/workflows
+          - link "Dataset Lab" [ref=f1e390] [cursor=pointer]:
+            - /url: /app/datasets
+          - link "Model Benchmarks" [ref=f1e397] [cursor=pointer]:
+            - /url: /app/benchmarks
+          - link "Notebooks" [ref=f1e403] [cursor=pointer]:
+            - /url: /app/notebooks
+          - link "Voice Assistant" [ref=f1e410] [cursor=pointer]:
+            - /url: /app/voice
+          - link "Models" [ref=f1e416] [cursor=pointer]:
+            - /url: /app/models
+          - link "Projects" [ref=f1e429] [cursor=pointer]:
+            - /url: /app/projects
+          - link "Workspace" [ref=f1e434] [cursor=pointer]:
+            - /url: /app/workspace
+          - link "PDF Utilities" [ref=f1e440] [cursor=pointer]:
+            - /url: /app/files
+      - generic [ref=f1e445]:
+        - generic [ref=f1e446]:
+          - generic [ref=f1e447]: B
+          - generic [ref=f1e449]:
+            - paragraph [ref=f1e450]: Browser Audit
+            - paragraph [ref=f1e451]: kfive-browser-20260902-0211@example.test
+        - generic [ref=f1e452]:
+          - link "Profile" [ref=f1e453] [cursor=pointer]:
+            - /url: /app/profile
+          - link "Settings" [ref=f1e457] [cursor=pointer]:
+            - /url: /app/settings
+          - button "Toggle theme" [ref=f1e461] [cursor=pointer]
+          - button "Sign out" [ref=f1e468] [cursor=pointer]
+    - main [ref=f1e472]:
+      - generic [ref=f1e474]:
+        - generic [ref=f1e475]:
+          - generic [ref=f1e476]:
+            - generic [ref=f1e477]: Notebook Mode
+            - heading "Persistent notebook documents" [level=1] [ref=f1e481]
+            - paragraph [ref=f1e482]: Edit bounded Python and Markdown cells without exposing a shell or Jupyter server.
+          - button "New notebook" [ref=f1e483] [cursor=pointer]
+        - status [ref=f1e487]:
+          - generic [ref=f1e490]:
+            - strong [ref=f1e491]: Isolated execution available
+            - paragraph [ref=f1e492]: Notebook execution is available through the isolated broker and verifier.
+        - generic [ref=f1e493]:
+          - complementary [ref=f1e494]:
+            - generic [ref=f1e495]:
+              - heading "Workspace notebooks" [level=2] [ref=f1e496]
+              - generic [ref=f1e497]: 0/100
+            - paragraph [ref=f1e498]: No saved notebooks in this scope.
+            - generic [ref=f1e499]:
+              - button "Previous" [disabled] [ref=f1e500]
+              - generic [ref=f1e501]: Page 1 / 1
+              - button "Next" [disabled] [ref=f1e502]
+          - main [ref=f1e503]:
+            - paragraph [ref=f1e509]: Create or select a notebook to edit it.
+  - generic:
+    - status [ref=f1e518]: Notebook storage is unavailable.
+    - status [ref=f1e524]: Server error occurred. Please try again later.

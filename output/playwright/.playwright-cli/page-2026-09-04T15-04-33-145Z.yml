@@ -1,0 +1,86 @@
+- generic [ref=e2]:
+  - generic [ref=e637]:
+    - complementary [ref=e638]:
+      - generic [ref=e639]:
+        - generic [ref=e640]: KFive AI
+        - button "Collapse sidebar" [ref=e646] [cursor=pointer]
+      - generic [ref=e650]:
+        - generic [ref=e651] [cursor=pointer]:
+          - generic [ref=e652]: Search
+          - generic [ref=e657]:
+            - generic [ref=e658]: ⌘
+            - generic [ref=e659]: K
+        - navigation [ref=e660]:
+          - link "Dashboard" [ref=e661] [cursor=pointer]:
+            - /url: /app/dashboard
+          - link "AI Chat" [ref=e669] [cursor=pointer]:
+            - /url: /app/chat
+          - link "Code Lab" [ref=e674] [cursor=pointer]:
+            - /url: /app/code
+          - link "Agents" [ref=e681] [cursor=pointer]:
+            - /url: /app/agents
+          - link "Documents" [ref=e687] [cursor=pointer]:
+            - /url: /app/documents
+          - link "Knowledge / RAG" [ref=e694] [cursor=pointer]:
+            - /url: /app/knowledge
+          - link "Repository Analyzer" [ref=e700] [cursor=pointer]:
+            - /url: /app/repositories
+          - link "Workflows" [ref=e707] [cursor=pointer]:
+            - /url: /app/workflows
+          - link "Dataset Lab" [ref=e715] [cursor=pointer]:
+            - /url: /app/datasets
+          - link "Model Benchmarks" [ref=e722] [cursor=pointer]:
+            - /url: /app/benchmarks
+          - link "Notebooks" [ref=e728] [cursor=pointer]:
+            - /url: /app/notebooks
+          - link "Voice Assistant" [ref=e734] [cursor=pointer]:
+            - /url: /app/voice
+          - link "Models" [ref=e740] [cursor=pointer]:
+            - /url: /app/models
+          - link "Projects" [ref=e753] [cursor=pointer]:
+            - /url: /app/projects
+          - link "Workspace" [ref=e758] [cursor=pointer]:
+            - /url: /app/workspace
+          - link "PDF Utilities" [ref=e764] [cursor=pointer]:
+            - /url: /app/files
+      - generic [ref=e769]:
+        - generic [ref=e770]:
+          - generic [ref=e771]: P
+          - generic [ref=e773]:
+            - paragraph [ref=e774]: PDF Smoke
+            - paragraph [ref=e775]: kfive-pdf-20260902@example.test
+        - generic [ref=e776]:
+          - link "Profile" [ref=e777] [cursor=pointer]:
+            - /url: /app/profile
+          - link "Settings" [ref=e781] [cursor=pointer]:
+            - /url: /app/settings
+          - button "Toggle theme" [ref=e785] [cursor=pointer]
+          - button "Sign out" [ref=e792] [cursor=pointer]
+    - main [ref=e796]:
+      - generic [ref=e798]:
+        - generic [ref=e799]:
+          - generic [ref=e800]:
+            - heading "Documents" [level=1] [ref=e801]
+            - paragraph [ref=e806]: Upload documents and track their actual processing status.
+          - button "Open PDF Utilities" [ref=e807] [cursor=pointer]
+        - paragraph [ref=e810]: PDF Utilities run locally in your browser. Select the source files again there; stored Documents are not passed to the utility or overwritten.
+        - generic [ref=e811]:
+          - generic [ref=e815]:
+            - paragraph [ref=e816]: Project documents
+            - paragraph [ref=e817]:
+              - text: Project E2E Renamed
+              - generic [ref=e818]: (active)
+          - button "Show all documents" [ref=e819] [cursor=pointer]
+        - generic [ref=e825]:
+          - generic [ref=e841] [cursor=pointer]
+          - heading "Drag & Drop files here" [level=3] [ref=e845]
+          - paragraph [ref=e831]: Store supported PDFs, Word documents, CSVs, or text files. Maximum 50 MB per file.
+          - button "Browse Files" [ref=e846] [cursor=pointer]
+        - textbox "Search documents by name..." [ref=e838]
+        - generic [ref=e847] [cursor=pointer]:
+          - heading "kfive-pdf-first.pdf" [level=3] [ref=e852]
+          - generic [ref=e853]:
+            - generic [ref=e854]: 1.1 KB
+            - generic "Document processing failed" [ref=e855]: Failed
+          - alert [ref=e856]: Document processing failed
+  - status [ref=e862]: Document added to Project E2E Renamed

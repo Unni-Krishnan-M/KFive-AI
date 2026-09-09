@@ -1,0 +1,250 @@
+- generic [ref=f5e16]:
+  - complementary [ref=f5e17]:
+    - generic [ref=f5e18]:
+      - generic [ref=f5e19]: KFive AI
+      - button "Collapse sidebar" [ref=f5e25] [cursor=pointer]
+    - generic [ref=f5e29]:
+      - generic [ref=f5e30] [cursor=pointer]:
+        - generic [ref=f5e31]: Search
+        - generic [ref=f5e36]:
+          - generic [ref=f5e37]: ⌘
+          - generic [ref=f5e38]: K
+      - navigation [ref=f5e39]:
+        - link "Dashboard" [ref=f5e40] [cursor=pointer]:
+          - /url: /app/dashboard
+        - link "AI Chat" [ref=f5e48] [cursor=pointer]:
+          - /url: /app/chat
+        - link "Code Lab" [ref=f5e53] [cursor=pointer]:
+          - /url: /app/code
+        - link "Agents" [ref=f5e60] [cursor=pointer]:
+          - /url: /app/agents
+        - link "Documents" [ref=f5e66] [cursor=pointer]:
+          - /url: /app/documents
+        - link "Knowledge / RAG" [ref=f5e72] [cursor=pointer]:
+          - /url: /app/knowledge
+        - link "Repository Analyzer" [ref=f5e78] [cursor=pointer]:
+          - /url: /app/repositories
+        - link "Workflows" [ref=f5e85] [cursor=pointer]:
+          - /url: /app/workflows
+        - link "Dataset Lab" [ref=f5e93] [cursor=pointer]:
+          - /url: /app/datasets
+        - link "Model Benchmarks" [ref=f5e100] [cursor=pointer]:
+          - /url: /app/benchmarks
+        - link "Notebooks" [ref=f5e107] [cursor=pointer]:
+          - /url: /app/notebooks
+        - link "Voice Assistant" [ref=f5e113] [cursor=pointer]:
+          - /url: /app/voice
+        - link "Models" [ref=f5e119] [cursor=pointer]:
+          - /url: /app/models
+        - link "Projects" [ref=f5e132] [cursor=pointer]:
+          - /url: /app/projects
+        - link "Workspace" [ref=f5e137] [cursor=pointer]:
+          - /url: /app/workspace
+        - link "PDF Utilities" [ref=f5e143] [cursor=pointer]:
+          - /url: /app/files
+    - generic [ref=f5e148]:
+      - generic [ref=f5e149]:
+        - generic [ref=f5e150]: b
+        - generic [ref=f5e152]:
+          - paragraph [ref=f5e153]: benchmarke2e
+          - paragraph [ref=f5e154]: kfive-benchmark-20260907@example.test
+      - generic [ref=f5e155]:
+        - link "Profile" [ref=f5e156] [cursor=pointer]:
+          - /url: /app/profile
+        - link "Settings" [ref=f5e160] [cursor=pointer]:
+          - /url: /app/settings
+        - button "Toggle theme" [ref=f5e164] [cursor=pointer]
+        - button "Sign out" [ref=f5e171] [cursor=pointer]
+  - main [ref=f5e175]:
+    - generic [ref=f5e177]:
+      - generic [ref=f5e178]:
+        - generic [ref=f5e179]:
+          - generic [ref=f5e180]:
+            - heading "Model Benchmarks" [level=1] [ref=f5e181]
+            - generic [ref=f5e185]: Experimental
+          - paragraph [ref=f5e186]: Measured, durable chat-model runs in the workspace or a verified project.
+        - button "Refresh benchmarks" [ref=f5e187] [cursor=pointer]
+      - note [ref=f5e193]: This is inference benchmarking, not ML training. The fixed suite runs 3 prompts twice, sequentially, through one durable shared benchmark worker. Submitted runs remain queued or running if this page disconnects; only Stop run requests cancellation. Remote providers may bill for six calls and receive the suite prompts; review their privacy terms before starting. GPU samples are before/after snapshots, not reliable peak VRAM measurements or exclusive attribution.
+      - generic [ref=f5e196]:
+        - generic [ref=f5e200]:
+          - paragraph [ref=f5e201]: Project benchmark scope
+          - paragraph [ref=f5e202]:
+            - text: Benchmark scope E2E
+            - generic [ref=f5e203]: (active)
+        - button "Show workspace history" [ref=f5e204] [cursor=pointer]
+      - generic [ref=f5e208]:
+        - generic [ref=f5e209]:
+          - generic [ref=f5e210]:
+            - text: Installed/configured model
+            - 'combobox "Installed/configured model Provider: ollama · catalog scope: installed" [ref=f5e211]':
+              - option "Choose a model"
+              - option "phi3:latest — phi3:latest" [selected]
+            - generic [ref=f5e212]: "Provider: ollama · catalog scope: installed"
+          - generic [ref=f5e213]:
+            - paragraph [ref=f5e214]: Chat Core
+            - paragraph [ref=f5e215]: 3 prompts × 2 sequential repetitions · 6 calls
+            - paragraph [ref=f5e216]: Temperature 0 · max output 128 tokens · suite chat-core-v1
+          - button "Queue 6 calls" [active] [ref=f5e364] [cursor=pointer]
+        - paragraph [ref=f5e242]: Run reached a terminal state; loading canonical detail…
+      - generic [ref=f5e220]:
+        - complementary [ref=f5e221]:
+          - generic [ref=f5e222]:
+            - heading "Run history" [level=2] [ref=f5e223]
+            - generic [ref=f5e224]: "1"
+          - paragraph [ref=f5e225]: 25 per page · at most 10 pages shown · owner retention 100
+          - generic [ref=f5e367]:
+            - button "cancelled 2/6 ollama · phi3:latest 9/7/2026, 11:53:37 PM" [ref=f5e368] [cursor=pointer]:
+              - generic [ref=f5e369]:
+                - generic [ref=f5e370]: cancelled
+                - generic [ref=f5e371]: 2/6
+              - paragraph [ref=f5e372]: ollama · phi3:latest
+              - paragraph [ref=f5e373]: 9/7/2026, 11:53:37 PM
+            - button "Delete benchmark run 6a9f0129390fcd4b06176cb9" [ref=f5e374] [cursor=pointer]
+          - generic [ref=f5e228]:
+            - button "Previous" [disabled] [ref=f5e229]
+            - generic [ref=f5e230]: 1 / 1
+            - button "Next" [disabled] [ref=f5e231]
+        - main [ref=f5e232]:
+          - generic [ref=f5e378]:
+            - generic [ref=f5e379]:
+              - generic [ref=f5e380]:
+                - heading "Run detail" [level=2] [ref=f5e381]
+                - paragraph [ref=f5e382]: 6a9f0129390fcd4b06176cb9
+              - generic [ref=f5e383]:
+                - button "Reconnect detail" [ref=f5e384] [cursor=pointer]
+                - button "Export JSON" [ref=f5e390] [cursor=pointer]
+            - generic [ref=f5e394]:
+              - generic [ref=f5e395]:
+                - paragraph [ref=f5e396]: Status
+                - paragraph [ref=f5e397]: cancelled
+              - generic [ref=f5e398]:
+                - paragraph [ref=f5e399]: Chosen provider
+                - paragraph [ref=f5e400]: ollama
+              - generic [ref=f5e401]:
+                - paragraph [ref=f5e402]: Requested model
+                - paragraph [ref=f5e403]: phi3:latest
+              - generic [ref=f5e404]:
+                - paragraph [ref=f5e405]: Actual model
+                - paragraph [ref=f5e406]: phi3:latest
+              - generic [ref=f5e407]:
+                - paragraph [ref=f5e408]: Wall duration
+                - paragraph [ref=f5e409]: 40.38 s
+              - generic [ref=f5e410]:
+                - paragraph [ref=f5e411]: Passed
+                - paragraph [ref=f5e412]: 2 / 6
+              - generic [ref=f5e413]:
+                - paragraph [ref=f5e414]: Output
+                - paragraph [ref=f5e415]: 318 B
+              - generic [ref=f5e416]:
+                - paragraph [ref=f5e417]: Started
+                - paragraph [ref=f5e418]: 9/7/2026, 11:53:37 PM
+          - generic [ref=f5e419]: No aggregate metrics were reported for this run.
+          - generic [ref=f5e421]:
+            - generic [ref=f5e422]:
+              - heading "Compare compatible completed run" [level=2] [ref=f5e423]
+              - paragraph [ref=f5e424]: Only succeeded runs from the same fixed suite version are eligible.
+            - combobox "Comparison run" [disabled] [ref=f5e425]:
+              - option "No comparison" [selected]
+          - generic [ref=f5e426]:
+            - generic [ref=f5e427]:
+              - heading "Sequential call results" [level=2] [ref=f5e428]
+              - paragraph [ref=f5e429]: Ordered call index is preserved. Output is rendered as inert text.
+            - table [ref=f5e431]:
+              - rowgroup [ref=f5e432]:
+                - row [ref=f5e433]:
+                  - columnheader "Call" [ref=f5e434]
+                  - columnheader "Prompt / repeat" [ref=f5e435]
+                  - columnheader "Result" [ref=f5e436]
+                  - columnheader "Duration" [ref=f5e437]
+                  - columnheader "TTFT" [ref=f5e438]
+                  - columnheader "Output" [ref=f5e439]
+                  - columnheader "Provider / model" [ref=f5e440]
+              - rowgroup [ref=f5e441]:
+                - row [ref=f5e442]:
+                  - cell "1" [ref=f5e443]
+                  - cell [ref=f5e444]:
+                    - text: 1 / 1
+                    - paragraph [ref=f5e445]: 76 chars
+                  - cell [ref=f5e446]:
+                    - text: Pass
+                    - paragraph [ref=f5e447]: stop
+                  - cell "6.73 s" [ref=f5e448]
+                  - cell "263 ms" [ref=f5e449]
+                  - cell [ref=f5e450]:
+                    - text: 159 B
+                    - paragraph [ref=f5e451]: 31 tokens
+                    - group [ref=f5e452]:
+                      - generic "View inert output" [ref=f5e453] [cursor=pointer]
+                  - cell [ref=f5e454]:
+                    - text: ollama
+                    - paragraph [ref=f5e455]: phi3:latest
+                - row [ref=f5e456]:
+                  - cell "2" [ref=f5e457]
+                  - cell [ref=f5e458]:
+                    - text: 1 / 2
+                    - paragraph [ref=f5e459]: 76 chars
+                  - cell [ref=f5e460]:
+                    - text: Pass
+                    - paragraph [ref=f5e461]: stop
+                  - cell "6.74 s" [ref=f5e462]
+                  - cell "272 ms" [ref=f5e463]
+                  - cell [ref=f5e464]:
+                    - text: 159 B
+                    - paragraph [ref=f5e465]: 31 tokens
+                    - group [ref=f5e466]:
+                      - generic "View inert output" [ref=f5e467] [cursor=pointer]
+                  - cell [ref=f5e468]:
+                    - text: ollama
+                    - paragraph [ref=f5e469]: phi3:latest
+          - generic [ref=f5e470]:
+            - article [ref=f5e471]:
+              - heading "GPU before" [level=2] [ref=f5e472]
+              - paragraph [ref=f5e476]: Sampled 9/7/2026, 11:53:37 PM · nvidia-smi-not-found
+              - paragraph [ref=f5e478]: No GPU devices were reported.
+            - article [ref=f5e479]:
+              - heading "GPU after" [level=2] [ref=f5e480]
+              - paragraph [ref=f5e484]: Sampled 9/7/2026, 11:54:18 PM · nvidia-smi-not-found
+              - paragraph [ref=f5e486]: No GPU devices were reported.
+          - generic [ref=f5e487]:
+            - heading "Timeline" [level=2] [ref=f5e488]
+            - list [ref=f5e489]:
+              - listitem [ref=f5e490]:
+                - generic [ref=f5e494]:
+                  - paragraph [ref=f5e495]: created
+                  - paragraph [ref=f5e496]: 9/7/2026, 11:53:37 PM
+              - listitem [ref=f5e497]:
+                - generic [ref=f5e501]:
+                  - paragraph [ref=f5e502]: started
+                  - paragraph [ref=f5e503]: 9/7/2026, 11:53:37 PM
+              - listitem [ref=f5e504]:
+                - generic [ref=f5e508]:
+                  - paragraph [ref=f5e509]: provider selected
+                  - paragraph [ref=f5e510]: 9/7/2026, 11:53:37 PM · ollama · phi3:latest
+              - listitem [ref=f5e511]:
+                - generic [ref=f5e515]:
+                  - paragraph [ref=f5e516]: call started · call 1
+                  - paragraph [ref=f5e517]: 9/7/2026, 11:53:37 PM
+              - listitem [ref=f5e518]:
+                - generic [ref=f5e522]:
+                  - paragraph [ref=f5e523]: call completed · call 1
+                  - paragraph [ref=f5e524]: 9/7/2026, 11:53:44 PM
+              - listitem [ref=f5e525]:
+                - generic [ref=f5e529]:
+                  - paragraph [ref=f5e530]: call started · call 2
+                  - paragraph [ref=f5e531]: 9/7/2026, 11:53:44 PM
+              - listitem [ref=f5e532]:
+                - generic [ref=f5e536]:
+                  - paragraph [ref=f5e537]: call completed · call 2
+                  - paragraph [ref=f5e538]: 9/7/2026, 11:53:51 PM
+              - listitem [ref=f5e539]:
+                - generic [ref=f5e543]:
+                  - paragraph [ref=f5e544]: call started · call 3
+                  - paragraph [ref=f5e545]: 9/7/2026, 11:53:51 PM
+              - listitem [ref=f5e546]:
+                - generic [ref=f5e550]:
+                  - paragraph [ref=f5e551]: cancel requested
+                  - paragraph [ref=f5e552]: 9/7/2026, 11:54:17 PM
+              - listitem [ref=f5e553]:
+                - generic [ref=f5e557]:
+                  - paragraph [ref=f5e558]: cancelled
+                  - paragraph [ref=f5e559]: 9/7/2026, 11:54:18 PM

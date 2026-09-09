@@ -7,6 +7,7 @@ import { apiUrl } from '@/config/runtime';
 import { getToken } from '@/utils/getToken';
 import { readSseResponse } from '@/utils/sse';
 import { readableApiError } from '@/services/runtimeSettings';
+import { ChatStreamProtocol, validateChatPrompt } from '@/services/chatModel';
 
 interface Task {
   id: string;
@@ -81,7 +82,11 @@ export default function WorkspacePage() {
   };
 
   const streamPrompt = async (prompt: string, task: Task, existingConversationId?: string) => {
-    if (!prompt.trim() || isAiLoading) return;
+    const input = validateChatPrompt(prompt);
+    if (!input.value || isAiLoading) {
+      if (input.error) setAiError(input.error);
+      return;
+    }
     abortControllerRef.current?.abort();
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -98,31 +103,40 @@ export default function WorkspacePage() {
         setAiConversationId(conversationId);
       }
 
+      const token = getToken();
+      if (!token) throw new Error('Your session is unavailable. Sign in again.');
       const response = await fetch(apiUrl(`/chat/conversations/${conversationId}/stream`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${getToken()}`,
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ message: prompt }),
+        body: JSON.stringify({ message: input.value }),
         signal: controller.signal,
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => undefined);
         throw new Error(readableApiError({ response: { data: payload } }, `AI request failed with HTTP ${response.status}.`));
       }
-      await readSseResponse(response, (dataString) => {
-        if (dataString === '[DONE]') return;
-        const data = JSON.parse(dataString) as { content?: string; error?: string };
-        if (data.error) throw new Error(data.error);
-        if (data.content) setAiStream((current) => current + data.content);
+      if (!(response.headers.get('content-type') || '').toLowerCase().startsWith('text/event-stream')) {
+        throw new Error('The chat endpoint returned a non-streaming response.');
+      }
+      const protocol = new ChatStreamProtocol();
+      await readSseResponse(response, (dataString, eventName, eventId) => {
+        const event = protocol.consume(dataString, eventName, eventId);
+        if (event.type === 'delta') setAiStream((current) => current + event.content);
+        else if (event.type === 'completed' && event.generation.error) setAiError(event.generation.error.message);
+        else if (event.type === 'error') throw new Error(event.error.message);
       });
+      protocol.finish();
     } catch (error: unknown) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
       setAiError(readableApiError(error, 'The configured AI provider could not analyze this task.'));
     } finally {
-      if (abortControllerRef.current === controller) abortControllerRef.current = null;
-      setIsAiLoading(false);
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+        setIsAiLoading(false);
+      }
     }
   };
 

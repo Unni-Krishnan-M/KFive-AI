@@ -1,0 +1,119 @@
+- generic [ref=f3e2]:
+  - generic [ref=f3e16]:
+    - complementary [ref=f3e17]:
+      - generic [ref=f3e18]:
+        - generic [ref=f3e19]: KFive AI
+        - button "Collapse sidebar" [ref=f3e25] [cursor=pointer]
+      - generic [ref=f3e29]:
+        - generic [ref=f3e30] [cursor=pointer]:
+          - generic [ref=f3e31]: Search
+          - generic [ref=f3e36]:
+            - generic [ref=f3e37]: ⌘
+            - generic [ref=f3e38]: K
+        - navigation [ref=f3e39]:
+          - link "Dashboard" [ref=f3e40] [cursor=pointer]:
+            - /url: /app/dashboard
+          - link "AI Chat" [ref=f3e48] [cursor=pointer]:
+            - /url: /app/chat
+          - link "Code Lab" [ref=f3e53] [cursor=pointer]:
+            - /url: /app/code
+          - link "Agents" [ref=f3e60] [cursor=pointer]:
+            - /url: /app/agents
+          - link "Documents" [ref=f3e66] [cursor=pointer]:
+            - /url: /app/documents
+          - link "Knowledge / RAG" [ref=f3e72] [cursor=pointer]:
+            - /url: /app/knowledge
+          - link "Repository Analyzer" [ref=f3e78] [cursor=pointer]:
+            - /url: /app/repositories
+          - link "Workflows" [ref=f3e85] [cursor=pointer]:
+            - /url: /app/workflows
+          - link "Dataset Lab" [ref=f3e93] [cursor=pointer]:
+            - /url: /app/datasets
+          - link "Model Benchmarks" [ref=f3e100] [cursor=pointer]:
+            - /url: /app/benchmarks
+          - link "Notebooks" [ref=f3e106] [cursor=pointer]:
+            - /url: /app/notebooks
+          - link "Voice Assistant" [ref=f3e113] [cursor=pointer]:
+            - /url: /app/voice
+          - link "Models" [ref=f3e119] [cursor=pointer]:
+            - /url: /app/models
+          - link "Projects" [ref=f3e132] [cursor=pointer]:
+            - /url: /app/projects
+          - link "Workspace" [ref=f3e137] [cursor=pointer]:
+            - /url: /app/workspace
+          - link "PDF Utilities" [ref=f3e143] [cursor=pointer]:
+            - /url: /app/files
+      - generic [ref=f3e148]:
+        - generic [ref=f3e149]:
+          - generic [ref=f3e150]: B
+          - generic [ref=f3e152]:
+            - paragraph [ref=f3e153]: Browser Audit
+            - paragraph [ref=f3e154]: kfive-browser-20260902-0211@example.test
+        - generic [ref=f3e155]:
+          - link "Profile" [ref=f3e156] [cursor=pointer]:
+            - /url: /app/profile
+          - link "Settings" [ref=f3e160] [cursor=pointer]:
+            - /url: /app/settings
+          - button "Toggle theme" [ref=f3e164] [cursor=pointer]
+          - button "Sign out" [ref=f3e171] [cursor=pointer]
+    - main [ref=f3e175]:
+      - generic [ref=f3e177]:
+        - generic [ref=f3e178]:
+          - generic [ref=f3e179]:
+            - generic [ref=f3e180]: Notebook Mode
+            - heading "Persistent notebook documents" [level=1] [ref=f3e184]
+            - paragraph [ref=f3e185]: Edit bounded Python and Markdown cells without exposing a shell or Jupyter server.
+          - button "New notebook" [ref=f3e186] [cursor=pointer]
+        - status [ref=f3e190]:
+          - generic [ref=f3e193]:
+            - strong [ref=f3e194]: Isolated execution available
+            - paragraph [ref=f3e195]: Notebook execution is available through the isolated broker and verifier.
+        - generic [ref=f3e196]:
+          - complementary [ref=f3e197]:
+            - generic [ref=f3e198]:
+              - heading "Workspace notebooks" [level=2] [ref=f3e199]
+              - generic [ref=f3e200]: 1/100
+            - button "Browser execution audit 1 cells · revision 2" [ref=f3e202] [cursor=pointer]:
+              - generic [ref=f3e203]: Browser execution audit
+              - generic [ref=f3e204]: 1 cells · revision 2
+            - generic [ref=f3e205]:
+              - button "Previous" [disabled] [ref=f3e206]
+              - generic [ref=f3e207]: Page 1 / 1
+              - button "Next" [disabled] [ref=f3e208]
+          - main [ref=f3e209]:
+            - generic [ref=f3e210]:
+              - generic [ref=f3e211]:
+                - generic [ref=f3e212]:
+                  - text: Title
+                  - textbox "Title" [ref=f3e213]: Browser execution audit
+                - generic [ref=f3e214]:
+                  - text: Cell timeout
+                  - spinbutton "Cell timeout" [ref=f3e215]: "10"
+                - generic [ref=f3e216]:
+                  - button "Delete notebook" [ref=f3e217] [cursor=pointer]
+                  - button "Run" [ref=f3e221] [cursor=pointer]
+                  - button "Save" [disabled] [ref=f3e224]
+              - generic [ref=f3e229]:
+                - generic [ref=f3e230]: Saved revision 2
+                - generic [ref=f3e231]: 1/32 cells
+              - generic [ref=f3e233]:
+                - generic [ref=f3e234]:
+                  - combobox "Cell 1 type" [ref=f3e235]:
+                    - option "Python" [selected]
+                    - option "Markdown"
+                  - generic [ref=f3e236]: Cell 1
+                  - button "Move cell 1 up" [disabled] [ref=f3e237]
+                  - button "Move cell 1 down" [disabled] [ref=f3e240]
+                  - button "Remove cell 1" [disabled] [ref=f3e243]
+                - textbox "Cell 1 code source" [ref=f3e247]:
+                  - /placeholder: print("Hello from KFive")
+                  - text: print("browser-notebook-result", 6 * 7)
+              - generic [ref=f3e250]:
+                - button "Python cell" [ref=f3e251] [cursor=pointer]
+                - button "Markdown cell" [ref=f3e256] [cursor=pointer]
+              - generic [ref=f3e261]:
+                - generic [ref=f3e263]:
+                  - heading "Execution history" [level=2] [ref=f3e264]
+                  - paragraph [ref=f3e265]: Saved revision snapshots only; untrusted HTML, SVG, and JavaScript outputs are never rendered.
+                - paragraph [ref=f3e292]: No retained runs for this notebook.
+  - status [ref=f3e298]: Notebook run deleted.

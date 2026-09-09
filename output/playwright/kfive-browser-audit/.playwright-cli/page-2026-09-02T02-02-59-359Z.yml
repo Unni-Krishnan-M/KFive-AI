@@ -1,0 +1,30 @@
+- generic [ref=e2]:
+  - generic [ref=e39]:
+    - generic [ref=e40]:
+      - heading "Join KFive AI" [level=1] [ref=e45]
+      - paragraph [ref=e46]: Create your AI workspace account
+    - generic [ref=e47]:
+      - generic [ref=e48]:
+        - generic [ref=e49]:
+          - generic [ref=e50]: First Name
+          - textbox "John" [ref=e51]
+        - generic [ref=e52]:
+          - generic [ref=e53]: Last Name
+          - textbox "Doe" [ref=e54]
+      - generic [ref=e55]:
+        - generic [ref=e56]: Username *
+        - textbox "johndoe" [ref=e57]
+      - generic [ref=e58]:
+        - generic [ref=e59]: Email *
+        - textbox "john@example.com" [ref=e60]
+      - generic [ref=e61]:
+        - generic [ref=e62]: Password *
+        - textbox "Create a strong password" [ref=e63]
+      - button "Create Account" [ref=e64] [cursor=pointer]
+    - paragraph [ref=e67]:
+      - text: Already have an account?
+      - link "Sign in" [ref=e68] [cursor=pointer]:
+        - /url: /login
+  - generic:
+    - status [ref=e74]: Something went wrong
+    - status [ref=e80]: Server error occurred. Please try again later.

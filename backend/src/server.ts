@@ -10,6 +10,10 @@ import { logger } from './utils/logger';
 import { validateEnvironment } from './utils/validation';
 import { agentRunService } from './services/agentRunService';
 import { workflowRunService } from './services/workflowRunService';
+import { benchmarkService } from './services/benchmarkService';
+import { notebookRunService } from './services/notebookRunService';
+import { chatService } from './services/chatService';
+import { closeHttpServerIfListening } from './utils/httpServer';
 
 const config = getEnvironment();
 validateEnvironment();
@@ -31,6 +35,12 @@ let recoveringAgentRuns = false;
 let agentRunRecoveryTimer: NodeJS.Timeout | undefined;
 let recoveringWorkflowRuns = false;
 let workflowRunRecoveryTimer: NodeJS.Timeout | undefined;
+let recoveringBenchmarkRuns = false;
+let benchmarkRunRecoveryTimer: NodeJS.Timeout | undefined;
+let recoveringNotebookRuns = false;
+let notebookRunRecoveryTimer: NodeJS.Timeout | undefined;
+let recoveringChatGenerations = false;
+let chatGenerationRecoveryTimer: NodeJS.Timeout | undefined;
 
 function startAgentRunRecoveryLoop(): void {
   agentRunRecoveryTimer = setInterval(() => {
@@ -60,6 +70,46 @@ function startWorkflowRunRecoveryLoop(): void {
   workflowRunRecoveryTimer.unref();
 }
 
+function startBenchmarkRunRecoveryLoop(): void {
+  benchmarkRunRecoveryTimer = setInterval(() => {
+    if (recoveringBenchmarkRuns || shuttingDown) return;
+    recoveringBenchmarkRuns = true;
+    void benchmarkService.recoverInterrupted()
+      .then((summary) => {
+        if (summary.interrupted > 0 || summary.orphaned > 0 || summary.deleted > 0) {
+          logger.warn('Reconciled benchmark runs', summary);
+        }
+      })
+      .catch(() => logger.error('Benchmark run recovery check failed'))
+      .finally(() => { recoveringBenchmarkRuns = false; });
+  }, 30_000);
+  benchmarkRunRecoveryTimer.unref();
+}
+
+function startNotebookRunRecoveryLoop(): void {
+  notebookRunRecoveryTimer = setInterval(() => {
+    if (recoveringNotebookRuns || shuttingDown) return;
+    recoveringNotebookRuns = true;
+    void notebookRunService.recoverInterrupted()
+      .then((count) => { if (count > 0) logger.warn('Recovered interrupted notebook runs', { count }); })
+      .catch(() => logger.error('Notebook run recovery check failed'))
+      .finally(() => { recoveringNotebookRuns = false; });
+  }, 30_000);
+  notebookRunRecoveryTimer.unref();
+}
+
+function startChatGenerationRecoveryLoop(): void {
+  chatGenerationRecoveryTimer = setInterval(() => {
+    if (recoveringChatGenerations || shuttingDown) return;
+    recoveringChatGenerations = true;
+    void chatService.recoverInterrupted()
+      .then((count) => { if (count > 0) logger.warn('Recovered interrupted chat generations', { count }); })
+      .catch(() => logger.error('Chat generation recovery check failed'))
+      .finally(() => { recoveringChatGenerations = false; });
+  }, 30_000);
+  chatGenerationRecoveryTimer.unref();
+}
+
 async function gracefulShutdown(signal: string): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
@@ -74,8 +124,11 @@ async function gracefulShutdown(signal: string): Promise<void> {
   try {
     if (agentRunRecoveryTimer) clearInterval(agentRunRecoveryTimer);
     if (workflowRunRecoveryTimer) clearInterval(workflowRunRecoveryTimer);
+    if (benchmarkRunRecoveryTimer) clearInterval(benchmarkRunRecoveryTimer);
+    if (notebookRunRecoveryTimer) clearInterval(notebookRunRecoveryTimer);
+    if (chatGenerationRecoveryTimer) clearInterval(chatGenerationRecoveryTimer);
     await new Promise<void>((resolve) => io.close(() => resolve()));
-    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    await closeHttpServerIfListening(server);
     await closeQueues();
     await disconnectRedis();
     await disconnectDatabase();
@@ -106,10 +159,22 @@ async function startServer(): Promise<void> {
     if (interruptedAgentRuns > 0) logger.warn('Recovered interrupted agent runs', { count: interruptedAgentRuns });
     const interruptedWorkflowRuns = await workflowRunService.recoverInterrupted();
     if (interruptedWorkflowRuns > 0) logger.warn('Recovered interrupted workflow runs', { count: interruptedWorkflowRuns });
+    const interruptedChatGenerations = await chatService.recoverInterrupted();
+    if (interruptedChatGenerations > 0) {
+      logger.warn('Recovered interrupted chat generations', { count: interruptedChatGenerations });
+    }
     await connectRedis();
     await initializeQueues();
+    const benchmarkRecovery = await benchmarkService.recoverInterrupted();
+    if (benchmarkRecovery.interrupted > 0 || benchmarkRecovery.orphaned > 0
+      || benchmarkRecovery.deleted > 0 || benchmarkRecovery.requeued > 0) {
+      logger.warn('Reconciled benchmark runs', benchmarkRecovery);
+    }
     startAgentRunRecoveryLoop();
     startWorkflowRunRecoveryLoop();
+    startBenchmarkRunRecoveryLoop();
+    startNotebookRunRecoveryLoop();
+    startChatGenerationRecoveryLoop();
     server.listen(config.port, () => {
       logger.info('KFive AI backend started', {
         port: config.port,

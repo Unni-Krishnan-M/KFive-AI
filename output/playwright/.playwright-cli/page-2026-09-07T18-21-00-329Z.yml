@@ -1,0 +1,21 @@
+- generic [ref=f2e2]:
+  - generic [ref=f2e18]:
+    - generic [ref=f2e19]:
+      - heading "Welcome Back" [level=1] [ref=f2e24]
+      - paragraph [ref=f2e25]: Sign in to your KFive AI workspace
+    - generic [ref=f2e26]:
+      - generic [ref=f2e27]:
+        - generic [ref=f2e28]: Email
+        - textbox "Enter your email" [ref=f2e29]: kfive-benchmark-20260907@example.test
+      - generic [ref=f2e30]:
+        - generic [ref=f2e31]: Password
+        - textbox "Enter your password" [ref=f2e32]: BenchmarkE2E-2026!
+      - alert [ref=f2e38]: Request failed with status code 502
+      - button "Sign In" [ref=f2e33] [cursor=pointer]
+    - paragraph [ref=f2e36]:
+      - text: Don't have an account?
+      - link "Sign up" [ref=f2e37] [cursor=pointer]:
+        - /url: /register
+  - generic:
+    - status [ref=f2e45]: Request failed with status code 502
+    - status [ref=f2e51]: Server error occurred. Please try again later.

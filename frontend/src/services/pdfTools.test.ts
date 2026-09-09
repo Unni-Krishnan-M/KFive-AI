@@ -4,11 +4,15 @@ import {
   MAX_PDF_AGGREGATE_BYTES,
   MAX_PDF_FILE_BYTES,
   MAX_PDF_OUTPUT_BYTES,
+  MAX_PDF_PAGE_SELECTION_CHARS,
   PdfInput,
   PdfToolError,
   extractPdfPages,
   mergePdfs,
+  pdfOutputFilename,
   parsePageSelection,
+  publicPdfToolError,
+  readBrowserPdfInputs,
   rotatePdfPages,
 } from './pdfTools';
 
@@ -77,6 +81,57 @@ describe('page selection parsing', () => {
     expectSyncCode(() => parsePageSelection('1,,2', 3), 'INVALID_PAGE_SELECTION');
     expectSyncCode(() => parsePageSelection('0', 3), 'PAGE_OUT_OF_RANGE');
     expectSyncCode(() => parsePageSelection('4', 3), 'PAGE_OUT_OF_RANGE');
+    expectSyncCode(() => parsePageSelection('1'.repeat(MAX_PDF_PAGE_SELECTION_CHARS + 1), 3), 'PAGE_SELECTION_TOO_LARGE');
+    expectSyncCode(() => parsePageSelection(Array.from({ length: 501 }, () => '1').join(','), 3), 'PAGE_SELECTION_TOO_LARGE');
+  });
+});
+
+describe('browser file preflight and public presentation', () => {
+  const file = (overrides: Partial<{ name: string; type: string; size: number }> = {}) => ({
+    name: 'input.pdf',
+    type: 'application/pdf',
+    size: 1024,
+    arrayBuffer: vi.fn().mockResolvedValue(new TextEncoder().encode('%PDF-fixture').buffer),
+    ...overrides,
+  });
+
+  it('rejects per-file and aggregate metadata before reading any bytes', async () => {
+    const oversized = file({ size: MAX_PDF_FILE_BYTES + 1 });
+    await expect(readBrowserPdfInputs([oversized], 'single')).rejects.toSatisfy(expectCode('FILE_TOO_LARGE'));
+    expect(oversized.arrayBuffer).not.toHaveBeenCalled();
+
+    const aggregateFiles = Array.from({ length: 4 }, (_, index) => file({
+      name: `part-${index}.pdf`,
+      size: Math.floor(MAX_PDF_AGGREGATE_BYTES / 4) + 1,
+    }));
+    await expect(readBrowserPdfInputs(aggregateFiles, 'merge')).rejects.toSatisfy(expectCode('AGGREGATE_TOO_LARGE'));
+    aggregateFiles.forEach((candidate) => expect(candidate.arrayBuffer).not.toHaveBeenCalled());
+  });
+
+  it('reads accepted files sequentially and returns fresh byte views', async () => {
+    const order: string[] = [];
+    const first = file({ name: 'first.pdf' });
+    const second = file({ name: 'second.pdf' });
+    first.arrayBuffer.mockImplementation(async () => { order.push('first'); return new Uint8Array([1]).buffer; });
+    second.arrayBuffer.mockImplementation(async () => { order.push('second'); return new Uint8Array([2]).buffer; });
+
+    const inputs = await readBrowserPdfInputs([first, second], 'merge');
+
+    expect(order).toEqual(['first', 'second']);
+    expect(inputs.map((input) => [...input.bytes])).toEqual([[1], [2]]);
+  });
+
+  it('never exposes unexpected internal errors and sanitizes download names', () => {
+    expect(publicPdfToolError(new Error('/private/path parser detail'))).toBe(
+      'The PDF operation could not be completed. Try another valid PDF.'
+    );
+    expect(publicPdfToolError(new PdfToolError('INVALID_FILE', 'Safe public error.'))).toBe('Safe public error.');
+    const filename = pdfOutputFilename('extract', '../unsafe\\name\n\u202eevil.pdf');
+    expect(filename).toBe('-unsafe-nameevil-extracted.pdf');
+    expect(filename).not.toMatch(/[\\/\n\u202e]/);
+    expect(pdfOutputFilename('rotate', '.pdf')).toBe('document-rotated.pdf');
+    expect(pdfOutputFilename('merge', '../ignored.pdf')).toBe('kfive-merged.pdf');
+    expect(Array.from(pdfOutputFilename('extract', `${'a'.repeat(200)}.pdf`)).length).toBeLessThanOrEqual(94);
   });
 });
 

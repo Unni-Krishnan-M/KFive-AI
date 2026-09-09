@@ -18,6 +18,9 @@ import codeRoutes from './code';
 import knowledgeRoutes from './knowledge';
 import repositoriesRoutes from './repositories';
 import workflowsRoutes from './workflows';
+import datasetsRoutes from './datasets';
+import benchmarksRoutes from './benchmarks';
+import notebooksRoutes from './notebooks';
 
 export function setupRoutes(app: Express, config: EnvironmentConfig): void {
   const apiVersion = config.apiVersion;
@@ -60,4 +63,7 @@ export function setupRoutes(app: Express, config: EnvironmentConfig): void {
   app.use(`${basePath}/knowledge`, authenticateToken, knowledgeRoutes);
   app.use(`${basePath}/repositories`, authenticateToken, repositoriesRoutes);
   app.use(`${basePath}/workflows`, authenticateToken, workflowsRoutes);
+  app.use(`${basePath}/datasets`, authenticateToken, datasetsRoutes);
+  app.use(`${basePath}/benchmarks`, authenticateToken, benchmarksRoutes);
+  app.use(`${basePath}/notebooks`, authenticateToken, notebooksRoutes);
 }

@@ -1,0 +1,77 @@
+- generic [ref=f2e2]:
+  - generic [ref=f2e4]:
+    - complementary [ref=f2e5]:
+      - generic [ref=f2e6]:
+        - generic [ref=f2e7]: KFive AI
+        - button "Collapse sidebar" [ref=f2e12] [cursor=pointer]
+      - generic [ref=f2e16]:
+        - generic [ref=f2e17] [cursor=pointer]:
+          - generic [ref=f2e18]: Search
+          - generic [ref=f2e23]:
+            - generic [ref=f2e24]: ⌘
+            - generic [ref=f2e25]: K
+        - navigation [ref=f2e26]:
+          - link "Dashboard" [ref=f2e27] [cursor=pointer]:
+            - /url: /app/dashboard
+          - link "AI Chat" [ref=f2e35] [cursor=pointer]:
+            - /url: /app/chat
+          - link "Code Lab" [ref=f2e40] [cursor=pointer]:
+            - /url: /app/code
+          - link "Agents" [ref=f2e47] [cursor=pointer]:
+            - /url: /app/agents
+          - link "Documents" [ref=f2e53] [cursor=pointer]:
+            - /url: /app/documents
+          - link "Knowledge / RAG" [ref=f2e59] [cursor=pointer]:
+            - /url: /app/knowledge
+          - link "Repository Analyzer" [ref=f2e65] [cursor=pointer]:
+            - /url: /app/repositories
+          - link "Workflows" [ref=f2e72] [cursor=pointer]:
+            - /url: /app/workflows
+          - link "Dataset Lab" [ref=f2e80] [cursor=pointer]:
+            - /url: /app/datasets
+          - link "Model Benchmarks" [ref=f2e87] [cursor=pointer]:
+            - /url: /app/benchmarks
+          - link "Notebooks" [ref=f2e93] [cursor=pointer]:
+            - /url: /app/notebooks
+          - link "Voice Assistant" [ref=f2e99] [cursor=pointer]:
+            - /url: /app/voice
+          - link "Models" [ref=f2e105] [cursor=pointer]:
+            - /url: /app/models
+          - link "Projects" [ref=f2e118] [cursor=pointer]:
+            - /url: /app/projects
+          - link "Workspace" [ref=f2e124] [cursor=pointer]:
+            - /url: /app/workspace
+          - link "PDF Utilities" [ref=f2e130] [cursor=pointer]:
+            - /url: /app/files
+      - generic [ref=f2e135]:
+        - generic [ref=f2e136]:
+          - generic [ref=f2e137]: b
+          - generic [ref=f2e139]:
+            - paragraph [ref=f2e140]: benchmarke2e
+            - paragraph [ref=f2e141]: kfive-benchmark-20260907@example.test
+        - generic [ref=f2e142]:
+          - link "Profile" [ref=f2e143] [cursor=pointer]:
+            - /url: /app/profile
+          - link "Settings" [ref=f2e147] [cursor=pointer]:
+            - /url: /app/settings
+          - button "Toggle theme" [ref=f2e151] [cursor=pointer]
+          - button "Sign out" [ref=f2e158] [cursor=pointer]
+    - main [ref=f2e162]:
+      - generic [ref=f2e164]:
+        - generic [ref=f2e165]:
+          - generic [ref=f2e166]:
+            - heading "Projects" [level=1] [ref=f2e167]
+            - paragraph [ref=f2e170]: Persistent, owner-scoped rooms for KFive work.
+          - generic [ref=f2e171]:
+            - button "Refresh projects" [ref=f2e172] [cursor=pointer]
+            - button "New project" [ref=f2e178] [cursor=pointer]
+        - generic [ref=f2e180]:
+          - button "active" [ref=f2e181] [cursor=pointer]
+          - button "archived" [ref=f2e182] [cursor=pointer]
+          - button "all" [ref=f2e183] [cursor=pointer]
+        - generic [ref=f2e184]:
+          - generic [ref=f2e185]: No archived projects.
+          - complementary [ref=f2e186]:
+            - heading "Project room" [level=2] [ref=f2e187]
+            - paragraph [ref=f2e188]: Select a project to open its chat, code runs, notebooks, documents, datasets, knowledge, repository analyses, workflows, agents, benchmarks, or activity.
+  - status [ref=f2e225]: Project restored

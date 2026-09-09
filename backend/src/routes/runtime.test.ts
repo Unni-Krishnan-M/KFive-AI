@@ -43,7 +43,7 @@ describe('runtime configuration route', () => {
     expect(body.data.services).toContainEqual(expect.objectContaining({ id: 'chromadb', location: 'remote' }));
     expect(body.data.missingDependencies).toEqual(expect.arrayContaining([
       'Code Runner is not configured.',
-      'Document Processor is not configured.',
+      'Document Processor is unavailable because this build has no isolated processor adapter.',
       'OCR service is not configured.',
     ]));
     expect(body.data.restartRequiredFields).toContain('AI_PROVIDER');
@@ -51,5 +51,33 @@ describe('runtime configuration route', () => {
     expect(serialized).not.toContain('vectors.example.test');
     expect(serialized).not.toContain('host.docker.internal');
     expect(serialized).not.toContain(process.env.JWT_SECRET);
+  });
+
+  it('does not claim document processing is available from an unused endpoint setting', async () => {
+    const configuredEndpoint = parseEnvironment({
+      ...process.env,
+      NODE_ENV: 'test',
+      KFIVE_MODE: 'hybrid',
+      AI_PROVIDER: 'ollama',
+      MONGODB_URL: 'mongodb://mongodb:27017/kfive?authSource=admin',
+      REDIS_URL: 'redis://redis:6379',
+      CHROMA_URL: 'http://chromadb:8000',
+      OLLAMA_BASE_URL: 'http://host.docker.internal:11434',
+      DOCUMENT_PROCESSOR_URL: 'https://processor.example.test',
+      JWT_SECRET: process.env.JWT_SECRET,
+      JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
+    });
+
+    const { body } = await invokeGet(createRuntimeRouter(configuredEndpoint), '/');
+    const processor = body.data.services.find((service: { id: string }) => service.id === 'document-processor');
+
+    expect(processor).toMatchObject({
+      configured: false,
+      location: 'remote',
+      message: 'An endpoint is configured, but this build has no isolated Document Processor adapter.',
+    });
+    expect(body.data.missingDependencies).toContain(
+      'Document Processor is unavailable because this build has no isolated processor adapter.',
+    );
   });
 });

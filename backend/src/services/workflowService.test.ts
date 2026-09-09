@@ -4,6 +4,11 @@ import {
   normalizeWorkflowDefinition, validateWorkflowCreateInput, validateWorkflowUpdateInput,
 } from './workflowService';
 import { ProjectError } from './projectService';
+import {
+  releaseWorkflowExecutionLease,
+  resetWorkflowExecutionLeasesForTests,
+  tryAcquireWorkflowExecutionLease,
+} from './workflowExecutionLease';
 
 const ownerId = '64b000000000000000000001';
 const otherOwnerId = '64b000000000000000000002';
@@ -78,6 +83,8 @@ describe('workflow validation', () => {
 });
 
 describe('WorkflowService', () => {
+  beforeEach(() => resetWorkflowExecutionLeasesForTests());
+
   it('creates/lists with owner scope, active project validation, revision one and a 100-workflow cap', async () => {
     const create = jest.fn(repository().create);
     const list = jest.fn(repository().list);
@@ -107,6 +114,23 @@ describe('WorkflowService', () => {
     await expect(service.get(ownerId, workflowId)).resolves.toMatchObject({ id: workflowId });
     await expect(service.update(ownerId, workflowId, { name: 'Blocked' })).rejects.toBe(archived);
     await expect(service.getActiveRecord(ownerId, workflowId)).rejects.toBe(archived);
+  });
+
+  it('serializes definition updates against execution and releases the lease after failures', async () => {
+    const updateByOwnerAndId = jest.fn(repository().updateByOwnerAndId);
+    const service = new WorkflowService(
+      repository({ updateByOwnerAndId }), jest.fn().mockResolvedValue(undefined), jest.fn()
+    );
+    expect(tryAcquireWorkflowExecutionLease(ownerId, workflowId)).toBe(true);
+    await expect(service.update(ownerId, workflowId, { name: 'Blocked' })).rejects.toMatchObject({
+      code: 'WORKFLOW_HAS_ACTIVE_RUNS', statusCode: 409,
+    });
+    expect(updateByOwnerAndId).not.toHaveBeenCalled();
+    releaseWorkflowExecutionLease(ownerId, workflowId);
+
+    await expect(service.update(ownerId, workflowId, {})).rejects.toMatchObject({ code: 'INVALID_WORKFLOW_INPUT' });
+    expect(tryAcquireWorkflowExecutionLease(ownerId, workflowId)).toBe(true);
+    releaseWorkflowExecutionLease(ownerId, workflowId);
   });
 
   it('blocks deletion with active/history runs, but allows run-free orphan cleanup', async () => {

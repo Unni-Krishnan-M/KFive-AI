@@ -33,14 +33,16 @@ describe('queue lifecycle', () => {
         removeOnFail: 100,
       },
     }));
-    expect(WorkerMock).toHaveBeenCalledTimes(2);
+    expect(QueueMock.mock.calls.map((call) => call[0])).not.toContain('document-processing');
+    expect(WorkerMock).toHaveBeenCalledTimes(1);
     expect(WorkerMock.mock.calls.map((call) => call[0])).not.toContain('code-runs');
+    expect(WorkerMock.mock.calls.map((call) => call[0])).not.toContain('document-processing');
     expect(QueueEventsMock).toHaveBeenCalledWith('code-runs', expect.objectContaining({
       connection: expect.any(Object),
       lastEventId: '0-0',
     }));
-    expect(getCodeRunsQueue()).toBe(QueueMock.mock.results[2].value);
-    expect(sweep).toHaveBeenCalledWith(QueueMock.mock.results[2].value);
+    expect(getCodeRunsQueue()).toBe(QueueMock.mock.results[1].value);
+    expect(sweep).toHaveBeenCalledWith(QueueMock.mock.results[1].value);
 
     const queueInstances = QueueMock.mock.results.map((result) => result.value);
     const workerInstances = WorkerMock.mock.results.map((result) => result.value);

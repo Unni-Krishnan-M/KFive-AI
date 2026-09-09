@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools==75.6.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kfive-notebook-runtime"
+version = "0.1.0"
+description = "One-shot, fixed-environment notebook supervisor for KFive AI"
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[tool.setuptools]
+packages = ["kfive_notebook_runtime"]
+py-modules = ["kfive_runtime"]
+

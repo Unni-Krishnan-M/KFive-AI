@@ -7,6 +7,7 @@ import {
   Database,
   FolderKanban,
   GitBranch,
+  Gauge,
   MessageSquare,
   Settings2,
   ShieldCheck,
@@ -44,6 +45,11 @@ const currentFeatures = [
     detail: 'Validated owner/project-scoped uploads plus browser-local PDF merge, extract, and rotate utilities.',
   },
   {
+    icon: Database,
+    title: 'Dataset Lab',
+    detail: 'Bounded CSV/JSON upload, deterministic quality profiling, preview, download, and immutable cleaned derivations.',
+  },
+  {
     icon: BookOpen,
     title: 'Knowledge / RAG',
     detail: 'Bounded TXT/Markdown ingestion and owner/project-scoped retrieval through an explicit embedding profile.',
@@ -52,6 +58,21 @@ const currentFeatures = [
     icon: GitBranch,
     title: 'Repository Analyzer',
     detail: 'Read-only, bounded ZIP inventory with evidence for languages, manifests, frameworks, tests, and infrastructure signals.',
+  },
+  {
+    icon: GitBranch,
+    title: 'Experimental Workflows',
+    detail: 'A server-validated Input → Prompt → LLM → Output slice with persistent definitions, runs, cancellation, and history.',
+  },
+  {
+    icon: BookOpen,
+    title: 'Notebook Mode',
+    detail: 'Owner/project-scoped Python and Markdown editing with opt-in isolated execution, cancellation, durable history, and verified output.',
+  },
+  {
+    icon: Gauge,
+    title: 'Model Benchmarks',
+    detail: 'Bounded six-call chat-suite runs with measured latency, output size, optional provider usage, safe GPU snapshots, comparison, and export.',
   },
 ];
 
@@ -132,7 +153,7 @@ export default function LandingPage() {
           <div className="mx-auto max-w-7xl px-5 py-16">
             <div className="grid gap-8 lg:grid-cols-[1fr_1.2fr]">
               <div><p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300">Planned roadmap</p><h2 className="mt-3 text-3xl font-bold">The larger platform is not being faked ahead of implementation.</h2></div>
-              <p className="leading-7 text-gray-400">The isolated Document Processor and remaining PDF utilities, OCR, deeper repository intelligence, workflows, Dataset Lab, notebooks, ML experiments, benchmarks, Kubernetes, GitOps, observability, and remote production deployment advance as tested vertical slices. Their absence from this page is intentional.</p>
+              <p className="leading-7 text-gray-400">The isolated Document Processor and remaining PDF utilities, OCR, deeper repository intelligence, broader workflow automation, ML experiments, Kubernetes, GitOps, observability, and remote production deployment remain planned or require their own tested vertical slices.</p>
             </div>
           </div>
         </section>

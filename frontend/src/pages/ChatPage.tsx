@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Bot, User, Send, StopCircle, Check, Copy, RefreshCw, MessageSquare, Plus, Brain, AlertCircle, FolderKanban, Mic, X } from 'lucide-react';
+import { Bot, User, Send, StopCircle, Check, Copy, MessageSquare, Plus, Brain, AlertCircle, FolderKanban, Mic, X } from 'lucide-react';
 import { chatApi, modelApi } from '@/services/api';
 import toast from 'react-hot-toast';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -14,24 +14,26 @@ import { ModelInfo, normalizeModelCatalog } from '@/services/modelManager';
 import { readableApiError, unwrapApiData } from '@/services/runtimeSettings';
 import { PROJECT_ARCHIVED_MESSAGE, projectContextPath, projectNavigationState } from '@/services/projectContext';
 import { useProjectContext } from '@/hooks/useProjectContext';
+import {
+  ChatConversation,
+  ChatGeneration,
+  ChatMessage,
+  ChatStreamProtocol,
+  ChatUsage,
+  chatGenerationLabel,
+  normalizeChatConversation,
+  validateChatPrompt,
+} from '@/services/chatModel';
 
 const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-interface Message {
-  _id?: string;
-  id?: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  isStreamingError?: boolean;
-}
-
-interface Conversation {
-  _id?: string;
-  id?: string;
-  title: string;
-  updatedAt: string;
-  messages?: Message[];
-  projectId?: string;
+interface PendingChatRequest {
+  controller: AbortController;
+  conversationId?: string;
+  requestId?: string;
+  assistantId: string;
+  scope: string;
+  stopping: boolean;
 }
 
 export default function ChatPage() {
@@ -42,22 +44,30 @@ export default function ChatPage() {
   const projectScopeReady = !projectRequested || Boolean(projectContext);
   const projectMutationsAllowed = projectScopeReady && projectContext?.status !== 'archived';
   
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [conversations, setConversations] = useState<ChatConversation[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [generation, setGeneration] = useState<ChatGeneration>();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
+  const [streamUsage, setStreamUsage] = useState<ChatUsage>();
   const [selectedModel, setSelectedModel] = useState(localStorage.getItem('kfive-default-model') || '');
   const [modelOptions, setModelOptions] = useState<ModelInfo[]>([]);
   const [selectedProvider, setSelectedProvider] = useState('provider');
   const [taskType, setTaskType] = useState('general-chat');
   const [smartRouting, setSmartRouting] = useState(true);
+  const [routingDecision, setRoutingDecision] = useState<{ provider: string; model: string; reasons?: string[] }>();
   const [lastSelection, setLastSelection] = useState<{ provider: string; model: string; reasons?: string[] }>();
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [pageError, setPageError] = useState<string>();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const activeRequestRef = useRef<PendingChatRequest | null>(null);
+  const detailRequestRef = useRef(0);
+  const scope = `${projectId || 'global'}:${conversationId || 'new'}`;
+  const scopeRef = useRef(scope);
+  scopeRef.current = scope;
 
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
@@ -134,38 +144,72 @@ export default function ChatPage() {
       setConversations([]);
       return;
     }
-    fetchConversations();
+    void fetchConversations();
   }, [conversationId, projectId, projectScopeReady]);
 
   useEffect(() => {
+    const active = activeRequestRef.current;
+    const continuingRequest = Boolean(active && active.scope === scope);
+    if (active && active.scope !== scope) {
+      active.controller.abort();
+      activeRequestRef.current = null;
+      setIsLoading(false);
+      setIsStopping(false);
+    }
+    if (!continuingRequest) {
+      setLastSelection(undefined);
+      setRoutingDecision(undefined);
+      setStreamUsage(undefined);
+      setPageError(undefined);
+    }
     if (conversationId && projectScopeReady) {
-      loadConversationContext(conversationId);
+      if (!activeRequestRef.current || activeRequestRef.current.conversationId !== conversationId) {
+        void loadConversationContext(conversationId);
+      }
     } else {
       setMessages([]);
+      setGeneration(undefined);
     }
-  }, [conversationId, projectId, projectScopeReady]);
+  }, [scope, conversationId, projectScopeReady]);
+
+  useEffect(() => () => {
+    activeRequestRef.current?.controller.abort();
+    activeRequestRef.current = null;
+  }, []);
 
   const fetchConversations = async () => {
+    const expectedProject = projectId || 'global';
     try {
       const res = await chatApi.getConversations(1, 20, projectId);
-      if (Array.isArray(res.data?.data)) {
-        setConversations(res.data.data);
-      }
+      if (!scopeRef.current.startsWith(`${expectedProject}:`) || !Array.isArray(res.data?.data)) return;
+      setConversations(res.data.data.map(normalizeChatConversation));
     } catch(error) { setPageError(readableApiError(error, 'Conversations could not be loaded.')); }
   };
 
-  const loadConversationContext = async (id: string) => {
+  const loadConversationContext = async (id: string, force = false) => {
+    const expectedScope = `${projectId || 'global'}:${id}`;
+    const serial = ++detailRequestRef.current;
+    if (!force && activeRequestRef.current?.conversationId === id) return;
     try {
       const res = await chatApi.getConversation(id);
-      const conversation = res.data?.data as Conversation | undefined;
-      if (projectId && String(conversation?.projectId || '') !== projectId) {
+      if (serial !== detailRequestRef.current || scopeRef.current !== expectedScope) return;
+      const conversation = normalizeChatConversation(res.data?.data);
+      if (projectId && String(conversation.projectId || '') !== projectId) {
         setMessages([]);
+        setGeneration(undefined);
         setPageError('This conversation does not belong to the selected project. Project-scoped actions are disabled.');
         return;
       }
-      if (conversation?.messages) {
-        setMessages(conversation.messages);
+      setMessages(conversation.messages);
+      setGeneration(conversation.generation);
+      const lastAssistant = [...conversation.messages].reverse().find((message) => message.role === 'assistant');
+      if (lastAssistant?.provider && lastAssistant.model) {
+        setLastSelection({ provider: lastAssistant.provider, model: lastAssistant.model });
+      } else if (conversation.generation?.provider && conversation.generation.model) {
+        setLastSelection({ provider: conversation.generation.provider, model: conversation.generation.model });
       }
+      setStreamUsage(lastAssistant?.usage ?? conversation.generation?.usage);
+      if (conversation.generation?.error) setPageError(conversation.generation.error.message);
     } catch(error) { setPageError(readableApiError(error, 'Conversation could not be loaded.')); }
   };
 
@@ -196,16 +240,32 @@ export default function ChatPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const stopGeneration = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-      setIsLoading(false);
+  const stopGeneration = async () => {
+    const active = activeRequestRef.current;
+    if (!active || active.stopping) return;
+    active.stopping = true;
+    setIsStopping(true);
+    if (!active.conversationId || !active.requestId) {
+      active.controller.abort();
+      return;
+    }
+    try {
+      await chatApi.cancelGeneration(active.conversationId, active.requestId);
+    } catch (error) {
+      active.controller.abort();
+      if (activeRequestRef.current === active) {
+        setPageError(readableApiError(error, 'The generation could not be stopped cleanly.'));
+      }
     }
   };
 
   const sendPayload = async (text: string) => {
-    if (!text.trim() || isLoading) return;
+    const prompt = validateChatPrompt(text);
+    if (isLoading) return;
+    if (!prompt.value) {
+      setPageError(prompt.error);
+      return;
+    }
     if (!projectMutationsAllowed) {
       const message = projectError || PROJECT_ARCHIVED_MESSAGE;
       setPageError(message);
@@ -213,15 +273,24 @@ export default function ChatPage() {
       return;
     }
     
-    // Stop any ongoing stream just in case
-    stopGeneration();
-    abortControllerRef.current = new AbortController();
+    const assistantId = `${Date.now()}-assistant`;
+    const active: PendingChatRequest = {
+      controller: new AbortController(),
+      conversationId,
+      assistantId,
+      scope,
+      stopping: false,
+    };
+    activeRequestRef.current = active;
     setPageError(undefined);
-
-    const userMessage: Message = { id: Date.now().toString(), role: 'user', content: text };
-    setMessages(prev => [...prev, userMessage]);
+    setGeneration(undefined);
+    setStreamUsage(undefined);
+    setLastSelection(undefined);
+    const userMessage: ChatMessage = { id: `${Date.now()}-user`, role: 'user', content: prompt.value };
+    setMessages((previous) => [...previous, userMessage, { id: assistantId, role: 'assistant', content: '' }]);
     setInput('');
     setIsLoading(true);
+    setIsStopping(false);
     
     if (textareaRef.current) {
       textareaRef.current.style.height = '56px'; // reset roughly
@@ -230,11 +299,27 @@ export default function ChatPage() {
     let activeConversationId = conversationId;
 
     try {
+      const token = getToken();
+      if (!token) throw new Error('Your session is unavailable. Sign in again.');
+      let requestModel = selectedModel || undefined;
+      if (smartRouting) {
+        const routingResponse = await modelApi.routeModel(taskType, requestModel);
+        const decision = unwrapApiData(routingResponse.data) as { provider: string; model: string; reasons?: string[] };
+        if (!decision?.provider || !decision?.model) throw new Error('The model router returned an invalid decision.');
+        requestModel = decision.model;
+        if (activeRequestRef.current === active) setRoutingDecision(decision);
+      }
+      if (active.stopping || activeRequestRef.current !== active) throw new DOMException('Stopped', 'AbortError');
+
       if (!activeConversationId) {
-        const title = text.slice(0, 30) + (text.length > 30 ? '...' : '');
+        const title = [...prompt.value].slice(0, 30).join('') + ([...prompt.value].length > 30 ? '...' : '');
         const res = await chatApi.createConversation({ title, ...(projectId ? { projectId } : {}) });
-        activeConversationId = res.data?.data?._id;
+        const created = normalizeChatConversation(res.data?.data);
+        activeConversationId = created._id;
         if (!activeConversationId) throw new Error('The conversation could not be created.');
+        active.conversationId = activeConversationId;
+        active.scope = `${projectId || 'global'}:${activeConversationId}`;
+        setConversations((previous) => [created, ...previous.filter((item) => item._id !== created._id)]);
         if (projectContext) {
           navigate(projectContextPath(`/app/chat/${activeConversationId}`, projectContext), {
             replace: true,
@@ -243,22 +328,7 @@ export default function ChatPage() {
         } else {
           navigate(`/app/chat/${activeConversationId}`, { replace: true });
         }
-        // Update history
-        fetchConversations();
       }
-
-      const token = getToken();
-      let requestModel = selectedModel || undefined;
-      if (smartRouting) {
-        const routingResponse = await modelApi.routeModel(taskType, requestModel);
-        const decision = unwrapApiData(routingResponse.data) as { provider: string; model: string; reasons?: string[] };
-        if (!decision?.provider || !decision?.model) throw new Error('The model router returned an invalid decision.');
-        requestModel = decision.model;
-        setLastSelection(decision);
-      }
-
-      const aiMsgId = Date.now().toString() + 'ai';
-      setMessages(prev => [...prev, { id: aiMsgId, role: 'assistant', content: '' }]);
 
       const response = await fetch(apiUrl(`/chat/conversations/${activeConversationId}/stream`), {
         method: 'POST',
@@ -266,46 +336,59 @@ export default function ChatPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ 
-          message: text, 
-          model: requestModel,
-          projectId,
-        }),
-        signal: abortControllerRef.current.signal
+        body: JSON.stringify({ message: prompt.value, ...(requestModel ? { model: requestModel } : {}) }),
+        signal: active.controller.signal,
       });
 
       if (!response.ok) {
         const payload = await response.json().catch(() => undefined);
         throw new Error(readableApiError({ response: { data: payload } }, `Chat request failed with HTTP ${response.status}.`));
       }
-
-      await readSseResponse(response, (dataString) => {
-        if (dataString === '[DONE]') return;
-        const data = JSON.parse(dataString);
-        if (data.error) throw new Error(data.error);
-        if (data.provider && data.model) setLastSelection({ provider: data.provider, model: data.model });
-        if (data.content) {
-          setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: m.content + data.content } : m));
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.toLowerCase().startsWith('text/event-stream')) {
+        throw new Error('The chat endpoint returned a non-streaming response.');
+      }
+      const protocol = new ChatStreamProtocol();
+      await readSseResponse(response, (dataString, eventName, eventId) => {
+        if (activeRequestRef.current !== active || scopeRef.current !== active.scope) return;
+        const event = protocol.consume(dataString, eventName, eventId);
+        if (event.type === 'generation') {
+          active.requestId = event.requestId;
+        } else if (event.type === 'start') {
+          setLastSelection({ provider: event.provider, model: event.model });
+        } else if (event.type === 'delta') {
+          setMessages((previous) => previous.map((message) => message.id === assistantId
+            ? { ...message, content: message.content + event.content }
+            : message));
+        } else if (event.type === 'usage') {
+          setStreamUsage(event.usage);
+        } else if (event.type === 'completed') {
+          setGeneration(event.generation);
+          if (event.generation.error) setPageError(event.generation.error.message);
+        } else if (event.type === 'error') {
+          setPageError(event.error.message);
         }
       });
-    } catch (error: any) {
-      if (error.name !== 'AbortError') {
-        const errorMsgId = Date.now().toString() + 'err';
-        setMessages(prev => {
-          const last = prev[prev.length - 1];
-          // If chunking failed mid-stream, append error to it
-          if (last && last.role === 'assistant') {
-            return prev.map(m => m.id === last.id ? { ...m, isStreamingError: true } : m);
-          }
-          return [...prev, { id: errorMsgId, role: 'assistant', content: 'Sorry, I encountered an error. Please try again.', isStreamingError: true }];
-        });
+      protocol.finish();
+    } catch (error: unknown) {
+      const aborted = error instanceof DOMException && error.name === 'AbortError';
+      if (!aborted && activeRequestRef.current === active) {
         const message = readableApiError(error, 'Failed to get response.');
         setPageError(message);
         toast.error(message);
       }
     } finally {
-      setIsLoading(false);
-      abortControllerRef.current = null;
+      if (active.conversationId && scopeRef.current === active.scope) {
+        await loadConversationContext(active.conversationId, true);
+        await fetchConversations();
+      } else if (!active.conversationId && activeRequestRef.current === active) {
+        setMessages((previous) => previous.filter((message) => message.id !== userMessage.id && message.id !== assistantId));
+      }
+      if (activeRequestRef.current === active) {
+        activeRequestRef.current = null;
+        setIsLoading(false);
+        setIsStopping(false);
+      }
     }
   };
 
@@ -320,7 +403,8 @@ export default function ChatPage() {
     sendPayload(prompt);
   };
 
-  const activeTitle = conversations.find(c => c._id === conversationId || c.id === conversationId)?.title;
+  const activeTitle = conversations.find((conversation) => conversation._id === conversationId)?.title;
+  const inputValidation = validateChatPrompt(input);
 
   return (
     <div className="flex h-full w-full bg-[#09090B]">
@@ -340,13 +424,13 @@ export default function ChatPage() {
         <div className="flex-1 overflow-y-auto p-3 space-y-1 scrollbar-thin scrollbar-thumb-white/10">
           <div className="text-xs font-semibold text-gray-500 mb-2 px-2 uppercase tracking-wider">Recent</div>
           {conversations.map(conv => {
-            const isActive = conv._id === conversationId || conv.id === conversationId;
+            const isActive = conv._id === conversationId;
             return (
               <div 
-                key={conv._id || conv.id} 
+                key={conv._id}
                 onClick={() => projectContext
-                  ? navigate(projectContextPath(`/app/chat/${conv._id || conv.id}`, projectContext), { state: projectNavigationState(projectContext) })
-                  : navigate(`/app/chat/${conv._id || conv.id}`)}
+                  ? navigate(projectContextPath(`/app/chat/${conv._id}`, projectContext), { state: projectNavigationState(projectContext) })
+                  : navigate(`/app/chat/${conv._id}`)}
                 className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors group ${isActive ? 'bg-primary/20 text-white border border-primary/20' : 'text-gray-400 hover:bg-white/5 hover:text-white border border-transparent'}`}
               >
                 <MessageSquare size={16} className={isActive ? 'text-primary' : 'text-gray-500 group-hover:text-gray-300'} />
@@ -385,7 +469,9 @@ export default function ChatPage() {
         {projectError ? <div role="alert" className="border-b border-red-500/20 bg-red-500/10 px-6 py-2 text-xs text-red-200">{projectError} Project-scoped actions are disabled.</div> : null}
         {projectContext?.status === 'archived' ? <div role="alert" className="border-b border-amber-500/20 bg-amber-500/10 px-6 py-2 text-xs text-amber-200">{PROJECT_ARCHIVED_MESSAGE}</div> : null}
         {pageError ? <div role="alert" className="border-b border-amber-500/20 bg-amber-500/10 px-6 py-2 text-xs text-amber-200">{pageError}</div> : null}
-        {lastSelection ? <div className="border-b border-white/10 bg-primary/5 px-6 py-2 text-xs text-gray-400">Selected <span className="font-medium text-primary">{lastSelection.provider} / {lastSelection.model}</span>{lastSelection.reasons?.length ? ` — ${lastSelection.reasons.join(' ')}` : ''}</div> : null}
+        {generation?.status === 'running' && !isLoading ? <div role="status" className="border-b border-amber-500/20 bg-amber-500/10 px-6 py-2 text-xs text-amber-200">A previously started generation is still being reconciled by the backend.</div> : null}
+        {routingDecision ? <div className="border-b border-white/10 bg-white/[0.02] px-6 py-1.5 text-xs text-gray-500">Router recommendation <span className="font-medium text-gray-300">{routingDecision.provider} / {routingDecision.model}</span>{routingDecision.reasons?.length ? ` — ${routingDecision.reasons.join(' ')}` : ''}</div> : null}
+        {lastSelection ? <div className="border-b border-white/10 bg-primary/5 px-6 py-2 text-xs text-gray-400">Actual selection <span className="font-medium text-primary">{lastSelection.provider} / {lastSelection.model}</span>{streamUsage?.totalTokens !== undefined ? ` — ${streamUsage.totalTokens} tokens` : ''}</div> : null}
 
         {/* Message Thread */}
         <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 px-4 md:px-8 py-6">
@@ -421,6 +507,11 @@ export default function ChatPage() {
               {messages.map((msg, index) => {
                 const isUser = msg.role === 'user';
                 const key = msg._id || msg.id || index;
+                const isPendingAssistant = !isUser && msg.id === activeRequestRef.current?.assistantId && isLoading;
+                const outputTokens = msg.usage?.outputTokens;
+                const tokensPerSecond = outputTokens !== undefined && msg.durationMs && msg.durationMs > 0
+                  ? (outputTokens / (msg.durationMs / 1000)).toFixed(1)
+                  : undefined;
                 
                 return (
                   <motion.div
@@ -444,7 +535,7 @@ export default function ChatPage() {
                            <div className="whitespace-pre-wrap text-[15px]">{msg.content}</div>
                         ) : (
                            <div className="prose prose-invert prose-p:leading-relaxed max-w-none text-[15px]">
-                            {msg.content === '' && isLoading ? (
+                            {msg.content === '' && isPendingAssistant ? (
                               <span className="flex items-center gap-1 my-2">
                                 <span className="w-2 h-2 rounded-full bg-primary animate-bounce"></span>
                                 <span className="w-2 h-2 rounded-full bg-primary animate-bounce delay-100"></span>
@@ -487,14 +578,25 @@ export default function ChatPage() {
                               </ReactMarkdown>
                             )}
                             
-                            {msg.isStreamingError && (
-                              <div className="mt-3 inline-flex items-center gap-2 bg-red-500/10 text-red-400 px-3 py-1.5 rounded-lg border border-red-500/20 text-xs font-medium">
-                                <AlertCircle size={14} /> Response interrupted
+                            {msg.status && msg.status !== 'succeeded' ? (
+                              <div className="mt-3 flex flex-col gap-1 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                                <span className="inline-flex items-center gap-2 font-medium"><AlertCircle size={14} />{chatGenerationLabel(msg.status)}</span>
+                                {msg.error?.message ? <span>{msg.error.message}</span> : null}
                               </div>
-                            )}
+                            ) : null}
                            </div>
                         )}
                       </div>
+
+                      {!isUser && (msg.provider || msg.model || msg.durationMs !== undefined || msg.timeToFirstTokenMs !== undefined) ? (
+                        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 px-1 text-[11px] text-gray-500">
+                          {msg.provider && msg.model ? <span>{msg.provider} / {msg.model}</span> : null}
+                          {msg.timeToFirstTokenMs !== undefined ? <span>TTFT {msg.timeToFirstTokenMs} ms</span> : null}
+                          {msg.durationMs !== undefined ? <span>Latency {msg.durationMs} ms</span> : null}
+                          {msg.usage?.totalTokens !== undefined ? <span>{msg.usage.totalTokens} tokens</span> : null}
+                          {tokensPerSecond ? <span>{tokensPerSecond} tok/s</span> : null}
+                        </div>
+                      ) : null}
                       
                       {/* Message Actions */}
                       {!isUser && msg.content && (
@@ -506,20 +608,6 @@ export default function ChatPage() {
                            >
                              {copiedId === String(key) ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
                            </button>
-                           {index === messages.length - 1 && (
-                             <button 
-                               onClick={() => {
-                                 // Simple logic to regenerate last user prompt
-                                 const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
-                                 if (lastUserMsg) sendPayload(lastUserMsg.content);
-                               }}
-                               disabled={!projectMutationsAllowed}
-                               className="p-1.5 text-gray-500 hover:text-white rounded bg-white/5 hover:bg-white/10 transition-colors"
-                               title="Regenerate response"
-                             >
-                                <RefreshCw size={14} />
-                             </button>
-                           )}
                          </div>
                       )}
                     </div>
@@ -564,7 +652,9 @@ export default function ChatPage() {
 
                  {isLoading ? (
                     <button 
-                      onClick={stopGeneration}
+                      onClick={() => void stopGeneration()}
+                      disabled={isStopping}
+                      aria-label={isStopping ? 'Stopping generation' : 'Stop generation'}
                       className="p-3 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/20"
                     >
                       <StopCircle className="w-5 h-5 fill-red-500/20" />
@@ -572,7 +662,7 @@ export default function ChatPage() {
                  ) : (
                     <button 
                       onClick={() => sendPayload(input)}
-                     disabled={!input.trim() || !projectMutationsAllowed}
+                     disabled={!inputValidation.value || !projectMutationsAllowed}
                       className="p-3 rounded-xl bg-gradient-to-br from-primary to-cyan-500 text-white disabled:opacity-50 transition-all hover:opacity-90 shadow-[0_0_15px_rgba(139,92,246,0.5)] disabled:shadow-none"
                     >
                       <Send className="w-5 h-5" />
@@ -584,8 +674,8 @@ export default function ChatPage() {
             
             {/* Character counter / Help text */}
             <div className="flex justify-between mt-2 px-1 text-xs text-gray-500">
-              <span className="opacity-0">Press Cmd+Enter to send</span>
-              <span>{input.length} / 4000</span>
+              <span className={inputValidation.error && input ? 'text-amber-400' : 'opacity-0'}>{input && inputValidation.error ? inputValidation.error : 'Press Enter to send'}</span>
+              <span>{inputValidation.characters} / 4000</span>
             </div>
           </div>
         </div>

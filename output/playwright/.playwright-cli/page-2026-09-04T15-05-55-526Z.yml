@@ -1,0 +1,88 @@
+- generic [ref=f1e229]:
+  - complementary [ref=f1e230]:
+    - generic [ref=f1e231]:
+      - generic [ref=f1e232]: KFive AI
+      - button "Collapse sidebar" [ref=f1e238] [cursor=pointer]
+    - generic [ref=f1e242]:
+      - generic [ref=f1e243] [cursor=pointer]:
+        - generic [ref=f1e244]: Search
+        - generic [ref=f1e249]:
+          - generic [ref=f1e250]: ⌘
+          - generic [ref=f1e251]: K
+      - navigation [ref=f1e252]:
+        - link "Dashboard" [ref=f1e253] [cursor=pointer]:
+          - /url: /app/dashboard
+        - link "AI Chat" [ref=f1e261] [cursor=pointer]:
+          - /url: /app/chat
+        - link "Code Lab" [ref=f1e266] [cursor=pointer]:
+          - /url: /app/code
+        - link "Agents" [ref=f1e273] [cursor=pointer]:
+          - /url: /app/agents
+        - link "Documents" [ref=f1e279] [cursor=pointer]:
+          - /url: /app/documents
+        - link "Knowledge / RAG" [ref=f1e285] [cursor=pointer]:
+          - /url: /app/knowledge
+        - link "Repository Analyzer" [ref=f1e291] [cursor=pointer]:
+          - /url: /app/repositories
+        - link "Workflows" [ref=f1e298] [cursor=pointer]:
+          - /url: /app/workflows
+        - link "Dataset Lab" [ref=f1e306] [cursor=pointer]:
+          - /url: /app/datasets
+        - link "Model Benchmarks" [ref=f1e313] [cursor=pointer]:
+          - /url: /app/benchmarks
+        - link "Notebooks" [ref=f1e319] [cursor=pointer]:
+          - /url: /app/notebooks
+        - link "Voice Assistant" [ref=f1e325] [cursor=pointer]:
+          - /url: /app/voice
+        - link "Models" [ref=f1e331] [cursor=pointer]:
+          - /url: /app/models
+        - link "Projects" [ref=f1e344] [cursor=pointer]:
+          - /url: /app/projects
+        - link "Workspace" [ref=f1e350] [cursor=pointer]:
+          - /url: /app/workspace
+        - link "PDF Utilities" [ref=f1e356] [cursor=pointer]:
+          - /url: /app/files
+    - generic [ref=f1e361]:
+      - generic [ref=f1e362]:
+        - generic [ref=f1e363]: P
+        - generic [ref=f1e365]:
+          - paragraph [ref=f1e366]: PDF Smoke
+          - paragraph [ref=f1e367]: kfive-pdf-20260902@example.test
+      - generic [ref=f1e368]:
+        - link "Profile" [ref=f1e369] [cursor=pointer]:
+          - /url: /app/profile
+        - link "Settings" [ref=f1e373] [cursor=pointer]:
+          - /url: /app/settings
+        - button "Toggle theme" [ref=f1e377] [cursor=pointer]
+        - button "Sign out" [ref=f1e384] [cursor=pointer]
+  - main [ref=f1e388]:
+    - generic [ref=f1e390]:
+      - generic [ref=f1e391]:
+        - generic [ref=f1e392]:
+          - heading "Projects" [level=1] [ref=f1e393]
+          - paragraph [ref=f1e396]: Persistent, owner-scoped rooms for KFive work.
+        - generic [ref=f1e397]:
+          - button [ref=f1e398] [cursor=pointer]
+          - button "New project" [ref=f1e404] [cursor=pointer]
+      - generic [ref=f1e406]:
+        - button "active" [ref=f1e407] [cursor=pointer]
+        - button "archived" [ref=f1e408] [cursor=pointer]
+        - button "all" [ref=f1e409] [cursor=pointer]
+      - generic [ref=f1e410]:
+        - article [ref=f1e412] [cursor=pointer]:
+          - generic [ref=f1e413]:
+            - generic [ref=f1e414]:
+              - heading "Project E2E Renamed" [level=2] [ref=f1e415]
+              - generic [ref=f1e416]: active
+            - generic [ref=f1e417]:
+              - button [ref=f1e418]
+              - button [ref=f1e422]
+              - button [ref=f1e426]
+          - paragraph [ref=f1e430]: Persistent project room browser verification
+          - generic [ref=f1e431]:
+            - generic [ref=f1e432]: e2e
+            - generic [ref=f1e433]: renamed
+          - paragraph [ref=f1e434]: 9/4/2026, 8:33:59 PM
+        - complementary [ref=f1e438]:
+          - heading "Project room" [level=2] [ref=f1e439]
+          - paragraph [ref=f1e440]: Select a project to open its chat, code runs, notebooks, documents, datasets, knowledge, repository analyses, workflows, agents, benchmarks, or activity.

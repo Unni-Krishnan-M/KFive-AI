@@ -1,0 +1,72 @@
+- generic [ref=e326]:
+  - complementary [ref=e327]:
+    - generic [ref=e328]:
+      - generic [ref=e329]: KFive AI
+      - button "Collapse sidebar" [ref=e335] [cursor=pointer]
+    - generic [ref=e339]:
+      - generic [ref=e340] [cursor=pointer]:
+        - generic [ref=e341]: Search
+        - generic [ref=e346]:
+          - generic [ref=e347]: ⌘
+          - generic [ref=e348]: K
+      - navigation [ref=e349]:
+        - link "Dashboard" [ref=e719] [cursor=pointer]:
+          - /url: /app/dashboard
+        - link "AI Chat" [ref=e727] [cursor=pointer]:
+          - /url: /app/chat
+        - link "Code Lab" [ref=e732] [cursor=pointer]:
+          - /url: /app/code
+        - link "Agents" [ref=e739] [cursor=pointer]:
+          - /url: /app/agents
+        - link "Documents" [ref=e745] [cursor=pointer]:
+          - /url: /app/documents
+        - link "Knowledge / RAG" [ref=e751] [cursor=pointer]:
+          - /url: /app/knowledge
+        - link "Repository Analyzer" [ref=e757] [cursor=pointer]:
+          - /url: /app/repositories
+        - link "Workflows" [ref=e764] [cursor=pointer]:
+          - /url: /app/workflows
+        - link "Dataset Lab" [ref=e772] [cursor=pointer]:
+          - /url: /app/datasets
+        - link "Model Benchmarks" [ref=e779] [cursor=pointer]:
+          - /url: /app/benchmarks
+        - link "Notebooks" [ref=e785] [cursor=pointer]:
+          - /url: /app/notebooks
+        - link "Voice Assistant" [ref=e791] [cursor=pointer]:
+          - /url: /app/voice
+        - link "Models" [ref=e797] [cursor=pointer]:
+          - /url: /app/models
+        - link "Projects" [ref=e810] [cursor=pointer]:
+          - /url: /app/projects
+        - link "Workspace" [ref=e815] [cursor=pointer]:
+          - /url: /app/workspace
+        - link "PDF Utilities" [ref=e821] [cursor=pointer]:
+          - /url: /app/files
+    - generic [ref=e458]:
+      - generic [ref=e459]:
+        - generic [ref=e460]: P
+        - generic [ref=e462]:
+          - paragraph [ref=e463]: PDF Smoke
+          - paragraph [ref=e464]: kfive-pdf-20260902@example.test
+      - generic [ref=e465]:
+        - link "Profile" [ref=e466] [cursor=pointer]:
+          - /url: /app/profile
+        - link "Settings" [ref=e470] [cursor=pointer]:
+          - /url: /app/settings
+        - button "Toggle theme" [ref=e474] [cursor=pointer]
+        - button "Sign out" [ref=e481] [cursor=pointer]
+  - main [ref=e485]:
+    - generic [ref=e827]:
+      - generic [ref=e828]:
+        - heading "PDF Utilities" [level=1] [ref=e829]
+        - paragraph [ref=e832]: These three operations run locally in this browser. Inputs are not uploaded, and results are downloads—not saved to Documents or Projects.
+      - generic [ref=e833]:
+        - button [ref=e834] [cursor=pointer]:
+          - heading "Merge PDF" [level=2] [ref=e843]
+          - paragraph [ref=e844]: Combine 2–10 PDFs in the order you choose.
+        - button [ref=e847] [cursor=pointer]:
+          - heading "Extract Pages" [level=2] [ref=e855]
+          - paragraph [ref=e856]: Create a new PDF from selected pages of one PDF.
+        - button [ref=e859] [cursor=pointer]:
+          - heading "Rotate Pages" [level=2] [ref=e864]
+          - paragraph [ref=e865]: Rotate selected pages by 90, 180, or 270 degrees.

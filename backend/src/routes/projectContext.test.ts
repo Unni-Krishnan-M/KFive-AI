@@ -65,7 +65,9 @@ describe('project context on chat, agents, and documents', () => {
   it('uses validated owner/project filters for conversation, agent, and document lists', async () => {
     jest.spyOn(projectService, 'resolveOwnedProject').mockResolvedValue(project);
     const findConversations = jest.spyOn(Conversation, 'find').mockReturnValue({
-      sort: () => ({ skip: () => ({ limit: () => Promise.resolve([]) }) }),
+      select: () => ({
+        sort: () => ({ skip: () => ({ limit: () => ({ lean: () => Promise.resolve([]) }) }) }),
+      }),
     } as any);
     jest.spyOn(Conversation, 'countDocuments').mockResolvedValue(0);
     const findAgents = jest.spyOn(Agent, 'find').mockReturnValue({
@@ -89,7 +91,9 @@ describe('project context on chat, agents, and documents', () => {
     const resolveOwned = jest.spyOn(projectService, 'resolveOwnedProject').mockResolvedValue(archivedProject);
     const resolveActive = jest.spyOn(projectService, 'resolveActiveProject');
     jest.spyOn(Conversation, 'find').mockReturnValue({
-      sort: () => ({ skip: () => ({ limit: () => Promise.resolve([]) }) }),
+      select: () => ({
+        sort: () => ({ skip: () => ({ limit: () => ({ lean: () => Promise.resolve([]) }) }) }),
+      }),
     } as any);
     jest.spyOn(Conversation, 'countDocuments').mockResolvedValue(0);
     jest.spyOn(Agent, 'find').mockReturnValue({
@@ -122,9 +126,13 @@ describe('project context on chat, agents, and documents', () => {
   it('blocks chat mutation and agent execution for archived project records', async () => {
     const archived = new ProjectError('Project is archived.', 'PROJECT_ARCHIVED', 409);
     const resolveActive = jest.spyOn(projectService, 'resolveActiveProject').mockRejectedValue(archived);
-    jest.spyOn(Conversation, 'findOne').mockResolvedValue({
-      projectId: { toString: () => projectId },
-      messages: [],
+    jest.spyOn(Conversation, 'findOne').mockReturnValue({
+      lean: () => Promise.resolve({
+        _id: '64b000000000000000000301',
+        projectId: { toString: () => projectId },
+        messages: [],
+        metadata: { messageCount: 0 },
+      }),
     } as any);
     jest.spyOn(Agent, 'findOne').mockResolvedValue({
       projectId: { toString: () => projectId },
@@ -133,9 +141,9 @@ describe('project context on chat, agents, and documents', () => {
       temperature: 0.7,
     } as any);
 
-    await expect(invoke(chatRouter, 'post', '/conversations/:id/messages', {
+    await expect(invoke(chatRouter, 'post', '/conversations/:id/stream', {
       params: { id: '64b000000000000000000301' },
-      body: { role: 'user', content: 'Blocked' },
+      body: { message: 'Blocked' },
     })).rejects.toBe(archived);
     await expect(invoke(agentRouter, 'post', '/:id/execute', {
       params: { id: '64b000000000000000000201' },

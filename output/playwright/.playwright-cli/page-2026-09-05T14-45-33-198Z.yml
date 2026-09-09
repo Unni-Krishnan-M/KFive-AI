@@ -1,0 +1,229 @@
+- generic [ref=f1e2]:
+  - generic [ref=f1e4]:
+    - complementary [ref=f1e5]:
+      - generic [ref=f1e6]:
+        - generic [ref=f1e7]: KFive AI
+        - button "Collapse sidebar" [ref=f1e13] [cursor=pointer]
+      - generic [ref=f1e17]:
+        - generic [ref=f1e18] [cursor=pointer]:
+          - generic [ref=f1e19]: Search
+          - generic [ref=f1e24]:
+            - generic [ref=f1e25]: ⌘
+            - generic [ref=f1e26]: K
+        - navigation [ref=f1e27]:
+          - link "Dashboard" [ref=f1e28] [cursor=pointer]:
+            - /url: /app/dashboard
+          - link "AI Chat" [ref=f1e36] [cursor=pointer]:
+            - /url: /app/chat
+          - link "Code Lab" [ref=f1e41] [cursor=pointer]:
+            - /url: /app/code
+          - link "Agents" [ref=f1e48] [cursor=pointer]:
+            - /url: /app/agents
+          - link "Documents" [ref=f1e54] [cursor=pointer]:
+            - /url: /app/documents
+          - link "Knowledge / RAG" [ref=f1e60] [cursor=pointer]:
+            - /url: /app/knowledge
+          - link "Repository Analyzer" [ref=f1e66] [cursor=pointer]:
+            - /url: /app/repositories
+          - link "Workflows" [ref=f1e73] [cursor=pointer]:
+            - /url: /app/workflows
+          - link "Dataset Lab" [ref=f1e81] [cursor=pointer]:
+            - /url: /app/datasets
+          - link "Model Benchmarks" [ref=f1e89] [cursor=pointer]:
+            - /url: /app/benchmarks
+          - link "Notebooks" [ref=f1e95] [cursor=pointer]:
+            - /url: /app/notebooks
+          - link "Voice Assistant" [ref=f1e101] [cursor=pointer]:
+            - /url: /app/voice
+          - link "Models" [ref=f1e107] [cursor=pointer]:
+            - /url: /app/models
+          - link "Projects" [ref=f1e120] [cursor=pointer]:
+            - /url: /app/projects
+          - link "Workspace" [ref=f1e125] [cursor=pointer]:
+            - /url: /app/workspace
+          - link "PDF Utilities" [ref=f1e131] [cursor=pointer]:
+            - /url: /app/files
+      - generic [ref=f1e136]:
+        - generic [ref=f1e137]:
+          - generic [ref=f1e138]: D
+          - generic [ref=f1e140]:
+            - paragraph [ref=f1e141]: Dataset Owner
+            - paragraph [ref=f1e142]: kfive-dataset-owner-20260905@example.test
+        - generic [ref=f1e143]:
+          - link "Profile" [ref=f1e144] [cursor=pointer]:
+            - /url: /app/profile
+          - link "Settings" [ref=f1e148] [cursor=pointer]:
+            - /url: /app/settings
+          - button "Toggle theme" [ref=f1e152] [cursor=pointer]
+          - button "Sign out" [ref=f1e159] [cursor=pointer]
+    - main [ref=f1e163]:
+      - generic [ref=f1e165]:
+        - generic [ref=f1e166]:
+          - generic [ref=f1e167]:
+            - generic [ref=f1e168]:
+              - heading "Dataset Lab" [level=1] [ref=f1e169]
+              - generic [ref=f1e174]: Experimental
+            - paragraph [ref=f1e175]: Inspect bounded CSV or JSON datasets and create deterministic cleaned copies.
+          - button "Refresh" [ref=f1e176] [cursor=pointer]
+        - note [ref=f1e182]: Analysis is deterministic and bounded. Dataset Lab does not execute dataset content, start notebooks, train models, run benchmarks, or submit GPU jobs.
+        - alert [ref=f1e186]: Uploaded and derived dataset content is persisted for later download. Do not upload passwords, access tokens, or data you are not authorized to store.
+        - generic [ref=f1e189]:
+          - generic [ref=f1e193]:
+            - paragraph [ref=f1e194]: Project datasets
+            - paragraph [ref=f1e195]:
+              - text: Dataset E2E Project
+              - generic [ref=f1e196]: (active)
+          - button "Show workspace datasets" [ref=f1e197] [cursor=pointer]
+        - region [ref=f1e201]:
+          - generic [ref=f1e202]:
+            - generic [ref=f1e203]:
+              - heading "Dataset service" [level=2] [ref=f1e204]
+              - paragraph [ref=f1e205]: Backend-advertised availability and enforced limits.
+            - generic [ref=f1e206]: Available
+          - generic [ref=f1e207]:
+            - generic [ref=f1e208]:
+              - term [ref=f1e209]: Upload
+              - definition [ref=f1e210]: 5.00 MiB
+            - generic [ref=f1e211]:
+              - term [ref=f1e212]: Derived file
+              - definition [ref=f1e213]: 10.0 MiB
+            - generic [ref=f1e214]:
+              - term [ref=f1e215]: Rows
+              - definition [ref=f1e216]: 10,000
+            - generic [ref=f1e217]:
+              - term [ref=f1e218]: Columns
+              - definition [ref=f1e219]: "100"
+            - generic [ref=f1e220]:
+              - term [ref=f1e221]: Preview rows
+              - definition [ref=f1e222]: "50"
+            - generic [ref=f1e223]:
+              - term [ref=f1e224]: Saved
+              - definition [ref=f1e225]: 1 / 100
+        - generic [ref=f1e226]:
+          - complementary [ref=f1e227]:
+            - region [ref=f1e228]:
+              - heading "Upload dataset" [level=2] [ref=f1e229]
+              - paragraph [ref=f1e230]: One UTF-8 CSV or flat-object JSON file, up to 5.00 MiB.
+              - button "Choose CSV or JSON" [ref=f1e231] [cursor=pointer]
+            - region [ref=f1e235]:
+              - generic [ref=f1e236]:
+                - heading "Saved datasets" [level=2] [ref=f1e237]
+                - generic [ref=f1e238]: "1"
+              - button "Dataset E2E Original original dataset-e2e.csv · 38 B 9/5/2026, 8:15:32 PM" [ref=f1e257] [cursor=pointer]:
+                - generic [ref=f1e258]:
+                  - paragraph [ref=f1e262]: Dataset E2E Original
+                  - generic [ref=f1e263]: original
+                - paragraph [ref=f1e264]: dataset-e2e.csv · 38 B
+                - paragraph [ref=f1e265]: 9/5/2026, 8:15:32 PM
+          - main [ref=f1e241]:
+            - generic [ref=f1e242]:
+              - generic [ref=f1e243]:
+                - generic [ref=f1e266]:
+                  - generic [ref=f1e267]:
+                    - heading "Dataset E2E Original" [level=2] [ref=f1e268]
+                    - generic [ref=f1e269]: original · csv
+                  - paragraph [ref=f1e270]:
+                    - text: dataset-e2e.csv · 38 B · SHA-256
+                    - generic [ref=f1e271]: 6a9edc13fbc0…
+                - generic [ref=f1e272]:
+                  - button "Download" [ref=f1e273] [cursor=pointer]
+                  - button "Delete Dataset E2E Original" [ref=f1e277] [cursor=pointer]
+              - generic [ref=f1e281]:
+                - generic [ref=f1e282]:
+                  - term [ref=f1e283]: Rows
+                  - definition [ref=f1e284]: "3"
+                - generic [ref=f1e285]:
+                  - term [ref=f1e286]: Columns
+                  - definition [ref=f1e287]: "2"
+                - generic [ref=f1e288]:
+                  - term [ref=f1e289]: Missing cells
+                  - definition [ref=f1e290]: "1"
+                - generic [ref=f1e291]:
+                  - term [ref=f1e292]: Duplicate rows
+                  - definition [ref=f1e293]: "1"
+              - region [ref=f1e294]:
+                - heading "Column profile" [level=3] [ref=f1e295]
+                - table [ref=f1e297]:
+                  - caption [ref=f1e298]: Profile of columns in Dataset E2E Original
+                  - rowgroup [ref=f1e299]:
+                    - row [ref=f1e300]:
+                      - columnheader "Column" [ref=f1e301]
+                      - columnheader "Type" [ref=f1e302]
+                      - columnheader "Missing" [ref=f1e303]
+                      - columnheader "Unique" [ref=f1e304]
+                      - columnheader "Numeric range" [ref=f1e305]
+                      - columnheader "Outliers" [ref=f1e306]
+                  - rowgroup [ref=f1e307]:
+                    - row [ref=f1e308]:
+                      - rowheader "name" [ref=f1e309]
+                      - cell "string" [ref=f1e310]
+                      - cell "0" [ref=f1e311]
+                      - cell "2" [ref=f1e312]
+                      - cell "Not numeric" [ref=f1e313]
+                      - cell "—" [ref=f1e314]
+                    - row [ref=f1e315]:
+                      - rowheader "value" [ref=f1e316]
+                      - cell "string" [ref=f1e317]
+                      - cell "1" [ref=f1e318]
+                      - cell "1" [ref=f1e319]
+                      - cell "Not numeric" [ref=f1e320]
+                      - cell "—" [ref=f1e321]
+              - region [ref=f1e322]:
+                - generic [ref=f1e324]:
+                  - heading "Bounded preview" [level=3] [ref=f1e325]
+                  - paragraph [ref=f1e326]: Showing 3 of 3 rows. Cells are rendered as inert text.
+                - table [ref=f1e328]:
+                  - caption [ref=f1e329]: Bounded data preview for Dataset E2E Original
+                  - rowgroup [ref=f1e330]:
+                    - row [ref=f1e331]:
+                      - columnheader "#" [ref=f1e332]
+                      - columnheader "name" [ref=f1e333]
+                      - columnheader "value" [ref=f1e334]
+                  - rowgroup [ref=f1e335]:
+                    - row [ref=f1e336]:
+                      - rowheader "1" [ref=f1e337]
+                      - cell "Ada" [ref=f1e338]
+                      - cell "=2+3" [ref=f1e339]
+                    - row [ref=f1e340]:
+                      - rowheader "2" [ref=f1e341]
+                      - cell "Ada" [ref=f1e342]
+                      - cell "=2+3" [ref=f1e343]
+                    - row [ref=f1e344]:
+                      - rowheader "3" [ref=f1e345]
+                      - cell "Bob" [ref=f1e346]
+                      - cell [ref=f1e347]
+              - generic [ref=f1e348]:
+                - region [ref=f1e349]:
+                  - heading "Quality suggestions" [level=3] [ref=f1e350]
+                  - list [ref=f1e351]:
+                    - listitem [ref=f1e352]:
+                      - generic [aria-hidden] [ref=f1e353]: •
+                      - generic [ref=f1e354]: 1 missing cell detected; review a missing-value strategy before training.
+                    - listitem [ref=f1e355]:
+                      - generic [aria-hidden] [ref=f1e356]: •
+                      - generic [ref=f1e357]: 1 duplicate row detected; create a derived copy to remove duplicates.
+                - region [ref=f1e358]:
+                  - heading "Numeric correlations" [level=3] [ref=f1e359]
+                  - paragraph [ref=f1e361]: No supported numeric correlations were reported.
+              - region [ref=f1e362]:
+                - generic [ref=f1e363]:
+                  - heading "Create a derived copy" [level=3] [ref=f1e364]
+                  - paragraph [ref=f1e369]: The source remains unchanged. A new owner-scoped dataset and analysis record will be created.
+                - generic [ref=f1e370]:
+                  - text: Derived dataset name
+                  - textbox "Derived dataset name" [ref=f1e371]: Dataset E2E Original cleaned
+                - group "Dataset cleanup transforms" [ref=f1e372]:
+                  - generic [ref=f1e374]:
+                    - checkbox "Trim surrounding whitespace in strings" [checked] [ref=f1e375]
+                    - generic [ref=f1e376]: Trim surrounding whitespace in strings
+                  - generic [ref=f1e377]:
+                    - checkbox "Drop duplicate rows" [ref=f1e378]
+                    - generic [ref=f1e379]: Drop duplicate rows
+                  - generic [ref=f1e380]:
+                    - checkbox "Drop rows with missing values" [ref=f1e381]
+                    - generic [ref=f1e382]: Drop rows with missing values
+                  - generic [ref=f1e383]:
+                    - checkbox "Escape spreadsheet formulas in CSV" [checked] [ref=f1e384]
+                    - generic [ref=f1e385]: Escape spreadsheet formulas in CSV
+                - button "Create derived dataset" [ref=f1e387] [cursor=pointer]
+  - status [ref=f1e397]: Dataset uploaded and analyzed.

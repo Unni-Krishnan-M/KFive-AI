@@ -1,0 +1,114 @@
+- generic [ref=f3e16]:
+  - complementary [ref=f3e17]:
+    - generic [ref=f3e18]:
+      - generic [ref=f3e19]: KFive AI
+      - button "Collapse sidebar" [ref=f3e25] [cursor=pointer]
+    - generic [ref=f3e29]:
+      - generic [ref=f3e30] [cursor=pointer]:
+        - generic [ref=f3e31]: Search
+        - generic [ref=f3e36]:
+          - generic [ref=f3e37]: ⌘
+          - generic [ref=f3e38]: K
+      - navigation [ref=f3e39]:
+        - link "Dashboard" [ref=f3e40] [cursor=pointer]:
+          - /url: /app/dashboard
+        - link "AI Chat" [ref=f3e48] [cursor=pointer]:
+          - /url: /app/chat
+        - link "Code Lab" [ref=f3e53] [cursor=pointer]:
+          - /url: /app/code
+        - link "Agents" [ref=f3e60] [cursor=pointer]:
+          - /url: /app/agents
+        - link "Documents" [ref=f3e66] [cursor=pointer]:
+          - /url: /app/documents
+        - link "Knowledge / RAG" [ref=f3e72] [cursor=pointer]:
+          - /url: /app/knowledge
+        - link "Repository Analyzer" [ref=f3e78] [cursor=pointer]:
+          - /url: /app/repositories
+        - link "Workflows" [ref=f3e85] [cursor=pointer]:
+          - /url: /app/workflows
+        - link "Dataset Lab" [ref=f3e93] [cursor=pointer]:
+          - /url: /app/datasets
+        - link "Model Benchmarks" [ref=f3e100] [cursor=pointer]:
+          - /url: /app/benchmarks
+        - link "Notebooks" [ref=f3e107] [cursor=pointer]:
+          - /url: /app/notebooks
+        - link "Voice Assistant" [ref=f3e113] [cursor=pointer]:
+          - /url: /app/voice
+        - link "Models" [ref=f3e119] [cursor=pointer]:
+          - /url: /app/models
+        - link "Projects" [ref=f3e132] [cursor=pointer]:
+          - /url: /app/projects
+        - link "Workspace" [ref=f3e137] [cursor=pointer]:
+          - /url: /app/workspace
+        - link "PDF Utilities" [ref=f3e143] [cursor=pointer]:
+          - /url: /app/files
+    - generic [ref=f3e148]:
+      - generic [ref=f3e149]:
+        - generic [ref=f3e150]: b
+        - generic [ref=f3e152]:
+          - paragraph [ref=f3e153]: benchmarke2e
+          - paragraph [ref=f3e154]: kfive-benchmark-20260907@example.test
+      - generic [ref=f3e155]:
+        - link "Profile" [ref=f3e156] [cursor=pointer]:
+          - /url: /app/profile
+        - link "Settings" [ref=f3e160] [cursor=pointer]:
+          - /url: /app/settings
+        - button "Toggle theme" [ref=f3e164] [cursor=pointer]
+        - button "Sign out" [ref=f3e171] [cursor=pointer]
+  - main [ref=f3e175]:
+    - generic [ref=f3e177]:
+      - generic [ref=f3e178]:
+        - generic [ref=f3e179]:
+          - generic [ref=f3e180]:
+            - heading "Model Benchmarks" [level=1] [ref=f3e181]
+            - generic [ref=f3e185]: Experimental
+          - paragraph [ref=f3e186]: Measured, durable chat-model runs in the workspace or a verified project.
+        - button "Refresh benchmarks" [ref=f3e187] [cursor=pointer]
+      - note [ref=f3e193]: This is inference benchmarking, not ML training. The fixed suite runs 3 prompts twice, sequentially, through one durable shared benchmark worker. Submitted runs remain queued or running if this page disconnects; only Stop run requests cancellation. Remote providers may bill for six calls and receive the suite prompts; review their privacy terms before starting. GPU samples are before/after snapshots, not reliable peak VRAM measurements or exclusive attribution.
+      - generic [ref=f3e196]:
+        - generic [ref=f3e200]:
+          - paragraph [ref=f3e201]: Project benchmark scope
+          - paragraph [ref=f3e202]:
+            - text: Benchmark scope E2E
+            - generic [ref=f3e203]: (active)
+        - button "Show workspace history" [ref=f3e204] [cursor=pointer]
+      - alert [ref=f3e209]: The ollama request timed out.
+      - generic [ref=f3e211]:
+        - generic [ref=f3e212]:
+          - text: Installed/configured model
+          - 'combobox "Installed/configured model Provider: unknown · catalog scope: unknown" [ref=f3e213]':
+            - option "Choose a model" [selected]
+          - generic [ref=f3e214]: "Provider: unknown · catalog scope: unknown"
+        - generic [ref=f3e215]:
+          - paragraph [ref=f3e216]: Chat Core
+          - paragraph [ref=f3e217]: 3 prompts × 2 sequential repetitions · 6 calls
+          - paragraph [ref=f3e218]: Temperature 0 · max output 128 tokens · suite chat-core-v1
+        - button "Queue 6 calls" [disabled] [ref=f3e219]
+      - generic [ref=f3e222]:
+        - complementary [ref=f3e223]:
+          - generic [ref=f3e224]:
+            - heading "Run history" [level=2] [ref=f3e225]
+            - generic [ref=f3e226]: "1"
+          - paragraph [ref=f3e227]: 25 per page · at most 10 pages shown · owner retention 100
+          - generic [ref=f3e229]:
+            - button "cancelled 2/6 ollama · phi3:latest 9/7/2026, 11:53:37 PM" [ref=f3e230] [cursor=pointer]:
+              - generic [ref=f3e231]:
+                - generic [ref=f3e232]: cancelled
+                - generic [ref=f3e233]: 2/6
+              - paragraph [ref=f3e234]: ollama · phi3:latest
+              - paragraph [ref=f3e235]: 9/7/2026, 11:53:37 PM
+            - button "Delete benchmark run 6a9f0129390fcd4b06176cb9" [active] [ref=f3e236] [cursor=pointer]
+          - generic [ref=f3e240]:
+            - button "Previous" [disabled] [ref=f3e241]
+            - generic [ref=f3e242]: 1 / 1
+            - button "Next" [disabled] [ref=f3e243]
+        - main [ref=f3e244]:
+          - paragraph [ref=f3e249]: Run the suite or select benchmark history.
+      - dialog [ref=f3e251]:
+        - generic [ref=f3e252]:
+          - heading "Delete Benchmark Run" [level=2] [ref=f3e253]
+          - button "Close dialog" [ref=f3e254] [cursor=pointer]
+        - paragraph [ref=f3e258]: Delete this terminal benchmark report, including its call outputs, metrics, safe GPU samples, and timeline? This cannot be undone.
+        - generic [ref=f3e259]:
+          - button "Cancel" [ref=f3e260] [cursor=pointer]
+          - button "Delete Run" [ref=f3e261] [cursor=pointer]

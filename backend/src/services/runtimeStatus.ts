@@ -7,6 +7,7 @@ export interface RuntimeServiceStatus {
   configured: boolean;
   location: ServiceLocation;
   restartRequired: boolean;
+  message?: string;
 }
 
 const localHostnames = new Set([
@@ -47,12 +48,21 @@ function providerLocation(config: EnvironmentConfig): ServiceLocation {
 }
 
 export function buildRuntimeStatus(config: EnvironmentConfig) {
+  const documentProcessorStatus: RuntimeServiceStatus = {
+    id: 'document-processor',
+    configured: false,
+    location: config.documentProcessorUrl ? classifyUrl(config.documentProcessorUrl) : 'disabled',
+    restartRequired: true,
+    message: config.documentProcessorUrl
+      ? 'An endpoint is configured, but this build has no isolated Document Processor adapter.'
+      : 'This build has no isolated Document Processor adapter.',
+  };
   const services: RuntimeServiceStatus[] = [
     { id: 'mongodb', configured: Boolean(config.mongodbUrl), location: classifyUrl(config.mongodbUrl), restartRequired: true },
     { id: 'redis', configured: Boolean(config.redisUrl), location: classifyUrl(config.redisUrl), restartRequired: true },
     { id: 'chromadb', configured: Boolean(config.chromaUrl), location: classifyUrl(config.chromaUrl), restartRequired: true },
     { id: 'code-runner', configured: config.codeRunnerMode !== 'disabled', location: config.codeRunnerMode === 'disabled' ? 'disabled' : 'local', restartRequired: true },
-    { id: 'document-processor', configured: Boolean(config.documentProcessorUrl), location: classifyUrl(config.documentProcessorUrl), restartRequired: true },
+    documentProcessorStatus,
     { id: 'ocr', configured: Boolean(config.ocrServiceUrl), location: classifyUrl(config.ocrServiceUrl), restartRequired: true },
   ];
 
@@ -64,7 +74,9 @@ export function buildRuntimeStatus(config: EnvironmentConfig) {
   };
   const missingDependencies = services
     .filter((service) => !service.configured)
-    .map((service) => `${serviceLabels[service.id] ?? service.id} is not configured.`);
+    .map((service) => service.id === 'document-processor'
+      ? 'Document Processor is unavailable because this build has no isolated processor adapter.'
+      : `${serviceLabels[service.id] ?? service.id} is not configured.`);
 
   return {
     mode: config.kfiveMode,

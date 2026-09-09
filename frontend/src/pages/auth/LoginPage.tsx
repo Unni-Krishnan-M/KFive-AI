@@ -4,11 +4,13 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Brain, Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'react-hot-toast';
+import { readableAuthError } from '@/services/authError';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -16,18 +18,23 @@ export default function LoginPage() {
     e.preventDefault();
     
     if (!email || !password) {
-      toast.error('Please fill in all fields');
+      const message = 'Please fill in all fields';
+      setSubmitError(message);
+      toast.error(message);
       return;
     }
 
     setIsLoading(true);
+    setSubmitError(null);
     
     try {
       await login(email, password);
       toast.success('Welcome to KFive AI!');
       navigate('/app/dashboard');
-    } catch (error: any) {
-      toast.error(error.response?.data?.error?.message || 'Login failed');
+    } catch (error: unknown) {
+      const message = readableAuthError(error, 'login');
+      setSubmitError(message);
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -55,7 +62,7 @@ export default function LoginPage() {
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => { setEmail(e.target.value); setSubmitError(null); }}
                 className="w-full px-4 py-3 bg-muted/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-colors"
                 placeholder="Enter your email"
                 disabled={isLoading}
@@ -66,12 +73,17 @@ export default function LoginPage() {
               <input
                 type="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => { setPassword(e.target.value); setSubmitError(null); }}
                 className="w-full px-4 py-3 bg-muted/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-colors"
                 placeholder="Enter your password"
                 disabled={isLoading}
               />
             </div>
+            {submitError && (
+              <div role="alert" aria-live="assertive" className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                {submitError}
+              </div>
+            )}
             <button
               type="submit"
               disabled={isLoading}

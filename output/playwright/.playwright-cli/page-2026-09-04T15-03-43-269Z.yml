@@ -1,0 +1,120 @@
+- generic [ref=e314]:
+  - complementary [ref=e315]:
+    - generic [ref=e316]:
+      - generic [ref=e317]: KFive AI
+      - button "Collapse sidebar" [ref=e323] [cursor=pointer]
+    - generic [ref=e327]:
+      - generic [ref=e328] [cursor=pointer]:
+        - generic [ref=e329]: Search
+        - generic [ref=e334]:
+          - generic [ref=e335]: ⌘
+          - generic [ref=e336]: K
+      - navigation [ref=e337]:
+        - link "Dashboard" [ref=e338] [cursor=pointer]:
+          - /url: /app/dashboard
+        - link "AI Chat" [ref=e346] [cursor=pointer]:
+          - /url: /app/chat
+        - link "Code Lab" [ref=e351] [cursor=pointer]:
+          - /url: /app/code
+        - link "Agents" [ref=e358] [cursor=pointer]:
+          - /url: /app/agents
+        - link "Documents" [ref=e364] [cursor=pointer]:
+          - /url: /app/documents
+        - link "Knowledge / RAG" [ref=e370] [cursor=pointer]:
+          - /url: /app/knowledge
+        - link "Repository Analyzer" [ref=e376] [cursor=pointer]:
+          - /url: /app/repositories
+        - link "Workflows" [ref=e383] [cursor=pointer]:
+          - /url: /app/workflows
+        - link "Dataset Lab" [ref=e391] [cursor=pointer]:
+          - /url: /app/datasets
+        - link "Model Benchmarks" [ref=e398] [cursor=pointer]:
+          - /url: /app/benchmarks
+        - link "Notebooks" [ref=e404] [cursor=pointer]:
+          - /url: /app/notebooks
+        - link "Voice Assistant" [ref=e410] [cursor=pointer]:
+          - /url: /app/voice
+        - link "Models" [ref=e416] [cursor=pointer]:
+          - /url: /app/models
+        - link "Projects" [ref=e429] [cursor=pointer]:
+          - /url: /app/projects
+        - link "Workspace" [ref=e435] [cursor=pointer]:
+          - /url: /app/workspace
+        - link "PDF Utilities" [ref=e441] [cursor=pointer]:
+          - /url: /app/files
+    - generic [ref=e446]:
+      - generic [ref=e447]:
+        - generic [ref=e448]: P
+        - generic [ref=e450]:
+          - paragraph [ref=e451]: PDF Smoke
+          - paragraph [ref=e452]: kfive-pdf-20260902@example.test
+      - generic [ref=e453]:
+        - link "Profile" [ref=e454] [cursor=pointer]:
+          - /url: /app/profile
+        - link "Settings" [ref=e458] [cursor=pointer]:
+          - /url: /app/settings
+        - button "Toggle theme" [ref=e462] [cursor=pointer]
+        - button "Sign out" [ref=e469] [cursor=pointer]
+  - main [ref=e473]:
+    - generic [ref=e475]:
+      - generic [ref=e476]:
+        - generic [ref=e477]:
+          - heading "Projects" [level=1] [ref=e478]
+          - paragraph [ref=e481]: Persistent, owner-scoped rooms for KFive work.
+        - generic [ref=e482]:
+          - button [ref=e483] [cursor=pointer]
+          - button "New project" [ref=e489] [cursor=pointer]
+      - generic [ref=e491]:
+        - button "active" [ref=e492] [cursor=pointer]
+        - button "archived" [ref=e493] [cursor=pointer]
+        - button "all" [ref=e494] [cursor=pointer]
+      - generic [ref=e495]:
+        - article [ref=e519] [cursor=pointer]:
+          - generic [ref=e520]:
+            - generic [ref=e521]:
+              - heading "Project E2E Initial" [level=2] [ref=e522]
+              - generic [ref=e523]: active
+            - generic [ref=e524]:
+              - button [active] [ref=e525]
+              - button [ref=e529]
+              - button [ref=e533]
+          - paragraph [ref=e537]: Persistent project room browser verification
+          - generic [ref=e538]:
+            - generic [ref=e539]: e2e
+            - generic [ref=e540]: initial
+          - paragraph [ref=e541]: 9/4/2026, 8:33:04 PM
+        - complementary [ref=e498]:
+          - heading "Project room" [level=2] [ref=e499]
+          - paragraph [ref=e551]: Project E2E Initial
+          - generic [ref=e552]:
+            - button "New project chat" [ref=e553] [cursor=pointer]
+            - button "Project code runs" [ref=e556] [cursor=pointer]
+            - button "Project notebooks" [ref=e561] [cursor=pointer]
+            - button "Project documents" [ref=e565] [cursor=pointer]
+            - button "Project datasets" [ref=e569] [cursor=pointer]
+            - button "Project knowledge" [ref=e574] [cursor=pointer]
+            - button "Repository analyses" [ref=e578] [cursor=pointer]
+            - button "Project workflows" [ref=e583] [cursor=pointer]
+            - button "Project agents" [ref=e589] [cursor=pointer]
+            - button "Project benchmarks" [ref=e593] [cursor=pointer]
+          - heading "Activity" [level=3] [ref=e597]
+          - generic [ref=e599]:
+            - paragraph [ref=e600]: created
+            - paragraph [ref=e601]: 9/4/2026, 8:33:04 PM
+      - generic [ref=e603]:
+        - generic [ref=e604]:
+          - heading "Edit project" [level=2] [ref=e605]
+          - button [ref=e606] [cursor=pointer]
+        - generic [ref=e610]:
+          - generic [ref=e611]:
+            - text: Name
+            - textbox "Name" [ref=e612]: Project E2E Initial
+          - generic [ref=e613]:
+            - text: Description
+            - textbox "Description" [ref=e614]: Persistent project room browser verification
+          - generic [ref=e615]:
+            - text: Tags, comma separated
+            - textbox "Tags, comma separated" [ref=e616]: e2e, initial
+        - generic [ref=e617]:
+          - button "Cancel" [ref=e618] [cursor=pointer]
+          - button "Save" [ref=e619] [cursor=pointer]

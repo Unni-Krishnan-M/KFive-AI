@@ -7,6 +7,7 @@ export type KFiveMode = 'local' | 'hybrid' | 'remote';
 export type AiProvider = 'ollama' | 'openai' | 'anthropic' | 'openai-compatible' | 'custom';
 
 export interface EnvironmentConfig {
+  processKind: 'api' | 'benchmark-worker' | 'notebook-worker';
   nodeEnv: 'development' | 'test' | 'production';
   port: number;
   apiVersion: string;
@@ -35,11 +36,15 @@ export interface EnvironmentConfig {
   jwtSecret: string;
   jwtRefreshSecret: string;
   codeRunnerMode: 'disabled' | 'container';
+  notebookExecutionEnabled: boolean;
+  notebookRuntimeImage?: string;
+  notebookVerifierImage?: string;
   documentProcessorUrl?: string;
   ocrServiceUrl?: string;
 }
 
 const schema = Joi.object({
+  KFIVE_PROCESS: Joi.string().valid('api', 'benchmark-worker', 'notebook-worker').default('api'),
   NODE_ENV: Joi.string().valid('development', 'test', 'production').default('development'),
   PORT: Joi.number().integer().min(1).max(65535).default(5000),
   API_VERSION: Joi.string().pattern(/^v\d+$/).default('v1'),
@@ -67,14 +72,53 @@ const schema = Joi.object({
   CUSTOM_LLM_SUPPORTS_STRUCTURED_OUTPUT: Joi.boolean().truthy('true').falsy('false').default(false),
   PUBLIC_BASE_URL: Joi.string().uri({ scheme: ['http', 'https'] }).allow(''),
   CORS_ORIGIN: Joi.string().default('http://localhost:3000'),
-  JWT_SECRET: Joi.string().min(32).required(),
-  JWT_REFRESH_SECRET: Joi.string().min(32).required(),
+  JWT_SECRET: Joi.when('KFIVE_PROCESS', {
+    is: 'api', then: Joi.string().min(32).required(),
+    otherwise: Joi.string().min(32).default('kfive-worker-no-http-authentication-00000001'),
+  }),
+  JWT_REFRESH_SECRET: Joi.when('KFIVE_PROCESS', {
+    is: 'api', then: Joi.string().min(32).required(),
+    otherwise: Joi.string().min(32).default('kfive-worker-no-refresh-authentication-0001'),
+  }),
   CODE_RUNNER_MODE: Joi.string().valid('disabled', 'container').default('disabled'),
+  NOTEBOOK_EXECUTION_ENABLED: Joi.boolean().truthy('true').falsy('false').default(false),
+  NOTEBOOK_RUNTIME_IMAGE: Joi.string().trim().max(500).allow(''),
+  NOTEBOOK_VERIFIER_IMAGE: Joi.string().trim().max(500).allow(''),
   DOCUMENT_PROCESSOR_URL: Joi.string().uri({ scheme: ['http', 'https'] }).allow(''),
   OCR_SERVICE_URL: Joi.string().uri({ scheme: ['http', 'https'] }).allow(''),
 }).unknown(true).custom((value, helpers) => {
   if (!value.MONGODB_URL && !value.MONGODB_URI) {
     return helpers.error('any.custom', { message: 'MONGODB_URL is required' });
+  }
+
+  const corsOrigins: string[] = [];
+  for (const rawOrigin of value.CORS_ORIGIN.split(',')) {
+    const origin = rawOrigin.trim().replace(/\/$/, '');
+    if (!origin) continue;
+    try {
+      const parsed = new URL(origin);
+      if (!['http:', 'https:'].includes(parsed.protocol) || parsed.origin !== origin) {
+        return helpers.error('any.custom', {
+          message: `CORS_ORIGIN entries must be HTTP(S) origins without credentials, paths, queries, or fragments: ${origin}`,
+        });
+      }
+      corsOrigins.push(origin);
+    } catch {
+      return helpers.error('any.custom', { message: `CORS_ORIGIN contains an invalid origin: ${origin}` });
+    }
+  }
+  if (corsOrigins.length === 0) {
+    return helpers.error('any.custom', { message: 'CORS_ORIGIN must contain at least one HTTP(S) origin' });
+  }
+  value.CORS_ORIGIN = corsOrigins.join(',');
+
+  if (value.PUBLIC_BASE_URL) {
+    const publicOrigin = new URL(value.PUBLIC_BASE_URL).origin;
+    if (!corsOrigins.includes(publicOrigin)) {
+      return helpers.error('any.custom', {
+        message: `CORS_ORIGIN must include the PUBLIC_BASE_URL origin ${publicOrigin}`,
+      });
+    }
   }
 
   const provider = value.AI_PROVIDER;
@@ -104,7 +148,7 @@ const schema = Joi.object({
   }
   if (value.NODE_ENV === 'production') {
     const unsafeSecret = (secret: string) => /change|example|replace|secret/i.test(secret);
-    if (unsafeSecret(value.JWT_SECRET) || unsafeSecret(value.JWT_REFRESH_SECRET)) {
+    if (value.KFIVE_PROCESS === 'api' && (unsafeSecret(value.JWT_SECRET) || unsafeSecret(value.JWT_REFRESH_SECRET))) {
       return helpers.error('any.custom', { message: 'Production JWT secrets must not use example/default values' });
     }
     if (provider === 'openai' && value.OPENAI_BASE_URL && !value.OPENAI_BASE_URL.startsWith('https://')) {
@@ -113,6 +157,12 @@ const schema = Joi.object({
     if (provider === 'anthropic' && !value.ANTHROPIC_BASE_URL.startsWith('https://')) {
       return helpers.error('any.custom', { message: 'ANTHROPIC_BASE_URL must use HTTPS in production' });
     }
+  }
+  if (value.NOTEBOOK_EXECUTION_ENABLED && (!value.NOTEBOOK_RUNTIME_IMAGE || !value.NOTEBOOK_VERIFIER_IMAGE)) {
+    return helpers.error('any.custom', { message: 'NOTEBOOK_RUNTIME_IMAGE and NOTEBOOK_VERIFIER_IMAGE are required when notebook execution is enabled' });
+  }
+  if (value.NOTEBOOK_RUNTIME_IMAGE && value.NOTEBOOK_RUNTIME_IMAGE === value.NOTEBOOK_VERIFIER_IMAGE) {
+    return helpers.error('any.custom', { message: 'Notebook runtime and verifier images must be distinct' });
   }
   return value;
 }, 'cross-field environment validation');
@@ -131,6 +181,7 @@ export function parseEnvironment(source: NodeJS.ProcessEnv): EnvironmentConfig {
     : value.AI_PROVIDER;
 
   return {
+    processKind: value.KFIVE_PROCESS,
     nodeEnv: value.NODE_ENV,
     port: value.PORT,
     apiVersion: value.API_VERSION,
@@ -159,6 +210,9 @@ export function parseEnvironment(source: NodeJS.ProcessEnv): EnvironmentConfig {
     jwtSecret: value.JWT_SECRET,
     jwtRefreshSecret: value.JWT_REFRESH_SECRET,
     codeRunnerMode: value.CODE_RUNNER_MODE,
+    notebookExecutionEnabled: value.NOTEBOOK_EXECUTION_ENABLED,
+    notebookRuntimeImage: cleanOptional(value.NOTEBOOK_RUNTIME_IMAGE),
+    notebookVerifierImage: cleanOptional(value.NOTEBOOK_VERIFIER_IMAGE),
     documentProcessorUrl: cleanOptional(value.DOCUMENT_PROCESSOR_URL),
     ocrServiceUrl: cleanOptional(value.OCR_SERVICE_URL),
   };

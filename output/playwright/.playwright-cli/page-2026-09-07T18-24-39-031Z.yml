@@ -1,0 +1,124 @@
+- generic [ref=f5e16]:
+  - complementary [ref=f5e17]:
+    - generic [ref=f5e18]:
+      - generic [ref=f5e19]: KFive AI
+      - button "Collapse sidebar" [ref=f5e25] [cursor=pointer]
+    - generic [ref=f5e29]:
+      - generic [ref=f5e30] [cursor=pointer]:
+        - generic [ref=f5e31]: Search
+        - generic [ref=f5e36]:
+          - generic [ref=f5e37]: ⌘
+          - generic [ref=f5e38]: K
+      - navigation [ref=f5e39]:
+        - link "Dashboard" [ref=f5e560] [cursor=pointer]:
+          - /url: /app/dashboard
+        - link "AI Chat" [ref=f5e568] [cursor=pointer]:
+          - /url: /app/chat
+        - link "Code Lab" [ref=f5e573] [cursor=pointer]:
+          - /url: /app/code
+        - link "Agents" [ref=f5e580] [cursor=pointer]:
+          - /url: /app/agents
+        - link "Documents" [ref=f5e586] [cursor=pointer]:
+          - /url: /app/documents
+        - link "Knowledge / RAG" [ref=f5e592] [cursor=pointer]:
+          - /url: /app/knowledge
+        - link "Repository Analyzer" [ref=f5e598] [cursor=pointer]:
+          - /url: /app/repositories
+        - link "Workflows" [ref=f5e605] [cursor=pointer]:
+          - /url: /app/workflows
+        - link "Dataset Lab" [ref=f5e613] [cursor=pointer]:
+          - /url: /app/datasets
+        - link "Model Benchmarks" [ref=f5e620] [cursor=pointer]:
+          - /url: /app/benchmarks
+        - link "Notebooks" [ref=f5e627] [cursor=pointer]:
+          - /url: /app/notebooks
+        - link "Voice Assistant" [ref=f5e633] [cursor=pointer]:
+          - /url: /app/voice
+        - link "Models" [ref=f5e639] [cursor=pointer]:
+          - /url: /app/models
+        - link "Projects" [ref=f5e652] [cursor=pointer]:
+          - /url: /app/projects
+        - link "Workspace" [ref=f5e657] [cursor=pointer]:
+          - /url: /app/workspace
+        - link "PDF Utilities" [ref=f5e663] [cursor=pointer]:
+          - /url: /app/files
+    - generic [ref=f5e148]:
+      - generic [ref=f5e149]:
+        - generic [ref=f5e150]: b
+        - generic [ref=f5e152]:
+          - paragraph [ref=f5e153]: benchmarke2e
+          - paragraph [ref=f5e154]: kfive-benchmark-20260907@example.test
+      - generic [ref=f5e155]:
+        - link "Profile" [ref=f5e156] [cursor=pointer]:
+          - /url: /app/profile
+        - link "Settings" [ref=f5e160] [cursor=pointer]:
+          - /url: /app/settings
+        - button "Toggle theme" [ref=f5e164] [cursor=pointer]
+        - button "Sign out" [ref=f5e171] [cursor=pointer]
+  - main [ref=f5e175]:
+    - generic [ref=f5e177]:
+      - generic [ref=f5e178]:
+        - generic [ref=f5e179]:
+          - generic [ref=f5e180]:
+            - heading "Model Benchmarks" [level=1] [ref=f5e181]
+            - generic [ref=f5e185]: Experimental
+          - paragraph [ref=f5e186]: Measured, durable chat-model runs in the workspace or a verified project.
+        - button "Refresh benchmarks" [ref=f5e187] [cursor=pointer]
+      - note [ref=f5e193]: This is inference benchmarking, not ML training. The fixed suite runs 3 prompts twice, sequentially, through one durable shared benchmark worker. Submitted runs remain queued or running if this page disconnects; only Stop run requests cancellation. Remote providers may bill for six calls and receive the suite prompts; review their privacy terms before starting. GPU samples are before/after snapshots, not reliable peak VRAM measurements or exclusive attribution.
+      - generic [ref=f5e209]:
+        - generic [ref=f5e210]:
+          - text: Installed/configured model
+          - 'combobox "Installed/configured model Provider: ollama · catalog scope: installed" [ref=f5e211]':
+            - option "Choose a model"
+            - option "phi3:latest — phi3:latest" [selected]
+          - generic [ref=f5e212]: "Provider: ollama · catalog scope: installed"
+        - generic [ref=f5e213]:
+          - paragraph [ref=f5e214]: Chat Core
+          - paragraph [ref=f5e215]: 3 prompts × 2 sequential repetitions · 6 calls
+          - paragraph [ref=f5e216]: Temperature 0 · max output 128 tokens · suite chat-core-v1
+        - button "Queue 6 calls" [ref=f5e364] [cursor=pointer]
+      - generic [ref=f5e220]:
+        - complementary [ref=f5e221]:
+          - generic [ref=f5e222]:
+            - heading "Run history" [level=2] [ref=f5e223]
+            - generic [ref=f5e224]: "4"
+          - paragraph [ref=f5e225]: 25 per page · at most 10 pages shown · owner retention 100
+          - generic [ref=f5e226]:
+            - generic [ref=f5e668]:
+              - button "succeeded 6/6 ollama · phi3:latest 9/7/2026, 11:48:05 PM" [ref=f5e669] [cursor=pointer]:
+                - generic [ref=f5e670]:
+                  - generic [ref=f5e671]: succeeded
+                  - generic [ref=f5e672]: 6/6
+                - paragraph [ref=f5e673]: ollama · phi3:latest
+                - paragraph [ref=f5e674]: 9/7/2026, 11:48:05 PM
+              - button "Delete benchmark run 6a9effddc340ccfb9b42d0e4" [ref=f5e675] [cursor=pointer]
+            - generic [ref=f5e679]:
+              - button "cancelled 0/6 ollama · phi3:latest 9/7/2026, 11:44:47 PM" [ref=f5e680] [cursor=pointer]:
+                - generic [ref=f5e681]:
+                  - generic [ref=f5e682]: cancelled
+                  - generic [ref=f5e683]: 0/6
+                - paragraph [ref=f5e684]: ollama · phi3:latest
+                - paragraph [ref=f5e685]: 9/7/2026, 11:44:47 PM
+              - button "Delete benchmark run 6a9eff17c340ccfb9b42ceb6" [ref=f5e686] [cursor=pointer]
+            - generic [ref=f5e690]:
+              - button "failed 6/6 ollama · phi3:latest 9/7/2026, 11:38:57 PM" [ref=f5e691] [cursor=pointer]:
+                - generic [ref=f5e692]:
+                  - generic [ref=f5e693]: failed
+                  - generic [ref=f5e694]: 6/6
+                - paragraph [ref=f5e695]: ollama · phi3:latest
+                - paragraph [ref=f5e696]: 9/7/2026, 11:38:57 PM
+              - button "Delete benchmark run 6a9efdb9c340ccfb9b42ce42" [ref=f5e697] [cursor=pointer]
+            - generic [ref=f5e701]:
+              - button "cancelled 0/6 ollama · phi3:latest 9/7/2026, 11:18:11 PM" [ref=f5e702] [cursor=pointer]:
+                - generic [ref=f5e703]:
+                  - generic [ref=f5e704]: cancelled
+                  - generic [ref=f5e705]: 0/6
+                - paragraph [ref=f5e706]: ollama · phi3:latest
+                - paragraph [ref=f5e707]: 9/7/2026, 11:18:11 PM
+              - button "Delete benchmark run 6a9ef8db7a986eed32f6bf84" [ref=f5e708] [cursor=pointer]
+          - generic [ref=f5e228]:
+            - button "Previous" [disabled] [ref=f5e229]
+            - generic [ref=f5e230]: 1 / 1
+            - button "Next" [disabled] [ref=f5e231]
+        - main [ref=f5e232]:
+          - paragraph [ref=f5e714]: Run the suite or select benchmark history.

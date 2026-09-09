@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   AlertCircle, Brain, CheckCircle2, Cloud, Database, HardDrive, Laptop,
@@ -56,40 +56,51 @@ export default function SettingsPage() {
   const [providerError, setProviderError] = useState<string>();
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<TestResult>();
+  const loadRequestRef = useRef(0);
 
   const loadRuntime = useCallback(async () => {
+    const request = ++loadRequestRef.current;
+    const current = () => loadRequestRef.current === request;
     setLoading(true);
     setRuntimeError(undefined);
     setProviderError(undefined);
-    const [runtimeResult, healthResult, modelsResult] = await Promise.allSettled([
-      settingsApi.getRuntime(), settingsApi.getProviderHealth(), settingsApi.getProviderModels(),
-    ]);
-
-    if (runtimeResult.status === 'fulfilled') {
-      const nextRuntime = normalizeRuntimeSettings(runtimeResult.value.data);
+    setTestResult(undefined);
+    const runtimeTask = settingsApi.getRuntime().then((response) => {
+      if (!current()) return;
+      const nextRuntime = normalizeRuntimeSettings(response.data);
       setRuntime(nextRuntime);
       setProviderStatus(nextRuntime.provider.status);
-    } else {
+      setLoading(false);
+    }).catch((error) => {
+      if (!current()) return;
       setRuntime(emptyRuntime);
-      setRuntimeError(readableApiError(runtimeResult.reason, 'Runtime configuration could not be loaded.'));
-    }
-
-    if (healthResult.status === 'fulfilled') {
-      const health = responseRecord(healthResult.value.data);
+      setRuntimeError(readableApiError(error, 'Runtime configuration could not be loaded.'));
+      setLoading(false);
+    });
+    const healthTask = settingsApi.getProviderHealth().then((response) => {
+      if (!current()) return;
+      const health = responseRecord(response.data);
       const rawStatus = typeof health.status === 'string' ? health.status.toLowerCase() : '';
       const healthy = rawStatus === 'healthy' || rawStatus === 'online' || rawStatus === 'connected';
       setProviderStatus(healthy ? 'online' : 'offline');
       if (!healthy) setProviderError('The configured AI provider reported that it is unavailable.');
-    } else {
+    }).catch((error) => {
+      if (!current()) return;
       setProviderStatus('offline');
-      setProviderError(readableApiError(healthResult.reason, 'The configured AI provider is unavailable.'));
-    }
-
-    setModels(modelsResult.status === 'fulfilled' ? normalizeModels(modelsResult.value.data) : []);
-    setLoading(false);
+      setProviderError(readableApiError(error, 'The configured AI provider is unavailable.'));
+    });
+    const modelsTask = settingsApi.getProviderModels().then((response) => {
+      if (current()) setModels(normalizeModels(response.data));
+    }).catch(() => {
+      if (current()) setModels([]);
+    });
+    await Promise.allSettled([runtimeTask, healthTask, modelsTask]);
   }, []);
 
-  useEffect(() => { void loadRuntime(); }, [loadRuntime]);
+  useEffect(() => {
+    void loadRuntime();
+    return () => { loadRequestRef.current += 1; };
+  }, [loadRuntime]);
 
   const testProvider = async () => {
     setTesting(true);
@@ -112,11 +123,12 @@ export default function SettingsPage() {
     }
   };
 
-  const dependencyMessages = Array.from(new Set([
-    ...runtime.missingDependencies,
-    ...runtime.services.filter((service) => !service.configured).map((service) => `${service.name} is not configured.`),
-    ...(!runtime.provider.configured ? [`${runtime.provider.name} is not configured.`] : []),
-  ]));
+  const dependencyMessages = runtime.missingDependencies.length
+    ? runtime.missingDependencies
+    : Array.from(new Set([
+      ...runtime.services.filter((service) => !service.configured).map((service) => `${service.name} is not configured.`),
+      ...(!runtime.provider.configured ? [`${runtime.provider.name} is not configured.`] : []),
+    ]));
 
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="mx-auto max-w-6xl space-y-8 p-6 md:p-8">

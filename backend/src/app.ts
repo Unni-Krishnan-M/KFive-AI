@@ -5,17 +5,26 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { randomUUID } from 'crypto';
 import { EnvironmentConfig } from './config/environment';
-import { errorHandler, notFound } from './middleware/errorHandler';
+import { AppError, errorHandler, notFound } from './middleware/errorHandler';
 import { setupRoutes } from './routes';
 import { logger } from './utils/logger';
 import { getLiveness } from './config/health';
 
 export const ALLOWED_CORS_METHODS = Object.freeze(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']);
 
+export function corsOriginError(origin: string | undefined, allowedOrigins: readonly string[]): AppError | undefined {
+  if (!origin || allowedOrigins.includes(origin)) return undefined;
+  return new AppError(`Origin ${origin} is not allowed by CORS`, 403);
+}
+
 export function createApp(config: EnvironmentConfig): Express {
   const app = express();
 
   app.disable('x-powered-by');
+  // KFive's supported routing places exactly one frontend/ingress proxy in
+  // front of the API. This lets rate limiting use that proxy's appended client
+  // address without accepting an arbitrary-length forwarded chain.
+  app.set('trust proxy', 1);
   app.use((req, res, next) => {
     const requestId = req.header('x-request-id') || randomUUID();
     res.setHeader('x-request-id', requestId);
@@ -45,8 +54,8 @@ export function createApp(config: EnvironmentConfig): Express {
 
   app.use(cors({
     origin(origin, callback) {
-      if (!origin || config.corsOrigins.includes(origin)) return callback(null, true);
-      return callback(new Error(`Origin ${origin} is not allowed by CORS`));
+      const error = corsOriginError(origin, config.corsOrigins);
+      return error ? callback(error) : callback(null, true);
     },
     credentials: true,
     methods: [...ALLOWED_CORS_METHODS],

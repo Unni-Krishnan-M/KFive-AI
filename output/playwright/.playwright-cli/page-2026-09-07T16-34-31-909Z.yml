@@ -1,0 +1,106 @@
+- generic [ref=f3e2]:
+  - generic [ref=f3e36]:
+    - complementary [ref=f3e37]:
+      - generic [ref=f3e38]:
+        - generic [ref=f3e39]: KFive AI
+        - button "Collapse sidebar" [ref=f3e45] [cursor=pointer]
+      - generic [ref=f3e49]:
+        - generic [ref=f3e50] [cursor=pointer]:
+          - generic [ref=f3e51]: Search
+          - generic [ref=f3e56]:
+            - generic [ref=f3e57]: ⌘
+            - generic [ref=f3e58]: K
+        - navigation [ref=f3e59]:
+          - link "Dashboard" [ref=f3e60] [cursor=pointer]:
+            - /url: /app/dashboard
+          - link "AI Chat" [ref=f3e69] [cursor=pointer]:
+            - /url: /app/chat
+          - link "Code Lab" [ref=f3e74] [cursor=pointer]:
+            - /url: /app/code
+          - link "Agents" [ref=f3e81] [cursor=pointer]:
+            - /url: /app/agents
+          - link "Documents" [ref=f3e87] [cursor=pointer]:
+            - /url: /app/documents
+          - link "Knowledge / RAG" [ref=f3e93] [cursor=pointer]:
+            - /url: /app/knowledge
+          - link "Repository Analyzer" [ref=f3e99] [cursor=pointer]:
+            - /url: /app/repositories
+          - link "Workflows" [ref=f3e106] [cursor=pointer]:
+            - /url: /app/workflows
+          - link "Dataset Lab" [ref=f3e114] [cursor=pointer]:
+            - /url: /app/datasets
+          - link "Model Benchmarks" [ref=f3e121] [cursor=pointer]:
+            - /url: /app/benchmarks
+          - link "Notebooks" [ref=f3e127] [cursor=pointer]:
+            - /url: /app/notebooks
+          - link "Voice Assistant" [ref=f3e133] [cursor=pointer]:
+            - /url: /app/voice
+          - link "Models" [ref=f3e139] [cursor=pointer]:
+            - /url: /app/models
+          - link "Projects" [ref=f3e152] [cursor=pointer]:
+            - /url: /app/projects
+          - link "Workspace" [ref=f3e157] [cursor=pointer]:
+            - /url: /app/workspace
+          - link "PDF Utilities" [ref=f3e163] [cursor=pointer]:
+            - /url: /app/files
+      - generic [ref=f3e168]:
+        - generic [ref=f3e169]:
+          - generic [ref=f3e170]: b
+          - generic [ref=f3e172]:
+            - paragraph [ref=f3e173]: benchmarke2e
+            - paragraph [ref=f3e174]: kfive-benchmark-20260907@example.test
+        - generic [ref=f3e175]:
+          - link "Profile" [ref=f3e176] [cursor=pointer]:
+            - /url: /app/profile
+          - link "Settings" [ref=f3e180] [cursor=pointer]:
+            - /url: /app/settings
+          - button "Toggle theme" [ref=f3e184] [cursor=pointer]
+          - button "Sign out" [ref=f3e191] [cursor=pointer]
+    - main [ref=f3e195]:
+      - generic [ref=f3e197]:
+        - generic [ref=f3e198]:
+          - heading "Welcome back, benchmarke2e!" [level=1] [ref=f3e199]
+          - paragraph [ref=f3e200]: Here's what's happening with your AI workspace today.
+        - generic [ref=f3e201]:
+          - paragraph [ref=f3e206]: AI Conversations
+          - paragraph [ref=f3e215]: Documents Uploaded
+          - paragraph [ref=f3e225]: Tokens Used
+        - generic [ref=f3e231]:
+          - heading "Recent Activity" [level=2] [ref=f3e234]
+          - generic [ref=f3e254]:
+            - heading "Quick Actions" [level=2] [ref=f3e256]
+            - generic [ref=f3e259]:
+              - button [ref=f3e260] [cursor=pointer]:
+                - paragraph [ref=f3e263]: New Chat
+                - paragraph [ref=f3e264]: Start AI conversation
+              - button [ref=f3e265] [cursor=pointer]:
+                - paragraph [ref=f3e269]: Upload Doc
+                - paragraph [ref=f3e270]: Store a document
+              - button [ref=f3e271] [cursor=pointer]:
+                - paragraph [ref=f3e275]: Run Agent
+                - paragraph [ref=f3e276]: Execute AI task
+              - button [ref=f3e277] [cursor=pointer]:
+                - paragraph [ref=f3e280]: Voice AI
+                - paragraph [ref=f3e281]: Start voice session
+        - generic [ref=f3e283]:
+          - heading "Recent Conversations" [level=2] [ref=f3e284]
+          - button "View All" [ref=f3e285] [cursor=pointer]
+        - generic [ref=f3e292]:
+          - heading "AI System Status" [level=2] [ref=f3e294]
+          - generic [ref=f3e296]:
+            - generic [ref=f3e297]:
+              - generic [ref=f3e298]: Ollama Models
+              - paragraph [ref=f3e301]: Ollama connection failed
+            - generic [ref=f3e302]:
+              - generic [ref=f3e303]:
+                - generic [ref=f3e304]: Vector Database
+                - generic [ref=f3e305]: Not checked
+              - paragraph [ref=f3e306]: See backend readiness for dependency status
+            - generic [ref=f3e307]:
+              - generic [ref=f3e308]:
+                - generic [ref=f3e309]: Real-time Sync
+                - generic [ref=f3e310]: Active
+              - paragraph [ref=f3e311]: WebSocket connected
+  - generic:
+    - status [ref=f3e317]: Connected to KFive AI
+    - status [ref=f3e323]: Welcome to KFive AI!

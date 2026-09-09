@@ -1,0 +1,16 @@
+- generic [ref=f4e245]:
+  - generic [ref=f4e246]:
+    - heading "Welcome Back" [level=1] [ref=f4e251]
+    - paragraph [ref=f4e252]: Sign in to your KFive AI workspace
+  - generic [ref=f4e253]:
+    - generic [ref=f4e254]:
+      - generic [ref=f4e255]: Email
+      - textbox "Enter your email" [ref=f4e256]
+    - generic [ref=f4e257]:
+      - generic [ref=f4e258]: Password
+      - textbox "Enter your password" [ref=f4e259]
+    - button "Sign In" [ref=f4e260] [cursor=pointer]
+  - paragraph [ref=f4e263]:
+    - text: Don't have an account?
+    - link "Sign up" [ref=f4e264] [cursor=pointer]:
+      - /url: /register

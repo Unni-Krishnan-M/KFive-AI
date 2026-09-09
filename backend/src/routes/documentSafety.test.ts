@@ -1,12 +1,13 @@
 import { Router } from 'express';
+import fs from 'fs';
 import { DocumentModel } from '@/models/Document';
 import { logger } from '@/utils/logger';
-import { projectService } from '@/services/projectService';
+import { ProjectError, projectService } from '@/services/projectService';
 import { errorHandler } from '@/middleware/errorHandler';
 import documentRouter, {
   DOCUMENT_PROCESSOR_UNAVAILABLE_MESSAGE,
   DocumentRouteError,
-  enqueueDocumentProcessing,
+  markDocumentProcessorUnavailable,
   persistUploadedDocument,
   publicDocumentRecord,
   removeDocumentStorageFile,
@@ -122,6 +123,52 @@ describe('document route safety stabilization', () => {
     expect(deleteOne).not.toHaveBeenCalled();
   });
 
+  it('keeps archived project documents read-only before touching storage or MongoDB', async () => {
+    const projectId = '64b000000000000000000101';
+    const deleteOne = jest.fn();
+    jest.spyOn(DocumentModel, 'findOne').mockResolvedValue({
+      _id: documentId,
+      projectId,
+      status: 'completed',
+      path: '/etc/passwd',
+      deleteOne,
+    } as any);
+    const resolveProject = jest.spyOn(projectService, 'resolveActiveProject').mockRejectedValue(new ProjectError(
+      'Project is archived. Restore it before adding or changing project content.',
+      'PROJECT_ARCHIVED',
+      409
+    ));
+
+    await expect(invoke(documentRouter, 'delete', '/:id', { params: { id: documentId } }))
+      .rejects.toMatchObject({ code: 'PROJECT_ARCHIVED', statusCode: 409 });
+    expect(resolveProject).toHaveBeenCalledWith(ownerId, projectId);
+    expect(deleteOne).not.toHaveBeenCalled();
+  });
+
+  it('allows cleanup of a retained document after its project was deleted', async () => {
+    const projectId = '64b000000000000000000101';
+    const deleteOne = jest.fn().mockResolvedValue(undefined);
+    jest.spyOn(DocumentModel, 'findOne').mockResolvedValue({
+      _id: documentId,
+      projectId,
+      status: 'completed',
+      path: `${process.cwd()}/uploads/orphan.pdf`,
+      deleteOne,
+    } as any);
+    jest.spyOn(projectService, 'resolveActiveProject').mockRejectedValue(new ProjectError(
+      'Project not found.',
+      'PROJECT_NOT_FOUND',
+      404
+    ));
+    const unlink = jest.spyOn(fs.promises, 'unlink').mockResolvedValue(undefined);
+
+    const response = await invoke(documentRouter, 'delete', '/:id', { params: { id: documentId } });
+
+    expect(response).toEqual({ status: 200, body: { success: true, message: 'Deleted' } });
+    expect(unlink).toHaveBeenCalledWith(`${process.cwd()}/uploads/orphan.pdf`);
+    expect(deleteOne).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects an unsafe stored deletion path with a fixed error', async () => {
     const deleteOne = jest.fn();
     jest.spyOn(DocumentModel, 'findOne').mockResolvedValue({
@@ -187,7 +234,7 @@ describe('document safety helpers', () => {
     expect(removeFile).toHaveBeenCalledWith(file.path);
   });
 
-  it('persists a fixed failed state when queue enqueueing is unavailable', async () => {
+  it('persists the fixed unavailable state without sending untrusted documents to an API worker', async () => {
     jest.spyOn(logger, 'warn').mockImplementation(() => logger);
     const save = jest.fn().mockResolvedValue(undefined);
     const document = {
@@ -198,17 +245,15 @@ describe('document safety helpers', () => {
       status: 'pending' as const,
       save,
     };
-    const add = jest.fn().mockRejectedValue(new Error('redis://:secret@internal'));
 
-    await enqueueDocumentProcessing(document, () => ({ add } as any));
+    await markDocumentProcessorUnavailable(document);
 
     expect(document).toMatchObject({
       status: 'failed',
       errorMessage: DOCUMENT_PROCESSOR_UNAVAILABLE_MESSAGE,
     });
     expect(save).toHaveBeenCalledTimes(1);
-    expect(logger.warn).toHaveBeenCalledWith('Document processing queue unavailable', { documentId });
-    expect(JSON.stringify((logger.warn as jest.Mock).mock.calls)).not.toContain('secret');
+    expect(logger.warn).toHaveBeenCalledWith('Document processor unavailable', { documentId });
   });
 
   it('allows only resolved files below the upload root and uses async deletion', async () => {

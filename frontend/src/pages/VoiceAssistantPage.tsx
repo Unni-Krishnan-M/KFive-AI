@@ -6,6 +6,7 @@ import { getToken } from '@/utils/getToken';
 import { chatApi } from '@/services/api';
 import { apiUrl } from '@/config/runtime';
 import { readSseResponse } from '@/utils/sse';
+import { ChatStreamProtocol, validateChatPrompt } from '@/services/chatModel';
 
 const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
@@ -28,6 +29,7 @@ export default function VoiceAssistantPage() {
   
   const recognitionRef = useRef<any>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
+  const streamControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if ('speechSynthesis' in window) {
@@ -74,6 +76,7 @@ export default function VoiceAssistantPage() {
       if (synthRef.current) {
         synthRef.current.cancel();
       }
+      streamControllerRef.current?.abort();
     };
   }, []); // Fix: removed conversationId to prevent re-init loop
 
@@ -125,12 +128,19 @@ export default function VoiceAssistantPage() {
   };
 
   const handleSendToAI = async (text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed) return;
+    const prompt = validateChatPrompt(text);
+    if (!prompt.value) {
+      if (prompt.error) toast.error(prompt.error);
+      return;
+    }
+    const trimmed = prompt.value;
     
     if (recognitionRef.current) recognitionRef.current.stop();
     setIsListening(false);
     setIsProcessing(true);
+    streamControllerRef.current?.abort();
+    const controller = new AbortController();
+    streamControllerRef.current = controller;
     
     const userMsgId = Date.now().toString();
     setHistory(prev => [...prev, { id: userMsgId, role: 'user', content: trimmed }]);
@@ -145,6 +155,7 @@ export default function VoiceAssistantPage() {
       }
 
       const token = getToken();
+      if (!token) throw new Error('Your session is unavailable. Sign in again.');
 
       const response = await fetch(apiUrl(`/chat/conversations/${chatId}/stream`), {
         method: 'POST',
@@ -152,7 +163,8 @@ export default function VoiceAssistantPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ message: trimmed })
+        body: JSON.stringify({ message: trimmed }),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -160,37 +172,48 @@ export default function VoiceAssistantPage() {
         throw new Error('API Error');
       }
 
+      if (!(response.headers.get('content-type') || '').toLowerCase().startsWith('text/event-stream')) {
+        throw new Error('The chat endpoint returned a non-streaming response.');
+      }
       let fullText = '';
       
       const aiMsgId = (Date.now() + 1).toString();
       setHistory(prev => [...prev, { id: aiMsgId, role: 'assistant', content: '' }]);
 
-      await readSseResponse(response, (dataString) => {
-        if (dataString === '[DONE]') return;
-        const data = JSON.parse(dataString);
-        if (data.error) throw new Error(data.error);
-        if (data.content) {
-          fullText += data.content;
-          setHistory(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: m.content + data.content } : m));
+      const protocol = new ChatStreamProtocol();
+      await readSseResponse(response, (dataString, eventName, eventId) => {
+        const event = protocol.consume(dataString, eventName, eventId);
+        if (event.type === 'delta') {
+          fullText += event.content;
+          setHistory(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: m.content + event.content } : m));
+        } else if (event.type === 'completed' && event.generation.error) {
+          throw new Error(event.generation.error.message);
+        } else if (event.type === 'error') {
+          throw new Error(event.error.message);
         }
       });
+      protocol.finish();
 
       speakText(fullText);
 
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
       const aiMsgId = (Date.now() + 1).toString();
       const failureMessage = 'Voice AI is unavailable because the backend or configured AI provider could not complete the request.';
       setHistory(prev => [...prev, { id: aiMsgId, role: 'assistant', content: failureMessage }]);
       toast.error(failureMessage);
     } finally {
-      setIsProcessing(false);
+      if (streamControllerRef.current === controller) {
+        streamControllerRef.current = null;
+        setIsProcessing(false);
+      }
     }
   };
 
   const handleInterrupt = () => {
+    streamControllerRef.current?.abort();
     if (synthRef.current) {
       synthRef.current.cancel();
-      setIsProcessing(false);
     }
   };
 

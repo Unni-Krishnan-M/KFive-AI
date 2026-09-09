@@ -1,6 +1,6 @@
 # Experimental Workflows
 
-The Phase 10 Workflow slice is **Experimental and currently being implemented**. It is a server-validated, fixed text pipeline:
+The Phase 10 Workflow source slice is **implemented and Experimental**. It is a server-validated, fixed text pipeline:
 
 ```text
 Input -> Prompt -> LLM -> Output
@@ -19,7 +19,7 @@ It is not a general-purpose workflow builder, automation service, or agent runti
 - Project deletion is non-cascading. If the associated project is already gone, retained terminal runs and then the run-free workflow definition remain owner-deletable so they do not permanently consume retention.
 - Model output is always inert text. It is displayed and stored, never evaluated or interpreted as a command, authorization, tool call, workflow definition, or instruction to another subsystem.
 
-The browser integration and source verification are still in progress. This document describes the intentionally narrow Phase 10 contract, not a claim that the target-host path has passed end-to-end verification.
+The browser page, strict response contracts, authenticated API mount, persistence models, execution service, and recovery wiring exist in source. This document describes that intentionally narrow contract, not a claim that the target-host path has passed end-to-end verification.
 
 ## API
 
@@ -75,3 +75,11 @@ Do not place secrets, credentials, regulated data, or other sensitive content in
 ## Pending verification
 
 The complete target-host path remains pending: browser definition management, authenticated owner/project authorization, active-versus-archived behavior, real configured-provider SSE streaming, MongoDB persistence and restart behavior, cancellation, timeout/output bounds, pagination/detail, and terminal deletion. External-provider smoke tests must remain opt-in so ordinary verification cannot make billable requests.
+
+## Source verification
+
+- 30 focused backend model/service/route tests pass.
+- 7 focused frontend contract tests pass.
+- The complete repository gate passes 331 tests: 59 frontend, 266 backend, and 6 Code Runner tests.
+- Frontend, backend, and Code Runner lint/build targets pass.
+- Default and Code Lab profile Compose configuration, lifecycle-script shell syntax, and repository diff checks pass.

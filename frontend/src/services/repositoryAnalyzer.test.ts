@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { canCreateRepositoryAnalysis, canDeleteRepositoryAnalysis, isRepositoryScopeRequestCurrent, normalizeRepositoryAnalyses, normalizeRepositoryAnalysis, normalizeRepositoryStatus, repositoryAnalysisScopeKey, validateRepositoryArchive, validateRepositoryZipSignature } from './repositoryAnalyzer';
+import { repositoryHistoryScope } from './repositoryAnalyzer';
+import { canCreateRepositoryAnalysis, canDeleteRepositoryAnalysis, effectiveRepositoryProjectStatus, isRepositoryScopeRequestCurrent, normalizeRepositoryAnalyses, normalizeRepositoryAnalysis, normalizeRepositoryStatus, repositoryAnalysisScopeKey, validateRepositoryArchive, validateRepositoryZipSignature } from './repositoryAnalyzer';
 
 const complete = {
   id: 'analysis-1', projectId: 'project-1', name: 'KFive', status: 'completed', analyzerVersion: 1,
@@ -15,6 +16,16 @@ const complete = {
 };
 
 describe('repository analyzer contract', () => {
+  it('rejects unknown, repeated, and project-combined recovery scopes without falling back to workspace', () => {
+    expect(repositoryHistoryScope('', false)).toBe('workspace');
+    expect(repositoryHistoryScope('?projectId=one', true)).toBe('workspace');
+    expect(repositoryHistoryScope('?scope=orphaned', false)).toBe('orphaned');
+    for (const search of ['?scope=all', '?scope=', '?scope=orphaned&scope=orphaned']) {
+      expect(repositoryHistoryScope(search, false)).toBe('invalid');
+    }
+    expect(repositoryHistoryScope('?scope=orphaned&projectId=one', true)).toBe('invalid');
+    expect(repositoryHistoryScope('?scope=orphaned&projectId=', false)).toBe('invalid');
+  });
   it('normalizes status without inventing availability', () => {
     expect(normalizeRepositoryStatus({ data: { canAnalyze: true, scope: { type: 'project', projectId: 'p1', projectStatus: 'active' }, dependencies: [{ id: 'mongodb', status: 'available' }], limits: { archiveBytes: 10485760 } } })).toEqual({
       available: undefined, canAnalyze: true, scope: { type: 'project', projectId: 'p1', projectStatus: 'active' }, dependencies: [{ id: 'mongodb', status: 'available', message: undefined }], limits: { maxArchiveBytes: 10485760 },
@@ -50,6 +61,9 @@ describe('repository analyzer contract', () => {
     expect(canDeleteRepositoryAnalysis('active', true)).toBe(true);
     expect(canDeleteRepositoryAnalysis('archived', true)).toBe(false);
     expect(canDeleteRepositoryAnalysis('active', false)).toBe(false);
+    expect(effectiveRepositoryProjectStatus('active', 'archived')).toBe('archived');
+    expect(effectiveRepositoryProjectStatus('archived', 'active')).toBe('active');
+    expect(effectiveRepositoryProjectStatus('active', undefined)).toBe('active');
   });
 
   it('checks ZIP magic bytes before upload', async () => {
@@ -59,6 +73,9 @@ describe('repository analyzer contract', () => {
 
   it('invalidates requests when the requested repository scope or request generation changes', () => {
     expect(repositoryAnalysisScopeKey(false)).toBe('workspace');
+    expect(repositoryAnalysisScopeKey(false, undefined, true)).toBe('orphaned');
+    expect(repositoryAnalysisScopeKey(true, 'project-1', true)).toBe('project:project-1');
+    expect(isRepositoryScopeRequestCurrent('orphaned', 'workspace', 4, 4)).toBe(false);
     expect(repositoryAnalysisScopeKey(true)).toBe('project:pending');
     expect(repositoryAnalysisScopeKey(true, 'project-1')).toBe('project:project-1');
     expect(isRepositoryScopeRequestCurrent('project:project-1', 'project:project-1', 4, 4)).toBe(true);

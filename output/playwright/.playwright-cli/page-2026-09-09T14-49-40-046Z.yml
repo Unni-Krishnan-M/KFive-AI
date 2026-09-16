@@ -1,0 +1,75 @@
+- generic [ref=f1e4]:
+  - complementary [ref=f1e5]:
+    - generic [ref=f1e6]:
+      - generic [ref=f1e7]: KFive AI
+      - button "Collapse sidebar" [ref=f1e13] [cursor=pointer]
+    - generic [ref=f1e17]:
+      - generic [ref=f1e18] [cursor=pointer]:
+        - generic [ref=f1e19]: Search
+        - generic [ref=f1e24]:
+          - generic [ref=f1e25]: ⌘
+          - generic [ref=f1e26]: K
+      - navigation [ref=f1e27]:
+        - link "Dashboard" [ref=f1e28] [cursor=pointer]:
+          - /url: /app/dashboard
+        - link "AI Chat" [ref=f1e36] [cursor=pointer]:
+          - /url: /app/chat
+        - link "Code Lab" [ref=f1e41] [cursor=pointer]:
+          - /url: /app/code
+        - link "Agents" [ref=f1e48] [cursor=pointer]:
+          - /url: /app/agents
+        - link "Documents" [ref=f1e54] [cursor=pointer]:
+          - /url: /app/documents
+        - link "Knowledge / RAG" [ref=f1e60] [cursor=pointer]:
+          - /url: /app/knowledge
+        - link "Repository Analyzer" [ref=f1e66] [cursor=pointer]:
+          - /url: /app/repositories
+        - link "Workflows" [ref=f1e74] [cursor=pointer]:
+          - /url: /app/workflows
+        - link "Dataset Lab" [ref=f1e82] [cursor=pointer]:
+          - /url: /app/datasets
+        - link "Model Benchmarks" [ref=f1e89] [cursor=pointer]:
+          - /url: /app/benchmarks
+        - link "Notebooks" [ref=f1e95] [cursor=pointer]:
+          - /url: /app/notebooks
+        - link "Voice Assistant" [ref=f1e101] [cursor=pointer]:
+          - /url: /app/voice
+        - link "Models" [ref=f1e107] [cursor=pointer]:
+          - /url: /app/models
+        - link "Projects" [ref=f1e120] [cursor=pointer]:
+          - /url: /app/projects
+        - link "Workspace" [ref=f1e125] [cursor=pointer]:
+          - /url: /app/workspace
+        - link "PDF Utilities" [ref=f1e131] [cursor=pointer]:
+          - /url: /app/files
+    - generic [ref=f1e136]:
+      - generic [ref=f1e137]:
+        - generic [ref=f1e138]: R
+        - generic [ref=f1e140]:
+          - paragraph [ref=f1e141]: Repo Auditor
+          - paragraph [ref=f1e142]: kfive-repo-20260909@example.test
+      - generic [ref=f1e143]:
+        - link "Profile" [ref=f1e144] [cursor=pointer]:
+          - /url: /app/profile
+        - link "Settings" [ref=f1e148] [cursor=pointer]:
+          - /url: /app/settings
+        - button "Toggle theme" [ref=f1e152] [cursor=pointer]
+        - button "Sign out" [ref=f1e159] [cursor=pointer]
+  - main [ref=f1e163]:
+    - generic [ref=f1e165]:
+      - generic [ref=f1e166]:
+        - generic [ref=f1e167]:
+          - heading "Repository Analyzer" [level=1] [ref=f1e168]
+          - paragraph [ref=f1e173]: Upload a bounded ZIP and inspect the deterministic report returned by KFive.
+        - button "Refresh" [disabled] [ref=f1e174]
+      - generic [ref=f1e180]: "Analysis is read-only: KFive inventories the uploaded ZIP without modifying its source files. It does not clone repositories, execute code, install packages, or generate an AI report."
+      - heading "Analyzer status" [level=2] [ref=f1e185]
+      - generic [ref=f1e186]:
+        - complementary [ref=f1e187]:
+          - generic [ref=f1e188]:
+            - heading "Analyze ZIP" [level=2] [ref=f1e189]
+            - paragraph [ref=f1e190]: One ZIP, up to 10.0 MiB. The archive is sent to the KFive backend.
+            - button "Choose ZIP" [disabled] [ref=f1e191]
+          - heading "Saved reports" [level=2] [ref=f1e197]
+        - main [ref=f1e198]:
+          - paragraph [ref=f1e205]: Select or create a repository analysis.

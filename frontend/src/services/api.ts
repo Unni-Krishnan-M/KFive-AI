@@ -207,8 +207,8 @@ export const documentApi = {
 export const knowledgeApi = {
   getStatus: (projectId?: string) =>
     apiClient.get('/knowledge/status', { params: projectId ? { projectId } : undefined }),
-  getSources: (projectId?: string) =>
-    apiClient.get('/knowledge/sources', { params: projectId ? { projectId } : undefined }),
+  getSources: (projectId?: string, scope?: 'orphaned') =>
+    apiClient.get('/knowledge/sources', { params: { ...(projectId ? { projectId } : {}), ...(scope ? { scope } : {}) } }),
   createSource: (data: {
     name: string;
     mediaType: 'text/plain' | 'text/markdown';
@@ -223,8 +223,8 @@ export const knowledgeApi = {
 export const repositoryApi = {
   getStatus: (projectId?: string) =>
     apiClient.get('/repositories/status', { params: projectId ? { projectId } : undefined }),
-  getAnalyses: (projectId?: string) =>
-    apiClient.get('/repositories/analyses', { params: projectId ? { projectId } : undefined }),
+  getAnalyses: (projectId?: string, scope?: 'orphaned') =>
+    apiClient.get('/repositories/analyses', { params: { ...(projectId ? { projectId } : {}), ...(scope ? { scope } : {}) } }),
   getAnalysis: (id: string) => apiClient.get(`/repositories/analyses/${id}`),
   deleteAnalysis: (id: string) => apiClient.delete(`/repositories/analyses/${id}`),
   createAnalysis: (archive: File, options: { name?: string; projectId?: string } = {}) => {

@@ -266,7 +266,7 @@ function signalFor(filePath: string): RepositorySignal[] {
   if (/(^|\/)(__tests__|test|tests|spec)(\/|$)/.test(lower) || /\.(?:test|spec)\.[^.]+$/.test(lower)) signals.push({ kind: 'tests', path: filePath });
   if (base === 'dockerfile' || base.startsWith('dockerfile.')) signals.push({ kind: 'docker', path: filePath });
   if (/^(?:docker-)?compose(?:\.[a-z0-9_-]+)?\.ya?ml$/.test(base)) signals.push({ kind: 'compose', path: filePath });
-  if (/^\.github\/workflows\/[^/]+\.ya?ml$/.test(lower) || base === '.gitlab-ci.yml') signals.push({ kind: 'ci', path: filePath });
+  if (/(?:^|\/)\.github\/workflows\/[^/]+\.ya?ml$/.test(lower) || base === '.gitlab-ci.yml') signals.push({ kind: 'ci', path: filePath });
   if (/(^|\/)(k8s|kubernetes)(\/|$)/.test(lower) && /\.ya?ml$/.test(lower)) signals.push({ kind: 'kubernetes', path: filePath });
   if ((base === '.env' || (base.startsWith('.env.') && !base.endsWith('.example'))) || /\.(?:pem|key|p12|pfx)$/.test(base)) {
     signals.push({ kind: 'security', path: filePath, severity: 'warning' });

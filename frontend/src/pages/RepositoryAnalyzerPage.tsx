@@ -1,6 +1,6 @@
 import { ChangeEvent, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Archive, Download, FileArchive, FileCode2, FolderKanban, GitBranch, Loader2, RefreshCw, ShieldCheck, Trash2, X } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useProjectContext } from '@/hooks/useProjectContext';
 import { repositoryApi } from '@/services/api';
@@ -11,12 +11,14 @@ import {
   RepositoryStatus,
   canCreateRepositoryAnalysis,
   canDeleteRepositoryAnalysis,
+  effectiveRepositoryProjectStatus,
   formatBytes,
   isRepositoryScopeRequestCurrent,
   normalizeRepositoryAnalyses,
   normalizeRepositoryAnalysis,
   normalizeRepositoryStatus,
   repositoryAnalysisScopeKey,
+  repositoryHistoryScope,
   validateRepositoryArchive,
   validateRepositoryZipSignature,
 } from '@/services/repositoryAnalyzer';
@@ -30,6 +32,7 @@ function reportFilename(analysis: RepositoryAnalysis): string {
 
 export default function RepositoryAnalyzerPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const requestRef = useRef(0);
   const fileSelectionRef = useRef(0);
@@ -37,9 +40,12 @@ export default function RepositoryAnalyzerPage() {
   const uploadRequestRef = useRef(0);
   const deleteRequestRef = useRef(0);
   const { requested, context, loading: projectLoading, error: projectError } = useProjectContext();
-  const projectValid = !requested || Boolean(context);
+  const historyScope = repositoryHistoryScope(location.search, requested);
+  const invalidScope = historyScope === 'invalid';
+  const projectValid = !invalidScope && (!requested || Boolean(context));
   const projectId = context?.projectId;
-  const scopeKey = repositoryAnalysisScopeKey(requested, projectId);
+  const orphaned = historyScope === 'orphaned';
+  const scopeKey = invalidScope ? 'invalid-scope' : repositoryAnalysisScopeKey(requested, projectId, orphaned);
   const scopeKeyRef = useRef(scopeKey);
   const mountedRef = useRef(true);
   const [status, setStatus] = useState<RepositoryStatus>();
@@ -56,8 +62,11 @@ export default function RepositoryAnalyzerPage() {
   const [deleting, setDeleting] = useState(false);
 
   const maximumBytes = Math.min(status?.limits?.maxArchiveBytes ?? REPOSITORY_ARCHIVE_LIMIT_BYTES, REPOSITORY_ARCHIVE_LIMIT_BYTES);
-  const createAllowed = canCreateRepositoryAnalysis(context?.status, projectValid, status?.canAnalyze === true);
-  const deleteAllowed = canDeleteRepositoryAnalysis(context?.status, projectValid);
+  const projectStatus = context
+    ? effectiveRepositoryProjectStatus(context.status, status?.scope?.type === 'project' ? status.scope.projectStatus : undefined)
+    : undefined;
+  const createAllowed = !orphaned && canCreateRepositoryAnalysis(projectStatus, projectValid, status?.canAnalyze === true);
+  const deleteAllowed = canDeleteRepositoryAnalysis(projectStatus, projectValid);
 
   const requestIsCurrent = useCallback((requestScopeKey: string, currentRequestId: number, requestId: number): boolean => (
     mountedRef.current && isRepositoryScopeRequestCurrent(scopeKeyRef.current, requestScopeKey, currentRequestId, requestId)
@@ -78,7 +87,7 @@ export default function RepositoryAnalyzerPage() {
     setLoading(true);
     const [statusResult, historyResult] = await Promise.allSettled([
       repositoryApi.getStatus(projectId),
-      repositoryApi.getAnalyses(projectId),
+      repositoryApi.getAnalyses(projectId, orphaned ? 'orphaned' : undefined),
     ]);
     if (!requestIsCurrent(requestScopeKey, requestRef.current, requestId)) return;
     if (statusResult.status === 'fulfilled') {
@@ -99,7 +108,7 @@ export default function RepositoryAnalyzerPage() {
       setHistoryError(readableApiError(historyResult.reason, 'Repository analyses could not be loaded.'));
     }
     setLoading(false);
-  }, [projectId, projectValid, requestIsCurrent, scopeKey]);
+  }, [orphaned, projectId, projectValid, requestIsCurrent, scopeKey]);
 
   useLayoutEffect(() => {
     mountedRef.current = true;
@@ -264,14 +273,16 @@ export default function RepositoryAnalyzerPage() {
     <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4 text-sm text-cyan-100"><ShieldCheck className="mr-2 inline h-4 w-4" />Analysis is read-only: KFive inventories the uploaded ZIP without modifying its source files. It does not clone repositories, execute code, install packages, or generate an AI report.</div>
     {projectLoading ? <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-gray-400">Verifying project context…</div> : null}
     {projectError ? <div role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">{projectError} No unscoped repository request was made.</div> : null}
-    {context?.status === 'archived' ? <div role="alert" className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">{PROJECT_ARCHIVED_MESSAGE} Saved analyses remain readable.</div> : null}
-    {context ? <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3"><div className="flex items-center gap-3"><FolderKanban className="h-5 w-5 text-primary" /><div><p className="text-xs uppercase tracking-wide text-gray-500">Project repository analyses</p><p className="font-medium text-white">{context.projectName} <span className="text-xs capitalize text-gray-500">({context.status})</span></p></div></div><button onClick={() => navigate('/app/repositories', { replace: true, state: null })} className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-gray-300"><X className="h-3.5 w-3.5" />Show workspace analyses</button></div> : null}
+    {invalidScope ? <div role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">Invalid repository history scope. Choose workspace history or deleted-project history; recovery history cannot be combined with a project. No repository request was made.<button onClick={() => navigate('/app/repositories', { replace: true, state: null })} className="ml-3 underline">Show workspace analyses</button></div> : null}
+    {!requested ? <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 p-4 text-sm text-gray-300"><p>{orphaned ? 'Reports from deleted projects remain available here. Open, export, or delete a report to recover storage capacity.' : 'Workspace reports. Reports from deleted projects have a separate recovery history.'}</p><button onClick={() => navigate(orphaned ? '/app/repositories' : '/app/repositories?scope=orphaned', { replace: true, state: null })} className="rounded-lg border border-white/20 px-3 py-2 text-white">{orphaned ? 'Show workspace analyses' : 'Reports from deleted projects'}</button></div> : null}
+    {projectStatus === 'archived' ? <div role="alert" className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">{PROJECT_ARCHIVED_MESSAGE} Saved analyses remain readable.</div> : null}
+    {context ? <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3"><div className="flex items-center gap-3"><FolderKanban className="h-5 w-5 text-primary" /><div><p className="text-xs uppercase tracking-wide text-gray-500">Project repository analyses</p><p className="font-medium text-white">{context.projectName} <span className="text-xs capitalize text-gray-500">({projectStatus ?? context.status})</span></p></div></div><button onClick={() => navigate('/app/repositories', { replace: true, state: null })} className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-gray-300"><X className="h-3.5 w-3.5" />Show workspace analyses</button></div> : null}
 
     <section className="rounded-2xl border border-white/10 bg-white/5 p-5"><h2 className="font-semibold text-white">Analyzer status</h2>{statusError ? <p role="alert" className="mt-3 rounded-lg bg-red-500/10 p-3 text-sm text-red-200">{statusError}</p> : null}{status ? <div className="mt-4 grid gap-3 md:grid-cols-3"><div className="rounded-xl border border-white/10 bg-black/20 p-3"><p className="text-xs text-gray-500">Service</p><p className={status.available === true ? 'mt-1 text-emerald-300' : status.available === false ? 'mt-1 text-red-300' : 'mt-1 text-gray-400'}>{status.available === true ? 'Available' : status.available === false ? 'Unavailable' : 'Not reported'}</p></div>{status.dependencies.map((dependency) => <div key={dependency.id} className="rounded-xl border border-white/10 bg-black/20 p-3"><p className="font-medium text-white">{dependency.id}</p><p className="mt-1 text-xs capitalize text-gray-400">{dependency.status.replace(/[-_]/g, ' ')}</p>{dependency.message ? <p className="mt-2 text-xs text-gray-500">{dependency.message}</p> : null}</div>)}</div> : null}</section>
 
     <div className="grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
       <aside className="space-y-5">
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-5"><h2 className="font-semibold text-white">Analyze ZIP</h2><p className="mt-2 text-sm text-gray-500">One ZIP, up to {formatBytes(maximumBytes)}. The archive is sent to the KFive backend.</p><input ref={fileInputRef} type="file" accept=".zip,application/zip,application/x-zip-compressed,application/octet-stream" onChange={(event) => void selectArchive(event)} disabled={!createAllowed || uploading} className="hidden" /><button onClick={() => fileInputRef.current?.click()} disabled={!createAllowed || uploading} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-gray-200 disabled:cursor-not-allowed disabled:opacity-40"><FileArchive className="h-4 w-4" />Choose ZIP</button>{archive ? <div className="mt-3 space-y-3"><p className="truncate text-sm text-white">{archive.name} <span className="text-gray-500">({formatBytes(archive.size)})</span></p><label className="block text-xs text-gray-400">Report name<input value={analysisName} onChange={(event) => setAnalysisName(event.target.value)} maxLength={200} className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white" /></label><button onClick={() => void analyze()} disabled={uploading} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}{uploading ? 'Analyzing…' : 'Analyze repository'}</button></div> : null}{context?.status === 'archived' ? <p className="mt-3 text-sm text-amber-300">{PROJECT_ARCHIVED_MESSAGE}</p> : status && !status.canAnalyze ? <p className="mt-3 text-sm text-amber-300">New analyses are unavailable. Check the status above.</p> : null}{archiveError ? <p role="alert" className="mt-3 rounded-lg bg-red-500/10 p-3 text-sm text-red-200">{archiveError}</p> : null}</section>
+        <section className="rounded-2xl border border-white/10 bg-white/5 p-5"><h2 className="font-semibold text-white">Analyze ZIP</h2><p className="mt-2 text-sm text-gray-500">One ZIP, up to {formatBytes(maximumBytes)}. The archive is sent to the KFive backend.</p><input ref={fileInputRef} type="file" accept=".zip,application/zip,application/x-zip-compressed,application/octet-stream" onChange={(event) => void selectArchive(event)} disabled={!createAllowed || uploading} className="hidden" /><button onClick={() => fileInputRef.current?.click()} disabled={!createAllowed || uploading} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-gray-200 disabled:cursor-not-allowed disabled:opacity-40"><FileArchive className="h-4 w-4" />Choose ZIP</button>{archive ? <div className="mt-3 space-y-3"><p className="truncate text-sm text-white">{archive.name} <span className="text-gray-500">({formatBytes(archive.size)})</span></p><label className="block text-xs text-gray-400">Report name<input value={analysisName} onChange={(event) => setAnalysisName(event.target.value)} maxLength={200} className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white" /></label><button onClick={() => void analyze()} disabled={!createAllowed || uploading} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}{uploading ? 'Analyzing…' : 'Analyze repository'}</button></div> : null}{projectStatus === 'archived' ? <p className="mt-3 text-sm text-amber-300">{PROJECT_ARCHIVED_MESSAGE}</p> : status && !status.canAnalyze ? <p className="mt-3 text-sm text-amber-300">New analyses are unavailable. Check the status above.</p> : null}{archiveError ? <p role="alert" className="mt-3 rounded-lg bg-red-500/10 p-3 text-sm text-red-200">{archiveError}</p> : null}</section>
 
         <section className="rounded-2xl border border-white/10 bg-white/5 p-5"><h2 className="font-semibold text-white">Saved reports</h2>{historyError ? <p role="alert" className="mt-3 text-sm text-red-300">{historyError}</p> : null}<div className="mt-3 space-y-2">{analyses.map((analysis) => <button key={analysis.id} onClick={() => void openAnalysis(analysis)} disabled={deleting} className={`w-full rounded-xl border p-3 text-left disabled:cursor-not-allowed disabled:opacity-50 ${selected?.id === analysis.id ? 'border-primary/50 bg-primary/10' : 'border-white/10 bg-black/20'}`}><p className="truncate text-sm font-medium text-white">{analysis.name}</p><p className="mt-1 truncate text-xs text-gray-500">{analysis.source.originalName}</p><p className="mt-1 text-xs capitalize text-emerald-300">{analysis.status}</p></button>)}{!loading && !analyses.length && !historyError ? <p className="py-6 text-center text-sm text-gray-500">No saved analyses in this scope.</p> : null}</div></section>
       </aside>

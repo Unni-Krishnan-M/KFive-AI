@@ -1,0 +1,222 @@
+- generic [ref=f1e239]:
+  - complementary [ref=f1e240]:
+    - generic [ref=f1e241]:
+      - generic [ref=f1e242]: KFive AI
+      - button "Collapse sidebar" [ref=f1e248] [cursor=pointer]
+    - generic [ref=f1e252]:
+      - generic [ref=f1e253] [cursor=pointer]:
+        - generic [ref=f1e254]: Search
+        - generic [ref=f1e259]:
+          - generic [ref=f1e260]: ⌘
+          - generic [ref=f1e261]: K
+      - navigation [ref=f1e262]:
+        - link "Dashboard" [ref=f1e701] [cursor=pointer]:
+          - /url: /app/dashboard
+        - link "AI Chat" [ref=f1e709] [cursor=pointer]:
+          - /url: /app/chat
+        - link "Code Lab" [ref=f1e714] [cursor=pointer]:
+          - /url: /app/code
+        - link "Agents" [ref=f1e721] [cursor=pointer]:
+          - /url: /app/agents
+        - link "Documents" [ref=f1e727] [cursor=pointer]:
+          - /url: /app/documents
+        - link "Knowledge / RAG" [ref=f1e733] [cursor=pointer]:
+          - /url: /app/knowledge
+        - link "Repository Analyzer" [ref=f1e739] [cursor=pointer]:
+          - /url: /app/repositories
+        - link "Workflows" [ref=f1e747] [cursor=pointer]:
+          - /url: /app/workflows
+        - link "Dataset Lab" [ref=f1e755] [cursor=pointer]:
+          - /url: /app/datasets
+        - link "Model Benchmarks" [ref=f1e762] [cursor=pointer]:
+          - /url: /app/benchmarks
+        - link "Notebooks" [ref=f1e768] [cursor=pointer]:
+          - /url: /app/notebooks
+        - link "Voice Assistant" [ref=f1e774] [cursor=pointer]:
+          - /url: /app/voice
+        - link "Models" [ref=f1e780] [cursor=pointer]:
+          - /url: /app/models
+        - link "Projects" [ref=f1e793] [cursor=pointer]:
+          - /url: /app/projects
+        - link "Workspace" [ref=f1e798] [cursor=pointer]:
+          - /url: /app/workspace
+        - link "PDF Utilities" [ref=f1e804] [cursor=pointer]:
+          - /url: /app/files
+    - generic [ref=f1e371]:
+      - generic [ref=f1e372]:
+        - generic [ref=f1e373]: R
+        - generic [ref=f1e375]:
+          - paragraph [ref=f1e376]: Repo Auditor
+          - paragraph [ref=f1e377]: kfive-repo-20260909@example.test
+      - generic [ref=f1e378]:
+        - link "Profile" [ref=f1e379] [cursor=pointer]:
+          - /url: /app/profile
+        - link "Settings" [ref=f1e383] [cursor=pointer]:
+          - /url: /app/settings
+        - button "Toggle theme" [ref=f1e387] [cursor=pointer]
+        - button "Sign out" [ref=f1e394] [cursor=pointer]
+  - main [ref=f1e398]:
+    - generic [ref=f1e400]:
+      - generic [ref=f1e401]:
+        - generic [ref=f1e402]:
+          - heading "Repository Analyzer" [level=1] [ref=f1e403]
+          - paragraph [ref=f1e408]: Upload a bounded ZIP and inspect the deterministic report returned by KFive.
+        - button "Refresh" [ref=f1e409] [cursor=pointer]
+      - generic [ref=f1e415]: "Analysis is read-only: KFive inventories the uploaded ZIP without modifying its source files. It does not clone repositories, execute code, install packages, or generate an AI report."
+      - generic [ref=f1e419]:
+        - paragraph [ref=f1e420]: Workspace reports. Reports from deleted projects have a separate recovery history.
+        - button "Reports from deleted projects" [ref=f1e809] [cursor=pointer]
+      - generic [ref=f1e422]:
+        - heading "Analyzer status" [level=2] [ref=f1e423]
+        - generic [ref=f1e810]:
+          - generic [ref=f1e811]:
+            - paragraph [ref=f1e812]: Service
+            - paragraph [ref=f1e813]: Available
+          - generic [ref=f1e814]:
+            - paragraph [ref=f1e815]: mongodb
+            - paragraph [ref=f1e816]: available
+      - generic [ref=f1e431]:
+        - complementary [ref=f1e432]:
+          - generic [ref=f1e433]:
+            - heading "Analyze ZIP" [level=2] [ref=f1e434]
+            - paragraph [ref=f1e435]: One ZIP, up to 10.0 MiB. The archive is sent to the KFive backend.
+            - button "Choose ZIP" [ref=f1e436] [cursor=pointer]
+          - generic [ref=f1e441]:
+            - heading "Saved reports" [level=2] [ref=f1e442]
+            - button [active] [ref=f1e817] [cursor=pointer]:
+              - paragraph [ref=f1e818]: kfive-repository-e2e-20260909
+              - paragraph [ref=f1e819]: kfive-repository-e2e-20260909.zip
+              - paragraph [ref=f1e820]: completed
+        - main [ref=f1e448]:
+          - generic [ref=f1e449]:
+            - generic [ref=f1e450]:
+              - generic [ref=f1e832]:
+                - heading "kfive-repository-e2e-20260909" [level=2] [ref=f1e833]
+                - paragraph [ref=f1e834]: kfive-repository-e2e-20260909.zip · SHA-256 c0e87f5cc58847c83c91e8f9ef5f2b725e06723fd2b77877715b31798e97e6f3
+              - generic [ref=f1e835]:
+                - button "Download JSON" [ref=f1e836] [cursor=pointer]
+                - button "Delete report" [ref=f1e840] [cursor=pointer]
+            - generic [ref=f1e844]:
+              - generic [ref=f1e845]:
+                - paragraph [ref=f1e846]: Files
+                - paragraph [ref=f1e847]: "9"
+              - generic [ref=f1e848]:
+                - paragraph [ref=f1e849]: Directories
+                - paragraph [ref=f1e850]: "6"
+              - generic [ref=f1e851]:
+                - paragraph [ref=f1e852]: Uncompressed
+                - paragraph [ref=f1e853]: 1.04 KiB
+              - generic [ref=f1e854]:
+                - paragraph [ref=f1e855]: Maximum depth
+                - paragraph [ref=f1e856]: "4"
+              - generic [ref=f1e857]:
+                - paragraph [ref=f1e858]: Package manifests
+                - paragraph [ref=f1e859]: "1"
+              - generic [ref=f1e860]:
+                - paragraph [ref=f1e861]: Test files
+                - paragraph [ref=f1e862]: "1"
+            - generic [ref=f1e863]:
+              - heading "Warnings" [level=3] [ref=f1e864]
+              - list [ref=f1e865]:
+                - listitem [ref=f1e866]:
+                  - text: SENSITIVE_DEPENDENCY_SPEC_OMITTED — A credential-bearing dependency specification was omitted from the report.
+                  - generic [ref=f1e867]: kfive-repo-analyzer-e2e-src/package.json
+            - generic [ref=f1e868]:
+              - generic [ref=f1e869]:
+                - heading "Languages" [level=3] [ref=f1e870]
+                - generic [ref=f1e871]: TypeScript · 2 files · 283 B
+              - generic [ref=f1e873]:
+                - heading "Frameworks and tools" [level=3] [ref=f1e874]
+                - generic [ref=f1e875]:
+                  - generic [ref=f1e876]:
+                    - paragraph [ref=f1e877]: Express
+                    - paragraph [ref=f1e878]: express in kfive-repo-analyzer-e2e-src/package.json
+                  - generic [ref=f1e879]:
+                    - paragraph [ref=f1e880]: Mongoose
+                    - paragraph [ref=f1e881]: mongoose in kfive-repo-analyzer-e2e-src/package.json
+                  - generic [ref=f1e882]:
+                    - paragraph [ref=f1e883]: React
+                    - paragraph [ref=f1e884]: react in kfive-repo-analyzer-e2e-src/package.json
+                  - generic [ref=f1e885]:
+                    - paragraph [ref=f1e886]: TypeScript
+                    - paragraph [ref=f1e887]: typescript in kfive-repo-analyzer-e2e-src/package.json
+                  - generic [ref=f1e888]:
+                    - paragraph [ref=f1e889]: Vitest
+                    - paragraph [ref=f1e890]: vitest in kfive-repo-analyzer-e2e-src/package.json
+            - generic [ref=f1e891]:
+              - heading "Package manifests" [level=3] [ref=f1e892]
+              - generic [ref=f1e894]:
+                - paragraph [ref=f1e895]: kfive-repo-analyzer-e2e-src/package.json npm
+                - paragraph [ref=f1e896]: kfive-repository-analyzer-e2e · 6 declared dependencies
+                - paragraph [ref=f1e897]: "Script names: build, test"
+            - generic [ref=f1e898]:
+              - heading "Declared dependencies" [level=3] [ref=f1e899]
+              - generic [ref=f1e900]:
+                - paragraph [ref=f1e901]: express ^5.0.0 · runtime · kfive-repo-analyzer-e2e-src/package.json
+                - paragraph [ref=f1e902]: mongoose ^8.0.0 · runtime · kfive-repo-analyzer-e2e-src/package.json
+                - paragraph [ref=f1e903]: react ^18.0.0 · runtime · kfive-repo-analyzer-e2e-src/package.json
+                - paragraph [ref=f1e904]: typescript ^5.0.0 · development · kfive-repo-analyzer-e2e-src/package.json
+                - paragraph [ref=f1e905]: vitest ^1.0.0 · development · kfive-repo-analyzer-e2e-src/package.json
+            - generic [ref=f1e906]:
+              - heading "Repository signals" [level=3] [ref=f1e907]
+              - generic [ref=f1e908]:
+                - generic [ref=f1e909]:
+                  - paragraph [ref=f1e910]: security · warning
+                  - paragraph [ref=f1e911]: kfive-repo-analyzer-e2e-src/.env
+                - generic [ref=f1e912]:
+                  - paragraph [ref=f1e913]: compose
+                  - paragraph [ref=f1e914]: kfive-repo-analyzer-e2e-src/compose.yaml
+                - generic [ref=f1e915]:
+                  - paragraph [ref=f1e916]: docker
+                  - paragraph [ref=f1e917]: kfive-repo-analyzer-e2e-src/Dockerfile
+                - generic [ref=f1e918]:
+                  - paragraph [ref=f1e919]: kubernetes
+                  - paragraph [ref=f1e920]: kfive-repo-analyzer-e2e-src/k8s/deployment.yaml
+                - generic [ref=f1e921]:
+                  - paragraph [ref=f1e922]: ci
+                  - paragraph [ref=f1e923]: kfive-repo-analyzer-e2e-src/.github/workflows/ci.yml
+                - generic [ref=f1e924]:
+                  - paragraph [ref=f1e925]: tests
+                  - paragraph [ref=f1e926]: kfive-repo-analyzer-e2e-src/tests/index.test.ts
+            - generic [ref=f1e927]:
+              - heading "Repository tree" [level=3] [ref=f1e928]
+              - generic [ref=f1e929]:
+                - paragraph [ref=f1e930]:
+                  - generic [ref=f1e936]: kfive-repo-analyzer-e2e-src/
+                - paragraph [ref=f1e937]:
+                  - generic [ref=f1e943]: kfive-repo-analyzer-e2e-src/README.md
+                  - generic [ref=f1e944]: 119 B
+                - paragraph [ref=f1e945]:
+                  - generic [ref=f1e951]: kfive-repo-analyzer-e2e-src/.env
+                  - generic [ref=f1e952]: 18 B
+                - paragraph [ref=f1e953]:
+                  - generic [ref=f1e959]: kfive-repo-analyzer-e2e-src/compose.yaml
+                  - generic [ref=f1e960]: 30 B
+                - paragraph [ref=f1e961]:
+                  - generic [ref=f1e967]: kfive-repo-analyzer-e2e-src/Dockerfile
+                  - generic [ref=f1e968]: 52 B
+                - paragraph [ref=f1e969]:
+                  - generic [ref=f1e975]: kfive-repo-analyzer-e2e-src/package.json
+                  - generic [ref=f1e976]: 395 B
+                - paragraph [ref=f1e977]:
+                  - generic [ref=f1e983]: kfive-repo-analyzer-e2e-src/k8s/
+                - paragraph [ref=f1e984]:
+                  - generic [ref=f1e990]: kfive-repo-analyzer-e2e-src/k8s/deployment.yaml
+                  - generic [ref=f1e991]: 63 B
+                - paragraph [ref=f1e992]:
+                  - generic [ref=f1e998]: kfive-repo-analyzer-e2e-src/.github/
+                - paragraph [ref=f1e999]:
+                  - generic [ref=f1e1005]: kfive-repo-analyzer-e2e-src/.github/workflows/
+                - paragraph [ref=f1e1006]:
+                  - generic [ref=f1e1012]: kfive-repo-analyzer-e2e-src/.github/workflows/ci.yml
+                  - generic [ref=f1e1013]: 106 B
+                - paragraph [ref=f1e1014]:
+                  - generic [ref=f1e1020]: kfive-repo-analyzer-e2e-src/tests/
+                - paragraph [ref=f1e1021]:
+                  - generic [ref=f1e1027]: kfive-repo-analyzer-e2e-src/tests/index.test.ts · TypeScript
+                  - generic [ref=f1e1028]: 137 B
+                - paragraph [ref=f1e1029]:
+                  - generic [ref=f1e1035]: kfive-repo-analyzer-e2e-src/src/
+                - paragraph [ref=f1e1036]:
+                  - generic [ref=f1e1042]: kfive-repo-analyzer-e2e-src/src/index.ts · TypeScript
+                  - generic [ref=f1e1043]: 146 B

@@ -1,6 +1,16 @@
 # KFive AI Status
 
-Documentation updated: 2026-09-09. Phase 9, Phase 10, and Phase 11 source verification plus live local Notebook Mode, Chat durability, Project Rooms, browser PDF, Dataset Lab, and Model Benchmark slices are included below; remaining gaps stay explicit.
+## 2026-09-16 RAG lifecycle follow-up
+
+- Fixed mixed-case ObjectId divergence between MongoDB and case-sensitive vector metadata/collection hashes.
+- Recheck project state under the shared in-process mutation lease before creating indexing metadata and publishing ready sources. Archive/delete during indexing triggers cleanup and failed metadata instead of ready publication.
+- Indexing-source deletion now returns a structured `409 RAG_SOURCE_BUSY`; refreshed server archive state controls the Knowledge page's mutation buttons and banner.
+- Verification: backend **71 suites / 453 tests passed**, frontend **18 files / 103 tests passed**, all lint targets passed, and frontend/backend production Compose builds and startup passed. These regression tests use controlled provider/vector implementations; they do not prove live embeddings or distributed concurrency safety.
+- Runtime diagnosis: embedding model remains unset; the backend's configured Ollama connection failed, while host Ollama was active on loopback only. No AI/network configuration was changed. Full ingestion/query E2E, deleted-project knowledge recovery, and indexing crash reconciliation remain outstanding. See [RAG](docs/RAG.md).
+
+The dated baseline below records the preceding verification run, not updated totals for this follow-up.
+
+Documentation updated: 2026-09-15. Phase 9, Phase 10, and Phase 11 source verification plus live local Notebook Mode, Chat durability, Project Rooms, browser PDF, Dataset Lab, Model Benchmark, and Repository Analyzer slices are included below; remaining gaps stay explicit.
 
 ## Phase 0 result
 
@@ -28,8 +38,8 @@ Completed in this slice:
 
 | Command/check | Result |
 | --- | --- |
-| `npm run build` | Passed |
-| `npm test` | Passed: 605 checks plus 3 intentional host-only skips (100 frontend, 434 backend, 6 Code Runner, 65 passed/3 skipped notebook-runtime checks) |
+| Production builds | Passed: frontend/backend Compose builds and Code Runner TypeScript build |
+| Test-script components, executed separately on 2026-09-15 | Passed: 617 checks plus 3 intentional image-only skips (101 frontend across 18 files, 445 backend across 71 suites using `npm test -- --runInBand`, 6 Code Runner, 65 passed/3 skipped notebook-runtime checks); not a single root `npm test` invocation |
 | `npm run lint` | Passed |
 | `bash -n setup.sh scripts/*.sh test-auth.sh` | Passed |
 | `docker compose --env-file .env.example config --quiet` | Passed |
@@ -37,7 +47,7 @@ Completed in this slice:
 | `npm audit` | 37 total advisories remain: 2 critical, 16 high, 17 moderate, 2 low; the two critical findings are in development tooling |
 | `npm audit --omit=dev` | 22 production-tree advisories remain: 7 high, 14 moderate, 1 low, 0 critical |
 | Docker image build | Passed on the user host for frontend, backend, benchmark/notebook workers, and both notebook image targets; the image test stage runs all 68 runtime checks |
-| Local Compose health/persistence | Frontend, backend, MongoDB, Redis, ChromaDB, and benchmark worker rebuilt and started; Notebook run/history, Chat timeout/Stop records, Project/document/Dataset data, and a completed Benchmark passed restart/reload persistence checks |
+| Local Compose health/persistence | Frontend, backend, MongoDB, Redis, ChromaDB, and benchmark worker rebuilt and started; Notebook run/history, Chat timeout/Stop records, Project/document/Dataset data, a completed Benchmark, and Repository Analyzer reports passed restart/reload persistence checks |
 | GPU access | Failed capability check; driver unavailable to this environment |
 
 ## Known limitations
@@ -134,7 +144,9 @@ Completed and locally source-verified in this slice:
 - Treats retrieved content and source labels as untrusted prompt data, rejects control characters in labels, and returns source markers and bounded excerpts derived by the backend.
 - Added a Project-aware Knowledge page with exact dependency failures, UTF-8 file validation, bounded refresh, archived read/query behavior, retrieved-source inspection, and no fabricated availability.
 
-Knowledge/RAG remains **Experimental**. Automated tests exercise its core contracts and attack boundaries, but this environment has not executed the critical MongoDB + ChromaDB + embedding-capable provider ingestion/query/delete/restart path. PDF/DOCX/OCR ingestion, page references, reranking, repository knowledge, background indexing, and conversational RAG memory remain Planned. See [docs/RAG.md](docs/RAG.md).
+Status now skips provider discovery when the embedding model is absent or embeddings are unsupported; otherwise discovery shares a five-second deadline. On 2026-09-15 the live status endpoint reported reachable ChromaDB and explicit missing embedding configuration, without a provider probe. That request and a persisted Repository Analyzer report fetch completed together in 33 ms; this is not an ingestion/query benchmark.
+
+Knowledge/RAG remains **Experimental**. Automated tests exercise its core contracts and attack boundaries, but this environment has not executed the critical MongoDB + ChromaDB + embedding-capable provider ingestion/query/delete/restart path; an embedding model is not configured. PDF/DOCX/OCR ingestion, page references, reranking, repository knowledge, background indexing, and conversational RAG memory remain Planned. See [docs/RAG.md](docs/RAG.md).
 
 ## Phase 8 Repository Analyzer slice
 
@@ -145,10 +157,13 @@ Completed and locally source-verified in this slice:
 - Added strict in-memory ZIP admission and parsing limits: 10 MiB upload, 2,000 entries, 25 MiB declared uncompressed data, 5 MiB per entry, 100:1 compression ratio, bounded paths/manifests/dependencies, two concurrent analyses, two uploads per minute, and a 15-second timeout.
 - Rejects encrypted, multi-volume, nested-archive, traversal/absolute/backslash/control/ambiguous/colliding/symlink/device archives; reads only selected bounded `package.json` manifests and verifies their CRC32. It never extracts files, runs code or package scripts, installs dependencies, writes repository contents, or performs network access.
 - Stores only bounded analysis metadata/evidence and package-script names, never uploaded ZIP bytes, complete file contents, script commands, credential-bearing dependency specifications, owner IDs, or internal database fields in public responses.
-- Unscoped history includes all owner reports so deleting a project cannot strand its analyzer records; project-filtered history remains exact and archived project records remain read-only.
+- Workspace and project histories are disjoint. A separate owner-scoped `?scope=orphaned` recovery view lists reports from deleted projects for reading, export, and deletion; mixed or invalid scopes fail closed.
+- Fixed the multipart part-count boundary that rejected a ZIP plus name and project ID, wrapped-repository GitHub CI detection, and stale archived-project controls. Publishing/deleting reports shares the in-process project mutation lease and rechecks project state; ObjectId case is normalized so equivalent IDs cannot acquire separate leases.
 - Added a 100-report per-user retention cap with authenticated deletion to recover capacity.
 
-Repository Analyzer remains **Experimental**. Parsing still occurs in the backend process, and this environment has not executed the browser-to-authenticated-API-to-MongoDB persistence/restart path or target-host adversarial CPU/RAM measurements. GitHub URL import, selected local directories, repository RAG, AI architecture analysis, and build/test execution remain Planned. See [docs/REPOSITORY_ANALYZER.md](docs/REPOSITORY_ANALYZER.md).
+Production-Compose browser verification completed on 2026-09-15: workspace/project ZIP uploads returned 201, exports worked, archive refresh disabled mutations, workspace/project lists stayed disjoint, and a second user received 404 for a foreign report. A traversal ZIP returned 400. Reports survived restart; after deleting the disposable project, its recovery-view report could still be listed, opened, exported with an identical checksum, and deleted. Only disposable test users/projects/reports were cleaned up; report exports were retained as evidence.
+
+Repository Analyzer remains **Experimental**. Parsing still occurs in the backend process; target-host adversarial CPU/RAM measurements and isolated processing remain pending. Lists are capped at 50 while the owner quota is 100, and pagination is not implemented. Project leases are not distributed. GitHub URL import, selected local directories, repository RAG, AI architecture analysis, and build/test execution remain Planned. See [docs/REPOSITORY_ANALYZER.md](docs/REPOSITORY_ANALYZER.md).
 
 ## Phase 9 Agent Runtime slice
 
@@ -184,7 +199,7 @@ The Phase 10 contract is limited to:
 
 This is not a general workflow or automation engine. Tool, shell, code-runner, agent, RAG, Knowledge, document, PDF, OCR, repository, action, branching, loop, and arbitrary-node execution are outside this slice. Inputs, outputs, prompt templates, and system prompts are retained as application-readable plaintext, and each run snapshots the full definition including its template and system prompt; they must not contain secrets or regulated data.
 
-Focused Phase 10 verification passes 30 backend tests and 7 frontend contract tests. The current complete repository gate passes 605 checks with three host-only notebook-runtime checks skipped, all lint targets, and frontend/backend/Code Runner production builds.
+Focused Phase 10 verification passes 30 backend tests and 7 frontend contract tests. See the current repository-wide verification table above; the workflow browser/provider/Mongo path remains pending.
 
 Phase 10 remains **Experimental**. Do not call its critical path complete until the target-host browser/authenticated API/configured-provider SSE/MongoDB persistence path, including archived behavior, cancellation, bounds, history/detail, and terminal deletion, is exercised. See [docs/WORKFLOWS.md](docs/WORKFLOWS.md).
 
@@ -217,7 +232,7 @@ Implemented in this source slice:
 - Added a dedicated portless BullMQ worker with opaque-id jobs, attempts-one delivery, checkpointed calls, retained-job recovery, worker heartbeat, graceful shutdown, and a fenced renewable Redis global lease. Mongo revision/fence/owner compare-and-swap prevents stale mutations, and a partial unique Mongo index enforces one active run per owner.
 - Enforced 16 KiB per call, 128 KiB per run, 180-second timeout, 100 retained runs per owner, 25 records per page over at most ten pages, and a 50-event timeline. Uncertain in-flight provider calls are interrupted rather than retried.
 
-Focused Model Benchmarks verification passes 40 backend model/queue/lease/executor/worker/service/route tests and 6 frontend strict-contract tests. Provider-discovery deadlines add three separately focused backend tests. The current repository gate passes 605 checks plus three intentional host-only notebook runtime skips (100 frontend, 434 backend, 6 Code Runner, and 65 passed/3 skipped notebook-runtime checks), every lint target, and frontend/backend/Code Runner production builds. The frontend build retains the pre-existing large-chunk warning, and the backend Jest gate reports one worker teardown warning despite exiting successfully.
+Focused Model Benchmarks verification passes 40 backend model/queue/lease/executor/worker/service/route tests and 6 frontend strict-contract tests. Provider-discovery deadlines add three separately focused backend tests. See the current repository-wide verification table above. The frontend build retains the pre-existing large-chunk warning; the 2026-09-15 serial backend run passed without the earlier worker teardown warning.
 
 Model Benchmarks remains **Experimental**. On 2026-09-07 a real production-Compose browser run used listed `phi3:latest` through a temporary internal CPU-only Ollama service and completed 6/6 calls in 85.26 seconds. Redis dispatch, the dedicated worker, Mongo checkpoints/history, provider/model identity, six ordered results, TTFT/duration/output/token aggregates, a 16-event timeline, JSON export (SHA-256 `5cb45e272ac236dfbd7fe303201580477b21a3de088362bd6a164f1c9a0bf6bb`), and completed-run backend/worker restart persistence passed. A running workspace run cancelled at 0/6, a project run cancelled at 2/6, workspace and project histories stayed disjoint, and fresh archived-project status kept history readable while disabling creation/deletion. The default worker correctly reported GPU unavailable because it had no GPU grant. Standard host-Ollama reachability, two-success comparison, active queued/checkpoint/in-flight restart recovery, timeout/output-limit live paths, remote billing/cancellation, target-host GPU samples, cross-user isolation, retention limits, and multi-replica races remain unverified. Passing means operational completion, not answer correctness or model quality. Raw outputs and metadata remain application-readable and may persist in backups. See [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
@@ -227,6 +242,6 @@ The authenticated owner/project editor now connects to a durable run path. The b
 
 The opt-in portless broker alone receives Docker-daemon access. It creates a bounded network-disabled UID-10001 runtime, streams strict hash-checked input/output envelopes without host mounts, force-removes the runtime, and only then creates a distinct UID-10002 verifier that executes no notebook code and independently reconstructs canonical inert output, metrics, and artifacts. The worker has an expiring Redis lease/heartbeat, canonical cancellation polling, stale-transition compare-and-swap, label-scoped recovery, and a real two-stage startup canary. Lease/heartbeat loss interrupts rather than completes the current run.
 
-Verification on 2026-09-02 passed all 68 runtime tests inside the image, 65/68 on the host with three image-only skips, focused worker lease-loss and missed-notification tests, and the then-current repository gate. The current repository gate has since grown to 605 passing checks plus the same three skips. A disposable authenticated API test through frontend port 3002 passed execution with exact stdout, distinct runtime/verifier image IDs, immutable snapshot identity, running-job cancellation, two-record history, backend-restart persistence, and cleanup. A separate Playwright browser test passed registration from `127.0.0.1:3002`, navigation, blank-notebook creation, edit/save to revision 2, isolated execution with `browser-notebook-result 42`, reload persistence, run deletion, notebook deletion, sign-out, and scoped account cleanup. MongoDB, Redis, ChromaDB, backend, frontend, and both workers were healthy afterward with no disposable notebook container left behind.
+Verification on 2026-09-02 passed all 68 runtime tests inside the image, 65/68 on the host with three image-only skips, focused worker lease-loss and missed-notification tests, and the then-current repository gate. The separately executed repository test components on 2026-09-15 total 617 passes plus the same three skips. A disposable authenticated API test through frontend port 3002 passed execution with exact stdout, distinct runtime/verifier image IDs, immutable snapshot identity, running-job cancellation, two-record history, backend-restart persistence, and cleanup. A separate Playwright browser test passed registration from `127.0.0.1:3002`, navigation, blank-notebook creation, edit/save to revision 2, isolated execution with `browser-notebook-result 42`, reload persistence, run deletion, notebook deletion, sign-out, and scoped account cleanup. MongoDB, Redis, ChromaDB, backend, frontend, and both workers were healthy afterward with no disposable notebook container left behind.
 
 Notebook Mode remains **Experimental**, not production-certified. The CachyOS daemon reports seccomp but no AppArmor, so the live functional test explicitly used `NOTEBOOK_REQUIRE_APPARMOR=false`; the repository default remains fail-closed with AppArmor required. Runtime transitive dependencies/local tags are not digest-locked, artifact downloads and age-based retention are absent, only one worker is supported, and remote/Kubernetes/multi-tenant hardening is unverified. ML experiments, model training, Python/AI dataset transformations, and a general shared GPU queue remain Planned. See [docs/NOTEBOOKS.md](docs/NOTEBOOKS.md).

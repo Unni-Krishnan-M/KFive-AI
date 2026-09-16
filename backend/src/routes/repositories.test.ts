@@ -90,7 +90,9 @@ describe('repository analysis routes', () => {
       status: 200, body: { success: true, data: { analysisId: analysis.id, deleted: true } },
     });
     expect(service.status).toHaveBeenCalledWith(ownerId, projectId);
-    expect(service.list).toHaveBeenCalledWith(ownerId, projectId);
+    expect(service.list).toHaveBeenCalledWith(ownerId, projectId, undefined);
+    await invoke(router, 'get', '/analyses', { query: { scope: 'orphaned' } });
+    expect(service.list).toHaveBeenLastCalledWith(ownerId, undefined, 'orphaned');
     expect(service.get).toHaveBeenCalledWith(ownerId, analysis.id);
     expect(service.delete).toHaveBeenCalledWith(ownerId, analysis.id);
   });
@@ -129,6 +131,25 @@ describe('repository analysis routes', () => {
     expect(service.create).toHaveBeenCalledWith(ownerId, { name: 'Repo' }, expect.objectContaining({
       originalname: 'repo.zip', mimetype: 'application/zip', buffer: emptyZip,
     }));
+
+    const projectOwner = '64b000000000000000000004';
+    const projectPrefix = Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="archive"; filename="repo.zip"\r\nContent-Type: application/zip\r\n\r\n`);
+    const projectFields = Buffer.from(`\r\n--${boundary}\r\nContent-Disposition: form-data; name="name"\r\n\r\nProject Repo\r\n--${boundary}\r\nContent-Disposition: form-data; name="projectId"\r\n\r\n${projectId}`);
+    await expect(invokeFullPostChain(
+      router,
+      Buffer.concat([projectPrefix, emptyZip, projectFields, suffix]),
+      `multipart/form-data; boundary=${boundary}`,
+      '127.0.0.4',
+      projectOwner,
+    )).resolves.toEqual({ status: 201, body: { success: true, data: { analysis } } });
+    expect(service.create).toHaveBeenLastCalledWith(projectOwner, { name: 'Project Repo', projectId }, expect.objectContaining({
+      originalname: 'repo.zip', mimetype: 'application/zip', buffer: emptyZip,
+    }));
+
+    const extraField = Buffer.from(`\r\n--${boundary}\r\nContent-Disposition: form-data; name="extra"\r\n\r\nunexpected`);
+    await expect(invokeFullPostChain(router, Buffer.concat([projectPrefix, emptyZip, projectFields, extraField, suffix]),
+      `multipart/form-data; boundary=${boundary}`, '127.0.0.5', '64b000000000000000000005'))
+      .resolves.toMatchObject({ status: 400, body: { error: { code: 'INVALID_REPOSITORY_INPUT' } } });
 
     const badMimePrefix = Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="archive"; filename="repo.zip"\r\nContent-Type: text/plain\r\n\r\n`);
     await expect(invokeFullPostChain(router, Buffer.concat([badMimePrefix, emptyZip, suffix]), `multipart/form-data; boundary=${boundary}`, '127.0.0.2', '64b000000000000000000002'))

@@ -26,8 +26,15 @@ export interface RepositoryAnalysis {
 }
 export type RepositoryAnalysisSummary = Omit<RepositoryAnalysis, 'languages' | 'frameworks' | 'manifests' | 'dependencies' | 'signals' | 'tree' | 'warnings'>;
 
-export function repositoryAnalysisScopeKey(projectRequested: boolean, projectId?: string): string {
-  if (!projectRequested) return 'workspace';
+export function repositoryHistoryScope(search: string, projectRequested: boolean): 'workspace' | 'orphaned' | 'invalid' {
+  const query = new URLSearchParams(search);
+  const values = query.getAll('scope');
+  if (!values.length) return 'workspace';
+  return values.length === 1 && values[0] === 'orphaned' && !projectRequested && !query.has('projectId') ? 'orphaned' : 'invalid';
+}
+
+export function repositoryAnalysisScopeKey(projectRequested: boolean, projectId?: string, orphaned = false): string {
+  if (!projectRequested) return orphaned ? 'orphaned' : 'workspace';
   return projectId ? `project:${projectId}` : 'project:pending';
 }
 
@@ -151,6 +158,13 @@ export async function validateRepositoryZipSignature(file: Pick<File, 'slice'>):
 }
 export function canCreateRepositoryAnalysis(projectStatus?: string, projectContextValid = true, backendCanAnalyze = false): boolean { return projectContextValid && projectStatus !== 'archived' && backendCanAnalyze; }
 export function canDeleteRepositoryAnalysis(projectStatus?: string, projectContextValid = true): boolean { return projectContextValid && projectStatus !== 'archived'; }
+export function effectiveRepositoryProjectStatus(
+  contextStatus?: string,
+  backendStatus?: string,
+): 'active' | 'archived' | undefined {
+  if (backendStatus === 'active' || backendStatus === 'archived') return backendStatus;
+  return contextStatus === 'active' || contextStatus === 'archived' ? contextStatus : undefined;
+}
 export function formatBytes(value: number): string {
   if (!Number.isFinite(value) || value < 0) return 'Not reported'; if (value < 1024) return `${value} B`;
   const units = ['KiB', 'MiB', 'GiB']; let amount = value; let index = -1; do { amount /= 1024; index += 1; } while (amount >= 1024 && index < units.length - 1);

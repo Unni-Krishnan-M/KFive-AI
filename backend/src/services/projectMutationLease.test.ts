@@ -20,4 +20,24 @@ describe('ProjectMutationLease', () => {
     await expect(lease.run('project', async () => { throw new Error('failed'); })).rejects.toThrow('failed');
     await expect(lease.run('project', async () => 'next')).resolves.toBe('next');
   });
+
+  it('serializes mixed-case ObjectIds through the same project lease', async () => {
+    const lease = new ProjectMutationLease();
+    const projectId = '64b00000000000000000000a';
+    const order: string[] = [];
+    let releaseFirst!: () => void;
+    const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    const first = lease.run(projectId, async () => {
+      order.push('publish:start');
+      await firstGate;
+      order.push('publish:end');
+    });
+    const second = lease.run(projectId.toUpperCase(), async () => { order.push('archive'); });
+    await lease.run('64b00000000000000000000b', async () => { order.push('other'); });
+    expect(order).toEqual(['publish:start', 'other']);
+    releaseFirst();
+    await Promise.all([first, second]);
+    expect(order).toEqual(['publish:start', 'other', 'publish:end', 'archive']);
+    await expect(lease.run(projectId.toUpperCase(), async () => 'released')).resolves.toBe('released');
+  });
 });

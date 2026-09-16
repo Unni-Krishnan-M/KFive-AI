@@ -1,0 +1,88 @@
+- generic [ref=f1e4]:
+  - complementary [ref=f1e5]:
+    - generic [ref=f1e6]:
+      - generic [ref=f1e7]: KFive AI
+      - button "Collapse sidebar" [ref=f1e13] [cursor=pointer]
+    - generic [ref=f1e17]:
+      - generic [ref=f1e18] [cursor=pointer]:
+        - generic [ref=f1e19]: Search
+        - generic [ref=f1e24]:
+          - generic [ref=f1e25]: ⌘
+          - generic [ref=f1e26]: K
+      - navigation [ref=f1e27]:
+        - link "Dashboard" [ref=f1e28] [cursor=pointer]:
+          - /url: /app/dashboard
+        - link "AI Chat" [ref=f1e36] [cursor=pointer]:
+          - /url: /app/chat
+        - link "Code Lab" [ref=f1e41] [cursor=pointer]:
+          - /url: /app/code
+        - link "Agents" [ref=f1e48] [cursor=pointer]:
+          - /url: /app/agents
+        - link "Documents" [ref=f1e54] [cursor=pointer]:
+          - /url: /app/documents
+        - link "Knowledge / RAG" [ref=f1e60] [cursor=pointer]:
+          - /url: /app/knowledge
+        - link "Repository Analyzer" [ref=f1e66] [cursor=pointer]:
+          - /url: /app/repositories
+        - link "Workflows" [ref=f1e73] [cursor=pointer]:
+          - /url: /app/workflows
+        - link "Dataset Lab" [ref=f1e81] [cursor=pointer]:
+          - /url: /app/datasets
+        - link "Model Benchmarks" [ref=f1e88] [cursor=pointer]:
+          - /url: /app/benchmarks
+        - link "Notebooks" [ref=f1e94] [cursor=pointer]:
+          - /url: /app/notebooks
+        - link "Voice Assistant" [ref=f1e100] [cursor=pointer]:
+          - /url: /app/voice
+        - link "Models" [ref=f1e106] [cursor=pointer]:
+          - /url: /app/models
+        - link "Projects" [ref=f1e119] [cursor=pointer]:
+          - /url: /app/projects
+        - link "Workspace" [ref=f1e125] [cursor=pointer]:
+          - /url: /app/workspace
+        - link "PDF Utilities" [ref=f1e131] [cursor=pointer]:
+          - /url: /app/files
+    - generic [ref=f1e136]:
+      - generic [ref=f1e137]:
+        - generic [ref=f1e138]: R
+        - generic [ref=f1e140]:
+          - paragraph [ref=f1e141]: Repo Auditor
+          - paragraph [ref=f1e142]: kfive-repo-20260909@example.test
+      - generic [ref=f1e143]:
+        - link "Profile" [ref=f1e144] [cursor=pointer]:
+          - /url: /app/profile
+        - link "Settings" [ref=f1e148] [cursor=pointer]:
+          - /url: /app/settings
+        - button "Toggle theme" [ref=f1e152] [cursor=pointer]
+        - button "Sign out" [ref=f1e159] [cursor=pointer]
+  - main [ref=f1e163]:
+    - generic [ref=f1e165]:
+      - generic [ref=f1e166]:
+        - generic [ref=f1e167]:
+          - heading "Projects" [level=1] [ref=f1e168]
+          - paragraph [ref=f1e171]: Persistent, owner-scoped rooms for KFive work.
+        - generic [ref=f1e172]:
+          - button "Refresh projects" [ref=f1e173] [cursor=pointer]
+          - button "New project" [ref=f1e179] [cursor=pointer]
+      - generic [ref=f1e181]:
+        - button "active" [ref=f1e182] [cursor=pointer]
+        - button "archived" [active] [ref=f1e183] [cursor=pointer]
+        - button "all" [ref=f1e184] [cursor=pointer]
+      - generic [ref=f1e185]:
+        - article [ref=f1e203] [cursor=pointer]:
+          - generic [ref=f1e204]:
+            - generic [ref=f1e205]:
+              - heading "Repository E2E Project" [level=2] [ref=f1e206]
+              - generic [ref=f1e207]: archived
+            - generic [ref=f1e208]:
+              - button "Edit Repository E2E Project" [ref=f1e209]
+              - button "Restore Repository E2E Project" [ref=f1e213]
+              - button "Delete Repository E2E Project" [ref=f1e219]
+          - paragraph [ref=f1e223]: Live repository scope verification
+          - generic [ref=f1e224]:
+            - generic [ref=f1e225]: e2e
+            - generic [ref=f1e226]: repository
+          - paragraph [ref=f1e227]: 9/15/2026, 5:59:44 PM
+        - complementary [ref=f1e188]:
+          - heading "Project room" [level=2] [ref=f1e189]
+          - paragraph [ref=f1e190]: Select a project to open its chat, code runs, notebooks, documents, datasets, knowledge, repository analyses, workflows, agents, benchmarks, or activity.

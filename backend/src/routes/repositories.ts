@@ -9,7 +9,9 @@ import { RepositoryAnalysisError, RepositoryAnalysisService, repositoryAnalysisS
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: REPOSITORY_LIMITS.archiveBytes, files: 1, fields: 2, parts: 3, fieldNameSize: 50, fieldSize: 500 },
+  // Busboy emits partsLimit when the count reaches the limit, including the
+  // final boundary. Permit three actual parts; files/fields remain bounded.
+  limits: { fileSize: REPOSITORY_LIMITS.archiveBytes, files: 1, fields: 2, parts: 4, fieldNameSize: 50, fieldSize: 500 },
 });
 
 const repositoryAnalysisLimiter = rateLimit({
@@ -74,7 +76,7 @@ export function createRepositoriesRouter(service: RepositoryAnalysisService = re
 
   router.get('/analyses', asyncHandler(async (req, res) => {
     try {
-      const analyses = await service.list(getAuthenticatedUserId(req), req.query.projectId);
+      const analyses = await service.list(getAuthenticatedUserId(req), req.query.projectId, req.query.scope);
       res.json({ success: true, data: { analyses, count: analyses.length } });
     } catch (error) { if (!handleRepositoryError(res, error)) throw error; }
   }));

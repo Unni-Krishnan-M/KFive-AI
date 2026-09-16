@@ -62,11 +62,21 @@ describe('repository ZIP analyzer', () => {
     expect(report.languages).toContainEqual({ name: 'TypeScript', files: 2, declaredBytes: 18 });
     expect(report.manifests[0]).toMatchObject({ packageName: 'safe-app', scriptNames: ['build', 'padded', 'test'], dependencyCount: 3 });
     expect(report.frameworks.map((item) => item.name)).toEqual(['Express', 'React', 'TypeScript']);
-    expect(report.signals).toEqual(expect.arrayContaining([expect.objectContaining({ kind: 'security', path: '.env' })]));
+    expect(report.signals).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'security', path: '.env' }),
+      expect.objectContaining({ kind: 'ci', path: '.github/workflows/ci.yml' }),
+    ]));
     expect(JSON.stringify(report)).not.toContain('SECRET command');
     expect(JSON.stringify(report)).not.toContain('third command');
     expect(JSON.stringify(report)).not.toContain('fourth command');
     expect(JSON.stringify(report)).not.toContain('SECRET=value');
+  });
+
+  it('detects GitHub Actions inside a conventional top-level repository directory', async () => {
+    const report = await analyzeRepositoryZip(makeZip([
+      { name: 'repo/.github/workflows/ci.yml', content: 'name: ci' },
+    ]), 'repo.zip', 'application/zip');
+    expect(report.signals).toContainEqual({ kind: 'ci', path: 'repo/.github/workflows/ci.yml' });
   });
 
   it.each([

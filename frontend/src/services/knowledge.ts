@@ -16,6 +16,8 @@ export interface KnowledgeStatus {
   canIngest: boolean;
   canQuery: boolean;
   scope?: string;
+  projectId?: string;
+  projectStatus?: 'active' | 'archived';
   dependencies: KnowledgeDependency[];
   readySourceCount: number;
   capabilities: Record<string, boolean>;
@@ -61,6 +63,19 @@ export interface KnowledgeQueryResult {
 export const KNOWLEDGE_FILE_LIMIT_BYTES = 64 * 1024;
 export const KNOWLEDGE_REFERENCE_LIMIT = 50;
 export const KNOWLEDGE_EXCERPT_LIMIT = 4000;
+
+export function knowledgeHistoryScope(search: string, projectRequested: boolean): 'workspace' | 'orphaned' | 'invalid' {
+  const query = new URLSearchParams(search);
+  const scopes = query.getAll('scope');
+  if (query.getAll('projectId').length > 1) return 'invalid';
+  if (!scopes.length) return 'workspace';
+  return scopes.length === 1 && scopes[0] === 'orphaned' && !projectRequested && !query.has('projectId')
+    ? 'orphaned' : 'invalid';
+}
+
+export function isKnowledgeRequestCurrent(currentGeneration: number, requestGeneration: number): boolean {
+  return currentGeneration === requestGeneration;
+}
 
 const record = (value: unknown): UnknownRecord | undefined =>
   value !== null && typeof value === 'object' && !Array.isArray(value) ? value as UnknownRecord : undefined;
@@ -126,6 +141,9 @@ export function normalizeKnowledgeStatus(payload: unknown): KnowledgeStatus {
     canIngest: bool(root.canIngest),
     canQuery: bool(root.canQuery),
     scope: text(root.scope) ?? text(scopeValue?.type),
+    projectId: text(scopeValue?.projectId),
+    projectStatus: scopeValue?.projectStatus === 'active' || scopeValue?.projectStatus === 'archived'
+      ? scopeValue.projectStatus : undefined,
     dependencies,
     readySourceCount: nonNegativeInteger(root.readySourceCount) ?? 0,
     capabilities,
@@ -202,6 +220,19 @@ export function knowledgeProjectPayload<T extends object>(payload: T, projectId?
 
 export function canMutateKnowledge(projectStatus?: string, projectContextValid = true): boolean {
   return projectContextValid && projectStatus !== 'archived';
+}
+
+export function effectiveKnowledgeProjectStatus(
+  contextStatus?: string,
+  projectId?: string,
+  status?: KnowledgeStatus,
+): string | undefined {
+  return projectId && status?.scope === 'project' && status.projectId === projectId && status.projectStatus
+    ? status.projectStatus : contextStatus;
+}
+
+export function canDeleteKnowledgeSource(sourceStatus: KnowledgeSourceStatus, mutationsAllowed: boolean): boolean {
+  return mutationsAllowed && (sourceStatus === 'ready' || sourceStatus === 'failed');
 }
 
 export function validateKnowledgeFile(file: Pick<File, 'name' | 'type' | 'size'>): string | undefined {

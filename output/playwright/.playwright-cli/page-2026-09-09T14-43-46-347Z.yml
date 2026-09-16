@@ -1,0 +1,102 @@
+- generic [ref=e36]:
+  - complementary [ref=e37]:
+    - generic [ref=e38]:
+      - generic [ref=e39]: KFive AI
+      - button "Collapse sidebar" [ref=e45] [cursor=pointer]
+    - generic [ref=e49]:
+      - generic [ref=e50] [cursor=pointer]:
+        - generic [ref=e51]: Search
+        - generic [ref=e56]:
+          - generic [ref=e57]: ⌘
+          - generic [ref=e58]: K
+      - navigation [ref=e59]:
+        - link "Dashboard" [ref=e60] [cursor=pointer]:
+          - /url: /app/dashboard
+        - link "AI Chat" [ref=e69] [cursor=pointer]:
+          - /url: /app/chat
+        - link "Code Lab" [ref=e74] [cursor=pointer]:
+          - /url: /app/code
+        - link "Agents" [ref=e81] [cursor=pointer]:
+          - /url: /app/agents
+        - link "Documents" [ref=e87] [cursor=pointer]:
+          - /url: /app/documents
+        - link "Knowledge / RAG" [ref=e93] [cursor=pointer]:
+          - /url: /app/knowledge
+        - link "Repository Analyzer" [ref=e99] [cursor=pointer]:
+          - /url: /app/repositories
+        - link "Workflows" [ref=e106] [cursor=pointer]:
+          - /url: /app/workflows
+        - link "Dataset Lab" [ref=e114] [cursor=pointer]:
+          - /url: /app/datasets
+        - link "Model Benchmarks" [ref=e121] [cursor=pointer]:
+          - /url: /app/benchmarks
+        - link "Notebooks" [ref=e127] [cursor=pointer]:
+          - /url: /app/notebooks
+        - link "Voice Assistant" [ref=e133] [cursor=pointer]:
+          - /url: /app/voice
+        - link "Models" [ref=e139] [cursor=pointer]:
+          - /url: /app/models
+        - link "Projects" [ref=e152] [cursor=pointer]:
+          - /url: /app/projects
+        - link "Workspace" [ref=e157] [cursor=pointer]:
+          - /url: /app/workspace
+        - link "PDF Utilities" [ref=e163] [cursor=pointer]:
+          - /url: /app/files
+    - generic [ref=e168]:
+      - generic [ref=e169]:
+        - generic [ref=e170]: R
+        - generic [ref=e172]:
+          - paragraph [ref=e173]: Repo Auditor
+          - paragraph [ref=e174]: kfive-repo-20260909@example.test
+      - generic [ref=e175]:
+        - link "Profile" [ref=e176] [cursor=pointer]:
+          - /url: /app/profile
+        - link "Settings" [ref=e180] [cursor=pointer]:
+          - /url: /app/settings
+        - button "Toggle theme" [ref=e184] [cursor=pointer]
+        - button "Sign out" [ref=e191] [cursor=pointer]
+  - main [ref=e195]:
+    - generic [ref=e197]:
+      - generic [ref=e198]:
+        - heading "Welcome back, Repo!" [level=1] [ref=e199]
+        - paragraph [ref=e200]: Here's what's happening with your AI workspace today.
+      - generic [ref=e201]:
+        - paragraph [ref=e206]: AI Conversations
+        - paragraph [ref=e215]: Documents Uploaded
+        - paragraph [ref=e225]: Tokens Used
+      - generic [ref=e231]:
+        - heading "Recent Activity" [level=2] [ref=e234]
+        - generic [ref=e254]:
+          - heading "Quick Actions" [level=2] [ref=e256]
+          - generic [ref=e259]:
+            - button [ref=e260] [cursor=pointer]:
+              - paragraph [ref=e263]: New Chat
+              - paragraph [ref=e264]: Start AI conversation
+            - button [ref=e265] [cursor=pointer]:
+              - paragraph [ref=e269]: Upload Doc
+              - paragraph [ref=e270]: Store a document
+            - button [ref=e271] [cursor=pointer]:
+              - paragraph [ref=e275]: Run Agent
+              - paragraph [ref=e276]: Execute AI task
+            - button [ref=e277] [cursor=pointer]:
+              - paragraph [ref=e280]: Voice AI
+              - paragraph [ref=e281]: Start voice session
+      - generic [ref=e283]:
+        - heading "Recent Conversations" [level=2] [ref=e284]
+        - button "View All" [ref=e285] [cursor=pointer]
+      - generic [ref=e292]:
+        - heading "AI System Status" [level=2] [ref=e294]
+        - generic [ref=e296]:
+          - generic [ref=e297]:
+            - generic [ref=e298]: Ollama Models
+            - paragraph [ref=e301]: Ollama connection failed
+          - generic [ref=e302]:
+            - generic [ref=e303]:
+              - generic [ref=e304]: Vector Database
+              - generic [ref=e305]: Not checked
+            - paragraph [ref=e306]: See backend readiness for dependency status
+          - generic [ref=e307]:
+            - generic [ref=e308]:
+              - generic [ref=e309]: Real-time Sync
+              - generic [ref=e310]: Active
+            - paragraph [ref=e311]: WebSocket connected

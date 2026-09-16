@@ -1,0 +1,101 @@
+- generic [ref=f1e842]:
+  - complementary [ref=f1e843]:
+    - generic [ref=f1e844]:
+      - generic [ref=f1e845]: KFive AI
+      - button "Collapse sidebar" [ref=f1e851] [cursor=pointer]
+    - generic [ref=f1e855]:
+      - generic [ref=f1e856] [cursor=pointer]:
+        - generic [ref=f1e857]: Search
+        - generic [ref=f1e862]:
+          - generic [ref=f1e863]: ⌘
+          - generic [ref=f1e864]: K
+      - navigation [ref=f1e865]:
+        - link "Dashboard" [ref=f1e866] [cursor=pointer]:
+          - /url: /app/dashboard
+        - link "AI Chat" [ref=f1e874] [cursor=pointer]:
+          - /url: /app/chat
+        - link "Code Lab" [ref=f1e879] [cursor=pointer]:
+          - /url: /app/code
+        - link "Agents" [ref=f1e886] [cursor=pointer]:
+          - /url: /app/agents
+        - link "Documents" [ref=f1e892] [cursor=pointer]:
+          - /url: /app/documents
+        - link "Knowledge / RAG" [ref=f1e898] [cursor=pointer]:
+          - /url: /app/knowledge
+        - link "Repository Analyzer" [ref=f1e904] [cursor=pointer]:
+          - /url: /app/repositories
+        - link "Workflows" [ref=f1e912] [cursor=pointer]:
+          - /url: /app/workflows
+        - link "Dataset Lab" [ref=f1e920] [cursor=pointer]:
+          - /url: /app/datasets
+        - link "Model Benchmarks" [ref=f1e927] [cursor=pointer]:
+          - /url: /app/benchmarks
+        - link "Notebooks" [ref=f1e933] [cursor=pointer]:
+          - /url: /app/notebooks
+        - link "Voice Assistant" [ref=f1e939] [cursor=pointer]:
+          - /url: /app/voice
+        - link "Models" [ref=f1e945] [cursor=pointer]:
+          - /url: /app/models
+        - link "Projects" [ref=f1e958] [cursor=pointer]:
+          - /url: /app/projects
+        - link "Workspace" [ref=f1e963] [cursor=pointer]:
+          - /url: /app/workspace
+        - link "PDF Utilities" [ref=f1e969] [cursor=pointer]:
+          - /url: /app/files
+    - generic [ref=f1e974]:
+      - generic [ref=f1e975]:
+        - generic [ref=f1e976]: R
+        - generic [ref=f1e978]:
+          - paragraph [ref=f1e979]: Repo Auditor
+          - paragraph [ref=f1e980]: kfive-repo-20260909@example.test
+      - generic [ref=f1e981]:
+        - link "Profile" [ref=f1e982] [cursor=pointer]:
+          - /url: /app/profile
+        - link "Settings" [ref=f1e986] [cursor=pointer]:
+          - /url: /app/settings
+        - button "Toggle theme" [ref=f1e990] [cursor=pointer]
+        - button "Sign out" [ref=f1e997] [cursor=pointer]
+  - main [ref=f1e1001]:
+    - generic [ref=f1e1003]:
+      - generic [ref=f1e1004]:
+        - generic [ref=f1e1005]:
+          - heading "Repository Analyzer" [level=1] [ref=f1e1006]
+          - paragraph [ref=f1e1011]: Upload a bounded ZIP and inspect the deterministic report returned by KFive.
+        - button "Refresh" [ref=f1e1012] [cursor=pointer]
+      - generic [ref=f1e1018]: "Analysis is read-only: KFive inventories the uploaded ZIP without modifying its source files. It does not clone repositories, execute code, install packages, or generate an AI report."
+      - generic [ref=f1e1022]:
+        - generic [ref=f1e1026]:
+          - paragraph [ref=f1e1027]: Project repository analyses
+          - paragraph [ref=f1e1028]:
+            - text: Repository E2E Project
+            - generic [ref=f1e1029]: (active)
+        - button "Show workspace analyses" [ref=f1e1030] [cursor=pointer]
+      - generic [ref=f1e1034]:
+        - heading "Analyzer status" [level=2] [ref=f1e1035]
+        - generic [ref=f1e1036]:
+          - generic [ref=f1e1037]:
+            - paragraph [ref=f1e1038]: Service
+            - paragraph [ref=f1e1039]: Available
+          - generic [ref=f1e1040]:
+            - paragraph [ref=f1e1041]: mongodb
+            - paragraph [ref=f1e1042]: available
+      - generic [ref=f1e1043]:
+        - complementary [ref=f1e1044]:
+          - generic [ref=f1e1045]:
+            - heading "Analyze ZIP" [level=2] [ref=f1e1046]
+            - paragraph [ref=f1e1047]: One ZIP, up to 10.0 MiB. The archive is sent to the KFive backend.
+            - button "Choose ZIP" [ref=f1e1048] [cursor=pointer]
+            - generic [ref=f1e1065]:
+              - paragraph [ref=f1e1066]:
+                - text: kfive-repository-e2e-20260909.zip
+                - generic [ref=f1e1067]: (3.80 KiB)
+              - generic [ref=f1e1068]:
+                - text: Report name
+                - textbox "Report name" [ref=f1e1069]: Project-scoped repository report
+              - button "Analyze repository" [ref=f1e1070] [cursor=pointer]
+            - alert [ref=f1e1077]: The repository upload is invalid.
+          - generic [ref=f1e1053]:
+            - heading "Saved reports" [level=2] [ref=f1e1054]
+            - paragraph [ref=f1e1056]: No saved analyses in this scope.
+        - main [ref=f1e1057]:
+          - paragraph [ref=f1e1064]: Select or create a repository analysis.

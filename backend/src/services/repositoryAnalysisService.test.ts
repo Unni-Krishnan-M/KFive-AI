@@ -7,6 +7,7 @@ import {
 import { RepositoryArchiveReport } from './repositoryArchiveAnalyzer';
 import { ProjectError } from './projectService';
 import { RepositoryAnalysisModel } from '../models/RepositoryAnalysis';
+import { ProjectMutationLease } from './projectMutationLease';
 
 const ownerId = '64b000000000000000000001';
 const otherOwnerId = '64b000000000000000000002';
@@ -44,9 +45,12 @@ describe('RepositoryAnalysisService', () => {
   it('creates an active-project report and explicitly removes owner/internal fields', async () => {
     const repository = fakeRepository();
     const projects = fakeProjects();
-    const service = new RepositoryAnalysisService(repository, projects as any, jest.fn().mockResolvedValue(report), () => true);
+    const lease = { run: jest.fn(async (_projectId: string, action: () => Promise<unknown>) => action()) };
+    const service = new RepositoryAnalysisService(repository, projects as any, jest.fn().mockResolvedValue(report), () => true, lease as any);
     const result = await service.create(ownerId, { name: 'Repo', projectId }, upload);
-    expect(projects.resolveActiveProject).toHaveBeenCalledWith(ownerId, projectId);
+    expect(projects.resolveActiveProject).toHaveBeenCalledTimes(2);
+    expect(projects.resolveActiveProject).toHaveBeenLastCalledWith(ownerId, projectId);
+    expect(lease.run).toHaveBeenCalledWith(projectId, expect.any(Function));
     expect(repository.create).toHaveBeenCalledWith(expect.objectContaining({ ownerId, projectId, status: 'completed', analyzerVersion: 1 }));
     expect(result).toMatchObject({ id: analysisId, projectId, name: 'Repo', tree: report.tree });
     expect(result).not.toHaveProperty('ownerId');
@@ -54,7 +58,7 @@ describe('RepositoryAnalysisService', () => {
     expect(result).not.toHaveProperty('__v');
   });
 
-  it('lists all owner reports in workspace scope and permits exact archived project reads', async () => {
+  it('keeps workspace and project report histories disjoint and permits exact archived project reads', async () => {
     const repository = fakeRepository();
     const projects = fakeProjects('archived');
     const service = new RepositoryAnalysisService(repository, projects as any, jest.fn(), () => true);
@@ -63,12 +67,11 @@ describe('RepositoryAnalysisService', () => {
     expect(repository.list).toHaveBeenNthCalledWith(1, ownerId, undefined);
     expect(repository.list).toHaveBeenNthCalledWith(2, ownerId, projectId);
     expect(projects.resolveOwnedProject).toHaveBeenLastCalledWith(ownerId, projectId);
-    expect(globalList[0]).toMatchObject({ projectId });
     expect(globalList[0]).not.toHaveProperty('tree');
     expect(globalList[0]).not.toHaveProperty('dependencies');
   });
 
-  it('uses owner-only workspace storage filters and exact project storage filters', async () => {
+  it('uses an unscoped-only workspace storage filter and an exact project storage filter', async () => {
     const lean = jest.fn().mockResolvedValue([]);
     const limit = jest.fn().mockReturnValue({ lean });
     const sort = jest.fn().mockReturnValue({ limit });
@@ -76,7 +79,7 @@ describe('RepositoryAnalysisService', () => {
     const find = jest.spyOn(RepositoryAnalysisModel, 'find').mockReturnValue({ select } as any);
 
     await mongooseRepositoryAnalysisRepository.list(ownerId);
-    expect(find).toHaveBeenLastCalledWith({ ownerId });
+    expect(find).toHaveBeenLastCalledWith({ ownerId, projectId: { $exists: false } });
     await mongooseRepositoryAnalysisRepository.list(ownerId, projectId);
     expect(find).toHaveBeenLastCalledWith({ ownerId, projectId });
     find.mockRestore();
@@ -97,6 +100,61 @@ describe('RepositoryAnalysisService', () => {
     expect(repository.deleteByOwnerAndId).toHaveBeenCalledWith(ownerId, analysisId);
   });
 
+  it('discovers deleted-project reports without requiring a remembered project id', async () => {
+    const repository = fakeRepository();
+    const projects = fakeProjects();
+    const service = new RepositoryAnalysisService(repository, projects as any, jest.fn(), () => true);
+    await expect(service.list(ownerId, undefined, 'orphaned')).resolves.toEqual([
+      expect.objectContaining({ id: analysisId, projectId }),
+    ]);
+    expect(repository.list).toHaveBeenCalledWith(ownerId, undefined, true);
+    expect(projects.resolveOwnedProject).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [projectId, 'orphaned'], ['', 'orphaned'], [undefined, 'all'], [undefined, ['orphaned']],
+  ])('rejects ambiguous or invalid recovery queries (%s, %s)', async (project, scope) => {
+    const repository = fakeRepository();
+    const service = new RepositoryAnalysisService(repository, fakeProjects() as any, jest.fn(), () => true);
+    await expect(service.list(ownerId, project, scope)).rejects.toMatchObject({ code: 'INVALID_REPOSITORY_INPUT', statusCode: 400 });
+    expect(repository.list).not.toHaveBeenCalled();
+  });
+
+  it('owner-scopes orphan discovery before joining projects and returns bounded summaries', async () => {
+    const aggregate = jest.spyOn(RepositoryAnalysisModel, 'aggregate').mockResolvedValue([record]);
+    try {
+      await expect(mongooseRepositoryAnalysisRepository.list(ownerId, undefined, true)).resolves.toEqual([record]);
+      const pipeline = aggregate.mock.calls[0][0] as any[];
+      expect(String(pipeline[0].$match.ownerId)).toBe(ownerId);
+      expect(pipeline[0].$match.projectId).toEqual({ $exists: true, $ne: null });
+      expect(pipeline[1].$lookup).toMatchObject({ localField: 'projectId', foreignField: '_id' });
+      expect(pipeline[2]).toEqual({ $match: { 'linkedProject.0': { $exists: false } } });
+      expect(pipeline).toContainEqual({ $limit: 50 });
+      expect(pipeline.at(-1).$project).not.toHaveProperty('ownerId');
+      expect(pipeline.at(-1).$project).not.toHaveProperty('tree');
+    } finally { aggregate.mockRestore(); }
+  });
+
+  it.each(['PROJECT_ARCHIVED', 'PROJECT_NOT_FOUND'] as const)('does not publish after %s during archive analysis', async (code) => {
+    const repository = fakeRepository();
+    const projects = fakeProjects();
+    const lease = new ProjectMutationLease();
+    let start!: () => void;
+    const started = new Promise<void>((resolve) => { start = resolve; });
+    let finish!: (value: RepositoryArchiveReport) => void;
+    const analyzed = new Promise<RepositoryArchiveReport>((resolve) => { finish = resolve; });
+    const analyzer = jest.fn(() => { start(); return analyzed; });
+    const service = new RepositoryAnalysisService(repository, projects as any, analyzer, () => true, lease);
+    const creating = service.create(ownerId, { projectId }, upload);
+    await started;
+    await lease.run(projectId, async () => {
+      projects.resolveActiveProject.mockRejectedValue(new ProjectError('Project changed.', code, code === 'PROJECT_ARCHIVED' ? 409 : 404));
+    });
+    finish(report);
+    await expect(creating).rejects.toMatchObject({ code });
+    expect(repository.create).not.toHaveBeenCalled();
+  });
+
   it('keeps missing/cross-owner analysis records indistinguishable', async () => {
     const repository = fakeRepository({ findByOwnerAndId: jest.fn().mockResolvedValue(null) });
     const service = new RepositoryAnalysisService(repository, fakeProjects() as any, jest.fn(), () => true);
@@ -107,15 +165,15 @@ describe('RepositoryAnalysisService', () => {
   it('deletes only owner-scoped analyses and rejects archived project mutation', async () => {
     const repository = fakeRepository();
     const activeProjects = fakeProjects();
-    const service = new RepositoryAnalysisService(repository, activeProjects as any, jest.fn(), () => true);
+    const lease = { run: jest.fn(async (_projectId: string, action: () => Promise<unknown>) => action()) };
+    const service = new RepositoryAnalysisService(repository, activeProjects as any, jest.fn(), () => true, lease as any);
     await service.delete(ownerId, analysisId);
+    expect(lease.run).toHaveBeenCalledWith(projectId, expect.any(Function));
     expect(activeProjects.resolveActiveProject).toHaveBeenCalledWith(ownerId, projectId);
     expect(repository.deleteByOwnerAndId).toHaveBeenCalledWith(ownerId, analysisId);
 
     const archivedProjects = fakeProjects('archived');
-    archivedProjects.resolveActiveProject.mockRejectedValue(Object.assign(new Error('Project is archived.'), {
-      code: 'PROJECT_ARCHIVED', statusCode: 409, isOperational: true,
-    }));
+    archivedProjects.resolveActiveProject.mockRejectedValue(new ProjectError('Project is archived.', 'PROJECT_ARCHIVED', 409));
     const archived = new RepositoryAnalysisService(fakeRepository(), archivedProjects as any, jest.fn(), () => true);
     await expect(archived.delete(ownerId, analysisId)).rejects.toMatchObject({ code: 'PROJECT_ARCHIVED' });
   });

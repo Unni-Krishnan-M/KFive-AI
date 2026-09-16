@@ -1,0 +1,108 @@
+- generic [ref=e464]:
+  - complementary [ref=e465]:
+    - generic [ref=e466]:
+      - generic [ref=e467]: KFive AI
+      - button "Collapse sidebar" [ref=e473] [cursor=pointer]
+    - generic [ref=e477]:
+      - generic [ref=e478] [cursor=pointer]:
+        - generic [ref=e479]: Search
+        - generic [ref=e484]:
+          - generic [ref=e485]: ⌘
+          - generic [ref=e486]: K
+      - navigation [ref=e487]:
+        - link "Dashboard" [ref=e488] [cursor=pointer]:
+          - /url: /app/dashboard
+        - link "AI Chat" [ref=e496] [cursor=pointer]:
+          - /url: /app/chat
+        - link "Code Lab" [ref=e501] [cursor=pointer]:
+          - /url: /app/code
+        - link "Agents" [ref=e508] [cursor=pointer]:
+          - /url: /app/agents
+        - link "Documents" [ref=e514] [cursor=pointer]:
+          - /url: /app/documents
+        - link "Knowledge / RAG" [ref=e520] [cursor=pointer]:
+          - /url: /app/knowledge
+        - link "Repository Analyzer" [ref=e527] [cursor=pointer]:
+          - /url: /app/repositories
+        - link "Workflows" [ref=e534] [cursor=pointer]:
+          - /url: /app/workflows
+        - link "Dataset Lab" [ref=e542] [cursor=pointer]:
+          - /url: /app/datasets
+        - link "Model Benchmarks" [ref=e549] [cursor=pointer]:
+          - /url: /app/benchmarks
+        - link "Notebooks" [ref=e555] [cursor=pointer]:
+          - /url: /app/notebooks
+        - link "Voice Assistant" [ref=e561] [cursor=pointer]:
+          - /url: /app/voice
+        - link "Models" [ref=e567] [cursor=pointer]:
+          - /url: /app/models
+        - link "Projects" [ref=e580] [cursor=pointer]:
+          - /url: /app/projects
+        - link "Workspace" [ref=e585] [cursor=pointer]:
+          - /url: /app/workspace
+        - link "PDF Utilities" [ref=e591] [cursor=pointer]:
+          - /url: /app/files
+    - generic [ref=e596]:
+      - generic [ref=e597]:
+        - generic [ref=e598]: r
+        - generic [ref=e600]:
+          - paragraph [ref=e601]: rag_recovery_a_20260916
+          - paragraph [ref=e602]: rag-recovery-a-20260916@example.test
+      - generic [ref=e603]:
+        - link "Profile" [ref=e604] [cursor=pointer]:
+          - /url: /app/profile
+        - link "Settings" [ref=e608] [cursor=pointer]:
+          - /url: /app/settings
+        - button "Toggle theme" [ref=e612] [cursor=pointer]
+        - button "Sign out" [ref=e619] [cursor=pointer]
+  - main [ref=e623]:
+    - generic [ref=e625]:
+      - generic [ref=e626]:
+        - generic [ref=e627]:
+          - heading "Knowledge / RAG" [level=1] [ref=e628]
+          - paragraph [ref=e632]: Index small text sources, retrieve relevant chunks, and inspect the sources returned by the backend.
+        - button "Refresh" [ref=e633] [cursor=pointer]
+      - button "Sources from deleted projects" [ref=e639] [cursor=pointer]
+      - generic [ref=e640]:
+        - generic [ref=e641]:
+          - generic [ref=e642]:
+            - heading "Dependencies" [level=2] [ref=e643]
+            - paragraph [ref=e644]: Availability and messages are reported by the backend.
+          - generic [ref=e645]: "Scope: global"
+        - generic [ref=e646]:
+          - generic [ref=e647]:
+            - paragraph [ref=e648]: Service
+            - paragraph [ref=e649]: Unavailable
+          - generic [ref=e650]:
+            - paragraph [ref=e651]: embeddingModel
+            - paragraph [ref=e652]: not configured
+            - paragraph [ref=e653]: RAG_EMBEDDING_MODEL_NOT_CONFIGURED
+          - generic [ref=e654]:
+            - paragraph [ref=e655]: provider
+            - paragraph [ref=e656]: not configured
+          - generic [ref=e657]:
+            - paragraph [ref=e658]: chroma
+            - paragraph [ref=e659]: available
+      - generic [ref=e660]:
+        - generic [ref=e661]:
+          - generic [ref=e662]:
+            - heading "Knowledge sources" [level=2] [ref=e663]
+            - paragraph [ref=e664]: TXT or Markdown only, up to 64 KiB. Text is sent to the configured backend for indexing.
+          - button "Choose source" [disabled] [ref=e666]
+          - paragraph [ref=e670]: Ingestion is unavailable. Check the dependency messages above.
+          - paragraph [ref=e672]: No knowledge sources in this scope.
+        - generic [ref=e673]:
+          - generic [ref=e674]:
+            - heading "Ask indexed knowledge" [level=2] [ref=e675]
+            - paragraph [ref=e676]: Answers and retrieved excerpts come from the configured backend.
+          - generic [ref=e677]:
+            - textbox "Ask a question about ready sources…" [ref=e678]
+            - generic [ref=e679]:
+              - text: Retrieved chunks
+              - combobox "Retrieved chunks" [ref=e680]:
+                - option "3"
+                - option "5" [selected]
+                - option "8"
+                - option "10"
+            - button "Ask" [disabled] [ref=e681]
+          - paragraph [ref=e685]: Querying is unavailable. Check the dependency messages above.

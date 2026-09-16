@@ -4,24 +4,26 @@ KFive AI is an existing browser-based, local-first AI workspace under active dev
 
 ## Verified baseline
 
-As of 2026-09-09:
+Latest follow-up (2026-09-16): RAG identity/lifecycle and refreshed archive controls pass 453 backend and 103 frontend tests, all lint targets, and frontend/backend production builds. Full RAG provider E2E remains pending; see [STATUS.md](STATUS.md).
+
+As of 2026-09-15:
 
 - Frontend production TypeScript/Vite build passes.
 - Backend TypeScript build passes and emitted `@/` imports are rewritten for production execution.
-- Frontend tests pass (100 tests).
-- Backend tests pass (434 tests).
+- Frontend tests pass (101 tests across 18 files).
+- Backend tests pass (445 tests across 71 suites, run serially).
 - Code Runner tests pass (6 Node tests).
-- Notebook-runtime host tests define 68 checks: 65 pass and three real-kernel/image checks skip because their dependencies are image-only; the Docker image build executes all 68 successfully.
-- Frontend and backend lint commands pass.
+- Notebook-runtime host tests define 68 checks: 65 pass and three real-kernel/image checks skip because their dependencies are image-only; the 2026-09-02 Docker image build executed all 68 successfully.
+- All lint targets pass. The separately executed test-script components total 617 passes and three intentional image-only skips.
 - Docker Compose configuration validates with explicit environment input.
-- The local Compose frontend, backend, MongoDB, Redis, ChromaDB, and benchmark worker rebuild and start cleanly; Notebook, Chat, Project Room, project-document, Dataset, and completed Benchmark persistence paths have been verified across a backend or application restart where applicable.
+- The local Compose frontend, backend, MongoDB, Redis, ChromaDB, and benchmark worker rebuild and start cleanly; Notebook, Chat, Project Room, project-document, Dataset, completed Benchmark, and Repository Analyzer persistence paths have been verified across a backend or application restart where applicable.
 - NVIDIA GPU access is not verified; `nvidia-smi` cannot communicate with the driver in this environment.
 
 See [STATUS.md](STATUS.md), [Project Rooms](docs/PROJECTS.md), [Experimental Workflows](docs/WORKFLOWS.md), [Dataset Lab](docs/DATASETS.md), [Model Benchmarks](docs/BENCHMARKS.md), [Notebook Mode](docs/NOTEBOOKS.md), [Kubernetes](docs/KUBERNETES.md), [Observability](docs/OBSERVABILITY.md), and [docs/AUDIT_PHASE_0.md](docs/AUDIT_PHASE_0.md) for the evidence and limitations.
 
 ## Current feature states
 
-Implemented means the code path and its local automated checks exist. Experimental means code exists but its critical external-service path has not yet been executed here. Planned means it must not be represented as working.
+Implemented means the listed feature surface has executed its critical end-to-end path successfully. Experimental means code exists, sometimes with partial live evidence, but important paths, features, or hardening remain unverified or incomplete. Planned means it must not be represented as working.
 
 | Area | State | Notes |
 | --- | --- | --- |
@@ -31,14 +33,14 @@ Implemented means the code path and its local automated checks exist. Experiment
 | Runtime mode/provider Settings | Experimental | Secret-safe topology, connection tests, bounded provider discovery, and adapters are tested; standard host-provider switching and external-provider E2E remain pending |
 | Models, GPU status, smart routing | Experimental | Catalog, routing, pull/delete safety, and GPU parsing are tested; host Ollama management E2E pending |
 | MongoDB/Redis configuration | Experimental | URL wiring and the Notebook Mode persistence/queue path passed live; the full platform persistence matrix remains pending |
-| Dependency readiness reporting | Implemented | Unit-tested unavailable states; live transitions pending |
+| Dependency readiness reporting | Experimental | Unit-tested unavailable states; complete live transitions pending |
 | Document storage | Experimental | Owner/project-scoped upload/list, restart persistence, archived-project deletion protection, and explicit processor-unavailable state passed live; processing is not implemented |
 | PDF Utilities | Implemented | The current browser-local merge, extract, and rotate surface passed production-Compose browser download and output-byte verification; the larger Document Studio remains Experimental |
 | Agents | Experimental | Owner-scoped SSE runs, cancellation, paginated history/detail, terminal deletion, and bounded persistent audit timelines exist; tools are disabled and browser/provider/Mongo E2E is pending |
 | Code Lab | Experimental | Real API/UI, BullMQ broker, disposable-container executor, limits, cancellation, and opt-in Compose profile are tested in source; live host-Docker isolation E2E is still mandatory |
 | Project Rooms | Experimental | Core CRUD/tags/activity/archive/restore/guarded deletion, restart persistence, project documents, and cross-owner rejection passed live; export/import and the complete associated-resource matrix remain planned or unverified |
-| Knowledge / RAG | Experimental | Bounded TXT/Markdown ingestion, Chroma retrieval, ownership checks, and source references are tested in source; live embedding/Chroma E2E pending |
-| Repository Analyzer | Experimental | Authenticated, project-aware ZIP inventory and deterministic evidence reports are source-tested; live browser/Mongo persistence and hostile-archive resource testing remain pending |
+| Knowledge / RAG | Experimental | Bounded ingestion/retrieval contracts are source-tested; live status reports reachable Chroma and missing embedding configuration without probing the provider, but full ingestion/query E2E remains pending |
+| Repository Analyzer | Experimental | Browser ZIP upload/export, scope/archive guards, second-user rejection, traversal rejection, restart persistence, deleted-project report recovery, and deletion passed live; hostile-resource proof and broader import/analysis features remain |
 | Workflows | Experimental | Source-verified server-validated Input -> Prompt -> LLM -> Output text runs with owner/project definitions and bounded persistent history; browser/provider/Mongo E2E pending |
 | Dataset Lab | Experimental | CSV upload/analysis, immutable derivation/download, workspace/project separation, archive guards, restart persistence, deletion order, and second-user isolation passed production-Compose browser E2E; charts, ML recommendations, and hostile-resource proof remain |
 | Model Benchmarks | Experimental | A real browser completed `chat-core-v1` 6/6 through Ollama, Redis, the worker, and MongoDB; cancellation, restart persistence, scope/archive guards, and JSON export also passed, while GPU/remote/multi-replica/second-user paths remain |

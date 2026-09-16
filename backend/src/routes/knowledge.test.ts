@@ -95,7 +95,17 @@ describe('knowledge routes', () => {
       body: { success: true, data: { sources: [source], count: 1 } },
     });
     expect(service.status).toHaveBeenCalledWith(ownerId, projectId);
-    expect(service.list).toHaveBeenCalledWith(ownerId, projectId);
+    expect(service.list).toHaveBeenCalledWith(ownerId, projectId, undefined);
+  });
+
+  it('forwards recovery and mixed query scopes without silently broadening them', async () => {
+    const service = fakeService();
+    await invoke(createKnowledgeRouter(service), 'get', '/sources', { query: { scope: 'orphaned' } });
+    expect(service.list).toHaveBeenCalledWith(ownerId, undefined, 'orphaned');
+    const invalid = fakeService({ list: jest.fn().mockRejectedValue(new RagServiceError('Invalid scope.', 'INVALID_RAG_INPUT', 400)) });
+    const result = await invoke(createKnowledgeRouter(invalid), 'get', '/sources', { query: { scope: 'orphaned', projectId: '' } });
+    expect(invalid.list).toHaveBeenCalledWith(ownerId, '', 'orphaned');
+    expect(result).toMatchObject({ status: 400, body: { error: { code: 'INVALID_RAG_INPUT' } } });
   });
 
   it('returns synchronous ingestion, query references, and deletion envelopes', async () => {
@@ -119,6 +129,18 @@ describe('knowledge routes', () => {
     expect(service.ingest).toHaveBeenCalledWith(ownerId, input);
     expect(service.query).toHaveBeenCalledWith(ownerId, { question: 'What?', projectId, topK: 3 });
     expect(service.delete).toHaveBeenCalledWith(ownerId, sourceId);
+  });
+
+  it('returns a structured conflict when deletion races an indexing source', async () => {
+    const busy = fakeService({
+      delete: jest.fn().mockRejectedValue(new RagServiceError(
+        'Knowledge source is still indexing.', 'RAG_SOURCE_BUSY', 409
+      )),
+    });
+    const result = await invoke(createKnowledgeRouter(busy), 'delete', '/sources/:id', { params: { id: sourceId } });
+    expect(result).toEqual({ status: 409, body: { success: false, error: {
+      code: 'RAG_SOURCE_BUSY', message: 'Knowledge source is still indexing.',
+    } } });
   });
 
   it('returns fixed dependency and project ownership errors without raw details', async () => {

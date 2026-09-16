@@ -1,0 +1,104 @@
+{
+  "id": "6aa93a06b2f94a476d9866e7",
+  "projectId": "6aa172a706c56db9503c61c8",
+  "name": "kfive-repo-20260915",
+  "status": "completed",
+  "analyzerVersion": 1,
+  "source": {
+    "kind": "zip",
+    "originalName": "kfive-repo-20260915.zip",
+    "mimeType": "application/zip",
+    "compressedBytes": 1380,
+    "sha256": "528cc85e3e8db0e9e2324601288d768a5c87d81a3aaea80257c59fc30eb6f183"
+  },
+  "summary": {
+    "fileCount": 3,
+    "directoryCount": 4,
+    "declaredUncompressedBytes": 250,
+    "maxDepth": 4,
+    "packageManifestCount": 1,
+    "testFileCount": 0
+  },
+  "createdAt": "2026-09-15T12:28:54.407Z",
+  "updatedAt": "2026-09-15T12:28:54.407Z",
+  "languages": [
+    {
+      "name": "TypeScript",
+      "files": 1,
+      "declaredBytes": 45
+    }
+  ],
+  "frameworks": [
+    {
+      "name": "Express",
+      "dependency": "express",
+      "manifestPath": "sample/package.json"
+    }
+  ],
+  "manifests": [
+    {
+      "path": "sample/package.json",
+      "packageName": "repository-proof",
+      "packageManager": "npm",
+      "dependencyCount": 2,
+      "scriptNames": [
+        "test"
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "manifestPath": "sample/package.json",
+      "name": "express",
+      "version": "^5.0.0",
+      "kind": "runtime"
+    }
+  ],
+  "signals": [
+    {
+      "kind": "ci",
+      "path": "sample/.github/workflows/ci.yml"
+    }
+  ],
+  "tree": [
+    {
+      "path": "sample/",
+      "type": "directory"
+    },
+    {
+      "path": "sample/package.json",
+      "type": "file",
+      "declaredBytes": 180
+    },
+    {
+      "path": "sample/.github/",
+      "type": "directory"
+    },
+    {
+      "path": "sample/.github/workflows/",
+      "type": "directory"
+    },
+    {
+      "path": "sample/.github/workflows/ci.yml",
+      "type": "file",
+      "declaredBytes": 25
+    },
+    {
+      "path": "sample/src/",
+      "type": "directory"
+    },
+    {
+      "path": "sample/src/index.ts",
+      "type": "file",
+      "declaredBytes": 45,
+      "language": "TypeScript"
+    }
+  ],
+  "warnings": [
+    {
+      "code": "SENSITIVE_DEPENDENCY_SPEC_OMITTED",
+      "message": "A credential-bearing dependency specification was omitted from the report.",
+      "path": "sample/package.json"
+    }
+  ]
+}

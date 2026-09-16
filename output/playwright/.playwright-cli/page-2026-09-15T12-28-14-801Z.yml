@@ -1,0 +1,103 @@
+- generic [ref=e302]:
+  - complementary [ref=e303]:
+    - generic [ref=e304]:
+      - generic [ref=e305]: KFive AI
+      - button "Collapse sidebar" [ref=e311] [cursor=pointer]
+    - generic [ref=e315]:
+      - generic [ref=e316] [cursor=pointer]:
+        - generic [ref=e317]: Search
+        - generic [ref=e322]:
+          - generic [ref=e323]: ⌘
+          - generic [ref=e324]: K
+      - navigation [ref=e325]:
+        - link "Dashboard" [ref=e326] [cursor=pointer]:
+          - /url: /app/dashboard
+        - link "AI Chat" [ref=e334] [cursor=pointer]:
+          - /url: /app/chat
+        - link "Code Lab" [ref=e339] [cursor=pointer]:
+          - /url: /app/code
+        - link "Agents" [ref=e346] [cursor=pointer]:
+          - /url: /app/agents
+        - link "Documents" [ref=e352] [cursor=pointer]:
+          - /url: /app/documents
+        - link "Knowledge / RAG" [ref=e358] [cursor=pointer]:
+          - /url: /app/knowledge
+        - link "Repository Analyzer" [ref=e364] [cursor=pointer]:
+          - /url: /app/repositories
+        - link "Workflows" [ref=e371] [cursor=pointer]:
+          - /url: /app/workflows
+        - link "Dataset Lab" [ref=e379] [cursor=pointer]:
+          - /url: /app/datasets
+        - link "Model Benchmarks" [ref=e386] [cursor=pointer]:
+          - /url: /app/benchmarks
+        - link "Notebooks" [ref=e392] [cursor=pointer]:
+          - /url: /app/notebooks
+        - link "Voice Assistant" [ref=e398] [cursor=pointer]:
+          - /url: /app/voice
+        - link "Models" [ref=e404] [cursor=pointer]:
+          - /url: /app/models
+        - link "Projects" [ref=e417] [cursor=pointer]:
+          - /url: /app/projects
+        - link "Workspace" [ref=e423] [cursor=pointer]:
+          - /url: /app/workspace
+        - link "PDF Utilities" [ref=e429] [cursor=pointer]:
+          - /url: /app/files
+    - generic [ref=e434]:
+      - generic [ref=e435]:
+        - generic [ref=e436]: R
+        - generic [ref=e438]:
+          - paragraph [ref=e439]: Repo Auditor
+          - paragraph [ref=e440]: kfive-repo-20260909@example.test
+      - generic [ref=e441]:
+        - link "Profile" [ref=e442] [cursor=pointer]:
+          - /url: /app/profile
+        - link "Settings" [ref=e446] [cursor=pointer]:
+          - /url: /app/settings
+        - button "Toggle theme" [ref=e450] [cursor=pointer]
+        - button "Sign out" [ref=e457] [cursor=pointer]
+  - main [ref=e461]:
+    - generic [ref=e463]:
+      - generic [ref=e464]:
+        - generic [ref=e465]:
+          - heading "Projects" [level=1] [ref=e466]
+          - paragraph [ref=e469]: Persistent, owner-scoped rooms for KFive work.
+        - generic [ref=e470]:
+          - button "Refresh projects" [ref=e471] [cursor=pointer]
+          - button "New project" [ref=e477] [cursor=pointer]
+      - generic [ref=e479]:
+        - button "active" [ref=e480] [cursor=pointer]
+        - button "archived" [ref=e481] [cursor=pointer]
+        - button "all" [ref=e482] [cursor=pointer]
+      - generic [ref=e483]:
+        - article [ref=e485] [cursor=pointer]:
+          - generic [ref=e486]:
+            - generic [ref=e487]:
+              - heading "Repository E2E Project" [level=2] [ref=e488]
+              - generic [ref=e489]: active
+            - generic [ref=e490]:
+              - button "Edit Repository E2E Project" [ref=e491]
+              - button "Archive Repository E2E Project" [ref=e495]
+              - button "Delete Repository E2E Project" [ref=e499]
+          - paragraph [ref=e503]: Live repository scope verification
+          - generic [ref=e504]:
+            - generic [ref=e505]: e2e
+            - generic [ref=e506]: repository
+          - paragraph [ref=e507]: 9/9/2026, 8:22:23 PM
+        - complementary [ref=e511]:
+          - heading "Project room" [level=2] [ref=e512]
+          - paragraph [ref=e514]: Repository E2E Project
+          - generic [ref=e515]:
+            - button "New project chat" [ref=e516] [cursor=pointer]
+            - button "Project code runs" [ref=e519] [cursor=pointer]
+            - button "Project notebooks" [ref=e524] [cursor=pointer]
+            - button "Project documents" [ref=e528] [cursor=pointer]
+            - button "Project datasets" [ref=e532] [cursor=pointer]
+            - button "Project knowledge" [ref=e537] [cursor=pointer]
+            - button "Repository analyses" [ref=e541] [cursor=pointer]
+            - button "Project workflows" [ref=e546] [cursor=pointer]
+            - button "Project agents" [ref=e552] [cursor=pointer]
+            - button "Project benchmarks" [ref=e556] [cursor=pointer]
+          - heading "Activity" [level=3] [ref=e560]
+          - generic [ref=e562]:
+            - paragraph [ref=e563]: created
+            - paragraph [ref=e564]: 9/9/2026, 8:22:23 PM

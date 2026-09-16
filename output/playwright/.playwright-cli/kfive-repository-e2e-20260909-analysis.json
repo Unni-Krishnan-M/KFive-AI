@@ -1,0 +1,208 @@
+{
+  "id": "6aa1721d06c56db9503c6198",
+  "name": "kfive-repository-e2e-20260909",
+  "status": "completed",
+  "analyzerVersion": 1,
+  "source": {
+    "kind": "zip",
+    "originalName": "kfive-repository-e2e-20260909.zip",
+    "mimeType": "application/zip",
+    "compressedBytes": 3895,
+    "sha256": "c0e87f5cc58847c83c91e8f9ef5f2b725e06723fd2b77877715b31798e97e6f3"
+  },
+  "summary": {
+    "fileCount": 9,
+    "directoryCount": 6,
+    "declaredUncompressedBytes": 1066,
+    "maxDepth": 4,
+    "packageManifestCount": 1,
+    "testFileCount": 1
+  },
+  "createdAt": "2026-09-09T14:50:06.004Z",
+  "updatedAt": "2026-09-09T14:50:06.004Z",
+  "languages": [
+    {
+      "name": "TypeScript",
+      "files": 2,
+      "declaredBytes": 283
+    }
+  ],
+  "frameworks": [
+    {
+      "name": "Express",
+      "dependency": "express",
+      "manifestPath": "kfive-repo-analyzer-e2e-src/package.json"
+    },
+    {
+      "name": "Mongoose",
+      "dependency": "mongoose",
+      "manifestPath": "kfive-repo-analyzer-e2e-src/package.json"
+    },
+    {
+      "name": "React",
+      "dependency": "react",
+      "manifestPath": "kfive-repo-analyzer-e2e-src/package.json"
+    },
+    {
+      "name": "TypeScript",
+      "dependency": "typescript",
+      "manifestPath": "kfive-repo-analyzer-e2e-src/package.json"
+    },
+    {
+      "name": "Vitest",
+      "dependency": "vitest",
+      "manifestPath": "kfive-repo-analyzer-e2e-src/package.json"
+    }
+  ],
+  "manifests": [
+    {
+      "path": "kfive-repo-analyzer-e2e-src/package.json",
+      "packageName": "kfive-repository-analyzer-e2e",
+      "packageManager": "npm",
+      "dependencyCount": 6,
+      "scriptNames": [
+        "build",
+        "test"
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "manifestPath": "kfive-repo-analyzer-e2e-src/package.json",
+      "name": "express",
+      "version": "^5.0.0",
+      "kind": "runtime"
+    },
+    {
+      "manifestPath": "kfive-repo-analyzer-e2e-src/package.json",
+      "name": "mongoose",
+      "version": "^8.0.0",
+      "kind": "runtime"
+    },
+    {
+      "manifestPath": "kfive-repo-analyzer-e2e-src/package.json",
+      "name": "react",
+      "version": "^18.0.0",
+      "kind": "runtime"
+    },
+    {
+      "manifestPath": "kfive-repo-analyzer-e2e-src/package.json",
+      "name": "typescript",
+      "version": "^5.0.0",
+      "kind": "development"
+    },
+    {
+      "manifestPath": "kfive-repo-analyzer-e2e-src/package.json",
+      "name": "vitest",
+      "version": "^1.0.0",
+      "kind": "development"
+    }
+  ],
+  "signals": [
+    {
+      "kind": "security",
+      "path": "kfive-repo-analyzer-e2e-src/.env",
+      "severity": "warning"
+    },
+    {
+      "kind": "compose",
+      "path": "kfive-repo-analyzer-e2e-src/compose.yaml"
+    },
+    {
+      "kind": "docker",
+      "path": "kfive-repo-analyzer-e2e-src/Dockerfile"
+    },
+    {
+      "kind": "kubernetes",
+      "path": "kfive-repo-analyzer-e2e-src/k8s/deployment.yaml"
+    },
+    {
+      "kind": "ci",
+      "path": "kfive-repo-analyzer-e2e-src/.github/workflows/ci.yml"
+    },
+    {
+      "kind": "tests",
+      "path": "kfive-repo-analyzer-e2e-src/tests/index.test.ts"
+    }
+  ],
+  "tree": [
+    {
+      "path": "kfive-repo-analyzer-e2e-src/",
+      "type": "directory"
+    },
+    {
+      "path": "kfive-repo-analyzer-e2e-src/README.md",
+      "type": "file",
+      "declaredBytes": 119
+    },
+    {
+      "path": "kfive-repo-analyzer-e2e-src/.env",
+      "type": "file",
+      "declaredBytes": 18
+    },
+    {
+      "path": "kfive-repo-analyzer-e2e-src/compose.yaml",
+      "type": "file",
+      "declaredBytes": 30
+    },
+    {
+      "path": "kfive-repo-analyzer-e2e-src/Dockerfile",
+      "type": "file",
+      "declaredBytes": 52
+    },
+    {
+      "path": "kfive-repo-analyzer-e2e-src/package.json",
+      "type": "file",
+      "declaredBytes": 395
+    },
+    {
+      "path": "kfive-repo-analyzer-e2e-src/k8s/",
+      "type": "directory"
+    },
+    {
+      "path": "kfive-repo-analyzer-e2e-src/k8s/deployment.yaml",
+      "type": "file",
+      "declaredBytes": 63
+    },
+    {
+      "path": "kfive-repo-analyzer-e2e-src/.github/",
+      "type": "directory"
+    },
+    {
+      "path": "kfive-repo-analyzer-e2e-src/.github/workflows/",
+      "type": "directory"
+    },
+    {
+      "path": "kfive-repo-analyzer-e2e-src/.github/workflows/ci.yml",
+      "type": "file",
+      "declaredBytes": 106
+    },
+    {
+      "path": "kfive-repo-analyzer-e2e-src/tests/",
+      "type": "directory"
+    },
+    {
+      "path": "kfive-repo-analyzer-e2e-src/tests/index.test.ts",
+      "type": "file",
+      "declaredBytes": 137,
+      "language": "TypeScript"
+    },
+    {
+      "path": "kfive-repo-analyzer-e2e-src/src/",
+      "type": "directory"
+    },
+    {
+      "path": "kfive-repo-analyzer-e2e-src/src/index.ts",
+      "type": "file",
+      "declaredBytes": 146,
+      "language": "TypeScript"
+    }
+  ],
+  "warnings": [
+    {
+      "code": "SENSITIVE_DEPENDENCY_SPEC_OMITTED",
+      "message": "A credential-bearing dependency specification was omitted from the report.",
+      "path": "kfive-repo-analyzer-e2e-src/package.json"
+    }
+  ]
+}

@@ -1,9 +1,13 @@
 import { createHash } from 'crypto';
+import { Types } from 'mongoose';
+import { ProjectModel } from '@/models/Project';
 import { RagSourceErrorCode, RagSourceMediaType, RagSourceModel, RagSourceStatus } from '@/models/RagSource';
 import { EnvironmentConfig, getEnvironment } from '@/config/environment';
 import { AiProviderClient, getAiProvider } from './aiProvider';
+import { withProviderDiscoveryDeadline } from './ai/providerDeadline';
 import { ChromaClient, ChromaClientError, ChromaMetadata, ChromaQueryResult, ChromaWhere } from './chromaClient';
-import { ProjectRecord, projectService } from './projectService';
+import { ProjectError, ProjectRecord, projectService } from './projectService';
+import { projectMutationLease } from './projectMutationLease';
 import { chunkRagContent, normalizeRagContent, RAG_MAX_CHUNKS, RAG_MAX_SOURCE_BYTES } from './ragChunker';
 
 const OBJECT_ID = /^[a-f\d]{24}$/i;
@@ -18,6 +22,7 @@ export type RagErrorCode =
   | 'INVALID_RAG_INPUT'
   | 'RAG_SOURCE_LIMIT_EXCEEDED'
   | 'RAG_SOURCE_NOT_FOUND'
+  | 'RAG_SOURCE_BUSY'
   | 'RAG_NO_READY_SOURCES'
   | 'RAG_EMBEDDING_MODEL_NOT_CONFIGURED'
   | 'RAG_EMBEDDINGS_UNSUPPORTED'
@@ -81,7 +86,7 @@ export interface RagSourceCreateData {
 
 export interface RagSourceRepository {
   create(data: RagSourceCreateData): Promise<RagSourceRecord>;
-  list(ownerId: string, projectId?: string): Promise<RagSourceRecord[]>;
+  list(ownerId: string, projectId?: string, orphaned?: boolean): Promise<RagSourceRecord[]>;
   listReadyInScope(ownerId: string, projectId?: string): Promise<RagSourceRecord[]>;
   findByOwnerAndId(ownerId: string, sourceId: string): Promise<RagSourceRecord | null>;
   markReady(ownerId: string, sourceId: string, values: {
@@ -109,7 +114,22 @@ export const mongooseRagSourceRepository: RagSourceRepository = {
   async create(data) {
     return RagSourceModel.create(data) as unknown as Promise<RagSourceRecord>;
   },
-  async list(ownerId, projectId) {
+  async list(ownerId, projectId, orphaned = false) {
+    if (orphaned) {
+      return RagSourceModel.aggregate([
+        { $match: { ownerId: new Types.ObjectId(ownerId), projectId: { $exists: true, $ne: null } } },
+        { $lookup: { from: ProjectModel.collection.name, localField: 'projectId', foreignField: '_id', as: 'linkedProject' } },
+        { $match: { 'linkedProject.0': { $exists: false } } },
+        { $sort: { createdAt: -1, _id: -1 } },
+        { $limit: 200 },
+        { $project: {
+          _id: 1, projectId: 1, name: 1, mediaType: 1, status: 1,
+          characterCount: 1, byteCount: 1, chunkCount: 1, errorCode: 1,
+          embeddingProvider: 1, embeddingModel: 1, embeddingDimension: 1,
+          indexedAt: 1, createdAt: 1, updatedAt: 1,
+        } },
+      ]) as Promise<RagSourceRecord[]>;
+    }
     return RagSourceModel.find({ ownerId, ...projectFilter(projectId, true) })
       .sort({ createdAt: -1 })
       .limit(200)
@@ -184,7 +204,13 @@ export interface RagDependencyStatus {
   scope: { type: 'global' | 'project'; projectId?: string; projectStatus?: 'active' | 'archived' };
   dependencies: {
     embeddingModel: { configured: boolean; model?: string; code?: RagErrorCode };
-    provider: { id: string; embeddingsSupported: boolean; available: boolean; code?: RagErrorCode };
+    provider: {
+      id: string;
+      embeddingsSupported: boolean;
+      available: boolean;
+      status: 'available' | 'unavailable' | 'not-configured' | 'disabled';
+      code?: RagErrorCode;
+    };
     chroma: { configured: boolean; available: boolean; code?: RagErrorCode };
   };
   limits: { maxSourceBytes: number; maxChunks: number; maxTopK: number };
@@ -201,7 +227,9 @@ function requireObjectId(value: unknown, label: string): string {
   if (typeof value !== 'string' || !OBJECT_ID.test(value)) {
     throw new RagServiceError(`${label} is invalid.`, 'INVALID_RAG_INPUT', 400);
   }
-  return value;
+  // MongoDB ObjectIds are case-insensitive, but Chroma metadata filters and
+  // collection hashes are not. Keep both stores on one canonical identity.
+  return value.toLowerCase();
 }
 
 function optionalProjectId(value: unknown): string | undefined {
@@ -371,8 +399,11 @@ export class RagService {
     const readySourceCount = (await this.repository.listReadyInScope(ownerId, projectId)).length;
     const embeddingModelConfigured = Boolean(this.config.aiEmbeddingModel);
     const embeddingsSupported = this.provider.capabilities.embeddings;
+    const shouldProbeProvider = embeddingModelConfigured && embeddingsSupported;
     const [providerAvailable, chromaAvailable] = await Promise.all([
-      embeddingsSupported ? this.provider.healthCheck().catch(() => false) : Promise.resolve(false),
+      shouldProbeProvider
+        ? withProviderDiscoveryDeadline(this.provider.id, (options) => this.provider.healthCheck(options)).catch(() => false)
+        : Promise.resolve(false),
       this.vectorStore ? this.vectorStore.healthCheck().catch(() => false) : Promise.resolve(false),
     ]);
     const usable = embeddingModelConfigured && embeddingsSupported && providerAvailable && chromaAvailable;
@@ -392,9 +423,12 @@ export class RagService {
           id: this.provider.id,
           embeddingsSupported,
           available: providerAvailable,
+          status: !embeddingsSupported ? 'disabled'
+            : !embeddingModelConfigured ? 'not-configured'
+              : providerAvailable ? 'available' : 'unavailable',
           ...(!embeddingsSupported
             ? { code: 'RAG_EMBEDDINGS_UNSUPPORTED' as const }
-            : (!providerAvailable ? { code: 'RAG_PROVIDER_UNAVAILABLE' as const } : {})),
+            : (shouldProbeProvider && !providerAvailable ? { code: 'RAG_PROVIDER_UNAVAILABLE' as const } : {})),
         },
         chroma: {
           configured: Boolean(this.vectorStore),
@@ -406,8 +440,14 @@ export class RagService {
     };
   }
 
-  async list(ownerIdValue: unknown, projectIdValue?: unknown): Promise<PublicRagSource[]> {
+  async list(ownerIdValue: unknown, projectIdValue?: unknown, scopeValue?: unknown): Promise<PublicRagSource[]> {
     const ownerId = requireObjectId(ownerIdValue, 'Owner id');
+    if (scopeValue !== undefined && (scopeValue !== 'orphaned' || projectIdValue !== undefined)) {
+      throw new RagServiceError('Knowledge scope is invalid. Do not combine recovery scope with a project id.', 'INVALID_RAG_INPUT', 400);
+    }
+    if (scopeValue === 'orphaned') {
+      return (await this.repository.list(ownerId, undefined, true)).map(publicSource);
+    }
     const projectId = optionalProjectId(projectIdValue);
     await this.resolveOwnedProject(ownerId, projectId);
     return (await this.repository.list(ownerId, projectId)).map(publicSource);
@@ -420,20 +460,24 @@ export class RagService {
     await this.assertDependencies();
     const model = this.config.aiEmbeddingModel as string;
     const chunks = chunkRagContent(input.content);
-    const source = await this.repository.create({
-      ownerId,
-      ...(project ? { projectId: project._id } : {}),
-      name: input.name,
-      mediaType: input.mediaType,
-      status: 'indexing',
-      characterCount: input.content.length,
-      byteCount: Buffer.byteLength(input.content, 'utf8'),
-      chunkCount: 0,
-      chunkingVersion: 1,
-      contentHash: createHash('sha256').update(input.content).digest('hex'),
-      embeddingProvider: this.provider.id,
-      embeddingModel: model,
-    });
+    const create = async () => {
+      if (input.projectId) await this.resolveActiveProject(ownerId, input.projectId);
+      return this.repository.create({
+        ownerId,
+        ...(project ? { projectId: project._id } : {}),
+        name: input.name,
+        mediaType: input.mediaType,
+        status: 'indexing',
+        characterCount: input.content.length,
+        byteCount: Buffer.byteLength(input.content, 'utf8'),
+        chunkCount: 0,
+        chunkingVersion: 1,
+        contentHash: createHash('sha256').update(input.content).digest('hex'),
+        embeddingProvider: this.provider.id,
+        embeddingModel: model,
+      });
+    };
+    const source = input.projectId ? await projectMutationLease.run(input.projectId, create) : await create();
     const sourceId = String(source._id);
     let collection: { id: string; name: string; metadata?: ChromaMetadata | null } | undefined;
     try {
@@ -484,13 +528,20 @@ export class RagService {
           },
         })));
       }
-      const ready = await this.repository.markReady(ownerId, sourceId, {
-        chunkCount: chunks.length,
-        embeddingDimension: dimension,
-        collectionId: collection.id,
-        collectionName: collection.name,
-        indexedAt: this.now(),
-      });
+      const indexedCollection = collection;
+      const publish = async () => {
+        if (input.projectId) await this.resolveActiveProject(ownerId, input.projectId);
+        return this.repository.markReady(ownerId, sourceId, {
+          chunkCount: chunks.length,
+          embeddingDimension: dimension,
+          collectionId: indexedCollection.id,
+          collectionName: indexedCollection.name,
+          indexedAt: this.now(),
+        });
+      };
+      // Network indexing stays outside the project lease. Only publication is
+      // serialized with archive/delete, so an obsolete scope never becomes ready.
+      const ready = input.projectId ? await projectMutationLease.run(input.projectId, publish) : await publish();
       if (!ready) {
         throw new RagServiceError('Knowledge source could not be finalized.', 'RAG_VECTOR_STORE_UNAVAILABLE', 503);
       }
@@ -515,25 +566,41 @@ export class RagService {
   async delete(ownerIdValue: unknown, sourceIdValue: unknown): Promise<void> {
     const ownerId = requireObjectId(ownerIdValue, 'Owner id');
     const sourceId = requireObjectId(sourceIdValue, 'Source id');
-    const source = await this.repository.findByOwnerAndId(ownerId, sourceId);
-    if (!source) throw new RagServiceError('Knowledge source not found.', 'RAG_SOURCE_NOT_FOUND', 404);
-    const projectId = source.projectId ? String(source.projectId) : undefined;
-    await this.resolveActiveProject(ownerId, projectId);
-    if (source.collectionId) {
-      if (!this.vectorStore) {
-        throw new RagServiceError('The configured vector store is unavailable.', 'RAG_VECTOR_STORE_UNAVAILABLE', 503);
-      }
+    const existing = await this.repository.findByOwnerAndId(ownerId, sourceId);
+    if (!existing) throw new RagServiceError('Knowledge source not found.', 'RAG_SOURCE_NOT_FOUND', 404);
+    const projectId = existing.projectId ? String(existing.projectId) : undefined;
+    const remove = async () => {
+      // Re-read after acquiring the lease: indexing may have completed while we waited.
+      const source = await this.repository.findByOwnerAndId(ownerId, sourceId);
+      if (!source) throw new RagServiceError('Knowledge source not found.', 'RAG_SOURCE_NOT_FOUND', 404);
       try {
-        await this.vectorStore.deleteWhere(
-          source.collectionId,
-          ownerScopeAndSourceWhere(ownerId, sourceId, projectId)
-        );
-      } catch {
-        throw new RagServiceError('The configured vector store is unavailable.', 'RAG_VECTOR_STORE_UNAVAILABLE', 503);
+        await this.resolveActiveProject(ownerId, projectId);
+      } catch (error) {
+        // Preserve owner-scoped cleanup after deletion of the parent project.
+        // Archived projects and unexpected resolver failures remain protected.
+        if (!projectId || !(error instanceof ProjectError) || error.code !== 'PROJECT_NOT_FOUND') throw error;
       }
-    }
-    const deleted = await this.repository.deleteByOwnerAndId(ownerId, sourceId);
-    if (!deleted) throw new RagServiceError('Knowledge source not found.', 'RAG_SOURCE_NOT_FOUND', 404);
+      if (source.status === 'indexing') {
+        throw new RagServiceError('Knowledge source is still indexing. Retry deletion after indexing finishes.', 'RAG_SOURCE_BUSY', 409);
+      }
+      if (source.collectionId) {
+        if (!this.vectorStore) {
+          throw new RagServiceError('The configured vector store is unavailable.', 'RAG_VECTOR_STORE_UNAVAILABLE', 503);
+        }
+        try {
+          await this.vectorStore.deleteWhere(
+            source.collectionId,
+            ownerScopeAndSourceWhere(ownerId, sourceId, projectId)
+          );
+        } catch {
+          throw new RagServiceError('The configured vector store is unavailable.', 'RAG_VECTOR_STORE_UNAVAILABLE', 503);
+        }
+      }
+      const deleted = await this.repository.deleteByOwnerAndId(ownerId, sourceId);
+      if (!deleted) throw new RagServiceError('Knowledge source not found.', 'RAG_SOURCE_NOT_FOUND', 404);
+    };
+    if (projectId) await projectMutationLease.run(projectId, remove);
+    else await remove();
   }
 
   async query(ownerIdValue: unknown, value: unknown): Promise<{
@@ -679,8 +746,8 @@ export class RagService {
     }
   }
 
-  private normalizeOperationalError(error: unknown, operation: 'ingestion' | 'query'): RagServiceError {
-    if (error instanceof RagServiceError) return error;
+  private normalizeOperationalError(error: unknown, operation: 'ingestion' | 'query'): RagServiceError | ProjectError {
+    if (error instanceof RagServiceError || error instanceof ProjectError) return error;
     if (error instanceof ChromaClientError) {
       return new RagServiceError('The configured vector store is unavailable.', 'RAG_VECTOR_STORE_UNAVAILABLE', 503);
     }

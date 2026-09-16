@@ -1,0 +1,96 @@
+- generic [ref=e464]:
+  - complementary [ref=e465]:
+    - generic [ref=e466]:
+      - generic [ref=e467]: KFive AI
+      - button "Collapse sidebar" [ref=e473] [cursor=pointer]
+    - generic [ref=e477]:
+      - generic [ref=e478] [cursor=pointer]:
+        - generic [ref=e479]: Search
+        - generic [ref=e484]:
+          - generic [ref=e485]: ⌘
+          - generic [ref=e486]: K
+      - navigation [ref=e487]:
+        - link "Dashboard" [ref=e686] [cursor=pointer]:
+          - /url: /app/dashboard
+        - link "AI Chat" [ref=e694] [cursor=pointer]:
+          - /url: /app/chat
+        - link "Code Lab" [ref=e699] [cursor=pointer]:
+          - /url: /app/code
+        - link "Agents" [ref=e706] [cursor=pointer]:
+          - /url: /app/agents
+        - link "Documents" [ref=e712] [cursor=pointer]:
+          - /url: /app/documents
+        - link "Knowledge / RAG" [ref=e718] [cursor=pointer]:
+          - /url: /app/knowledge
+        - link "Repository Analyzer" [ref=e725] [cursor=pointer]:
+          - /url: /app/repositories
+        - link "Workflows" [ref=e732] [cursor=pointer]:
+          - /url: /app/workflows
+        - link "Dataset Lab" [ref=e740] [cursor=pointer]:
+          - /url: /app/datasets
+        - link "Model Benchmarks" [ref=e747] [cursor=pointer]:
+          - /url: /app/benchmarks
+        - link "Notebooks" [ref=e753] [cursor=pointer]:
+          - /url: /app/notebooks
+        - link "Voice Assistant" [ref=e759] [cursor=pointer]:
+          - /url: /app/voice
+        - link "Models" [ref=e765] [cursor=pointer]:
+          - /url: /app/models
+        - link "Projects" [ref=e778] [cursor=pointer]:
+          - /url: /app/projects
+        - link "Workspace" [ref=e783] [cursor=pointer]:
+          - /url: /app/workspace
+        - link "PDF Utilities" [ref=e789] [cursor=pointer]:
+          - /url: /app/files
+    - generic [ref=e596]:
+      - generic [ref=e597]:
+        - generic [ref=e598]: r
+        - generic [ref=e600]:
+          - paragraph [ref=e601]: rag_recovery_a_20260916
+          - paragraph [ref=e602]: rag-recovery-a-20260916@example.test
+      - generic [ref=e603]:
+        - link "Profile" [ref=e604] [cursor=pointer]:
+          - /url: /app/profile
+        - link "Settings" [ref=e608] [cursor=pointer]:
+          - /url: /app/settings
+        - button "Toggle theme" [ref=e612] [cursor=pointer]
+        - button "Sign out" [ref=e619] [cursor=pointer]
+  - main [ref=e623]:
+    - generic [ref=e794]:
+      - generic [ref=e795]:
+        - generic [ref=e796]:
+          - heading "Knowledge / RAG" [level=1] [ref=e797]
+          - paragraph [ref=e801]: Index small text sources, retrieve relevant chunks, and inspect the sources returned by the backend.
+        - button "Refresh" [ref=e802] [cursor=pointer]
+      - button "Show workspace knowledge" [ref=e808] [cursor=pointer]
+      - generic [ref=e809]: "Recovery view: these sources belong to your deleted projects. You may delete completed or failed sources and their stored vectors. Uploading and querying are disabled here; workspace knowledge remains separate."
+      - generic [ref=e810]:
+        - generic [ref=e811]:
+          - generic [ref=e812]:
+            - heading "Knowledge sources" [level=2] [ref=e813]
+            - paragraph [ref=e814]: TXT or Markdown only, up to 64 KiB. Text is sent to the configured backend for indexing.
+          - button "Choose source" [disabled] [ref=e816]
+          - article [ref=e821]:
+            - generic [ref=e822]:
+              - generic [ref=e823]:
+                - paragraph [ref=e824]: Synthetic recovery fixture — not AI ingestion
+                - paragraph [ref=e828]: text/plain · 20 characters · 1 chunks
+              - generic [ref=e829]:
+                - generic [ref=e830]: ready
+                - button "Delete Synthetic recovery fixture — not AI ingestion" [ref=e831] [cursor=pointer]
+            - paragraph [ref=e835]: "Embedding: fixture / synthetic-two-dimensional / 2 dimensions"
+        - generic [ref=e836]:
+          - generic [ref=e837]:
+            - heading "Ask indexed knowledge" [level=2] [ref=e838]
+            - paragraph [ref=e839]: Answers and retrieved excerpts come from the configured backend.
+          - generic [ref=e840]:
+            - textbox "Ask a question about ready sources…" [ref=e841]
+            - generic [ref=e842]:
+              - text: Retrieved chunks
+              - combobox "Retrieved chunks" [ref=e843]:
+                - option "3"
+                - option "5" [selected]
+                - option "8"
+                - option "10"
+            - button "Ask" [disabled] [ref=e844]
+          - paragraph [ref=e848]: Deleted-project sources cannot be queried.

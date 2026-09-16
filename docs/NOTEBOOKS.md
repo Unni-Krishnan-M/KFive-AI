@@ -39,7 +39,7 @@ stat -c '%g' /var/run/docker.sock
 - The host runtime suite has 68 checks: 65 pass and three real-kernel/image checks skip because nbclient/nbformat are image-only.
 - The Docker build executes all 68 checks, including real kernel state, supervisor workspace, streamed preload/export, and the complete runtime-to-verifier pipeline.
 - The live authenticated path through the frontend proxy passed registration, dependency status, notebook persistence, real Python output, distinct runtime/verifier identities, immutable snapshots, cancellation, history, backend-restart persistence, and cleanup.
-- The complete repository gate passes 605 checks plus the three host-only skips; all lint targets and production builds pass.
+- On 2026-09-15 the separately executed repository test-script components passed 617 checks plus the three intentional image-only skips; all lint targets and frontend/backend/Code Runner production builds passed. The notebook image and live lifecycle evidence above dates to 2026-09-02.
 
 ## Known limitations
 

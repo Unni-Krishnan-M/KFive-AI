@@ -1,6 +1,8 @@
 import { RepositoryAnalysisModel } from '@/models/RepositoryAnalysis';
+import { ProjectModel } from '@/models/Project';
 import mongoose from 'mongoose';
 import { ProjectError, ProjectService, projectService } from '@/services/projectService';
+import { ProjectMutationLease, projectMutationLease } from '@/services/projectMutationLease';
 import { REPOSITORY_LIMITS, RepositoryArchiveError, RepositoryArchiveReport, analyzeRepositoryZip } from './repositoryArchiveAnalyzer';
 
 export type RepositoryAnalysisErrorCode = 'INVALID_REPOSITORY_INPUT' | 'REPOSITORY_ANALYSIS_NOT_FOUND' | 'REPOSITORY_ANALYSIS_FAILED' | 'REPOSITORY_ANALYZER_BUSY' | 'REPOSITORY_ANALYSIS_LIMIT_REACHED';
@@ -26,7 +28,7 @@ export interface RepositoryAnalysisRecord extends RepositoryArchiveReport {
 
 export interface RepositoryAnalysisRepository {
   create(value: Omit<RepositoryAnalysisRecord, '_id' | 'createdAt' | 'updatedAt'>): Promise<RepositoryAnalysisRecord>;
-  list(ownerId: string, projectId?: string): Promise<RepositoryAnalysisRecord[]>;
+  list(ownerId: string, projectId?: string, orphaned?: boolean): Promise<RepositoryAnalysisRecord[]>;
   findByOwnerAndId(ownerId: string, analysisId: string): Promise<RepositoryAnalysisRecord | null>;
   countByOwner(ownerId: string): Promise<number>;
   deleteByOwnerAndId(ownerId: string, analysisId: string): Promise<RepositoryAnalysisRecord | null>;
@@ -36,8 +38,20 @@ export const mongooseRepositoryAnalysisRepository: RepositoryAnalysisRepository 
   async create(value) {
     return RepositoryAnalysisModel.create(value) as unknown as Promise<RepositoryAnalysisRecord>;
   },
-  async list(ownerId, projectId) {
-    return RepositoryAnalysisModel.find({ ownerId, ...(projectId ? { projectId } : {}) })
+  async list(ownerId, projectId, orphaned = false) {
+    if (orphaned) {
+      return RepositoryAnalysisModel.aggregate([
+        { $match: { ownerId: new mongoose.Types.ObjectId(ownerId), projectId: { $exists: true, $ne: null } } },
+        { $lookup: { from: ProjectModel.collection.name, localField: 'projectId', foreignField: '_id', as: 'linkedProject' } },
+        { $match: { 'linkedProject.0': { $exists: false } } },
+        { $sort: { createdAt: -1, _id: -1 } },
+        { $limit: 50 },
+        { $project: { _id: 1, projectId: 1, name: 1, status: 1, analyzerVersion: 1, source: 1, summary: 1, createdAt: 1, updatedAt: 1 } },
+      ]) as Promise<RepositoryAnalysisRecord[]>;
+    }
+    return RepositoryAnalysisModel.find(projectId
+      ? { ownerId, projectId }
+      : { ownerId, projectId: { $exists: false } })
       .select('_id projectId name status analyzerVersion source summary createdAt updatedAt')
       .sort({ createdAt: -1, _id: -1 }).limit(50).lean() as unknown as Promise<RepositoryAnalysisRecord[]>;
   },
@@ -132,7 +146,8 @@ export class RepositoryAnalysisService {
     private readonly repository: RepositoryAnalysisRepository = mongooseRepositoryAnalysisRepository,
     private readonly projects: Pick<ProjectService, 'resolveActiveProject' | 'resolveOwnedProject'> = projectService,
     private readonly analyzer: RepositoryZipAnalyzer = analyzeRepositoryZip,
-    private readonly databaseAvailable: () => boolean = () => mongoose.connection.readyState === 1
+    private readonly databaseAvailable: () => boolean = () => mongoose.connection.readyState === 1,
+    private readonly projectLease: Pick<ProjectMutationLease, 'run'> = projectMutationLease,
   ) {}
 
   async status(ownerIdValue: unknown, projectIdValue?: unknown): Promise<Record<string, unknown>> {
@@ -177,9 +192,13 @@ export class RepositoryAnalysisService {
         if (error instanceof RepositoryArchiveError) throw error;
         throw new RepositoryAnalysisError('The repository ZIP could not be analyzed safely.', 'REPOSITORY_ANALYSIS_FAILED', 422);
       }
-      const record = await this.repository.create({
-        ownerId, ...(project ? { projectId: String(project._id) } : {}), name, status: 'completed', analyzerVersion: 1, ...report,
-      });
+      const publish = async () => {
+        if (project) await this.projects.resolveActiveProject(ownerId, String(project._id));
+        return this.repository.create({
+          ownerId, ...(project ? { projectId: String(project._id) } : {}), name, status: 'completed', analyzerVersion: 1, ...report,
+        });
+      };
+      const record = project ? await this.projectLease.run(String(project._id), publish) : await publish();
       return publicAnalysis(record);
     } catch (error) {
       if (error instanceof RepositoryAnalysisError || error instanceof ProjectError) throw error;
@@ -190,8 +209,15 @@ export class RepositoryAnalysisService {
     }
   }
 
-  async list(ownerIdValue: unknown, projectIdValue?: unknown): Promise<PublicRepositoryAnalysis[]> {
+  async list(ownerIdValue: unknown, projectIdValue?: unknown, scopeValue?: unknown): Promise<PublicRepositoryAnalysis[]> {
     const ownerId = requireOwnerId(ownerIdValue);
+    if ((scopeValue !== undefined && scopeValue !== 'orphaned') || (scopeValue === 'orphaned' && projectIdValue !== undefined)) {
+      throw new RepositoryAnalysisError('Choose either a project or deleted-project history.', 'INVALID_REPOSITORY_INPUT', 400);
+    }
+    if (scopeValue === 'orphaned') {
+      try { return (await this.repository.list(ownerId, undefined, true)).map(publicAnalysisSummary); }
+      catch { throw new RepositoryAnalysisError('Repository analysis storage is unavailable.', 'REPOSITORY_ANALYSIS_FAILED', 503); }
+    }
     let projectId: string | undefined;
     try {
       const project = await this.projects.resolveOwnedProject(ownerId, projectIdValue);
@@ -224,15 +250,21 @@ export class RepositoryAnalysisService {
     try { existing = await this.repository.findByOwnerAndId(ownerId, analysisId); }
     catch { throw new RepositoryAnalysisError('Repository analysis storage is unavailable.', 'REPOSITORY_ANALYSIS_FAILED', 503); }
     if (!existing) throw new RepositoryAnalysisError('Repository analysis not found.', 'REPOSITORY_ANALYSIS_NOT_FOUND', 404);
-    if (existing.projectId) {
-      try { await this.projects.resolveActiveProject(ownerId, String(existing.projectId)); }
-      catch (error) {
-        if (!(error instanceof ProjectError) || error.code !== 'PROJECT_NOT_FOUND') throw error;
+    const remove = async (): Promise<RepositoryAnalysisRecord | null> => {
+      if (existing.projectId) {
+        try { await this.projects.resolveActiveProject(ownerId, String(existing.projectId)); }
+        catch (error) {
+          if (!(error instanceof ProjectError) || error.code !== 'PROJECT_NOT_FOUND') throw error;
+        }
       }
-    }
+      return this.repository.deleteByOwnerAndId(ownerId, analysisId);
+    };
     let deleted: RepositoryAnalysisRecord | null;
-    try { deleted = await this.repository.deleteByOwnerAndId(ownerId, analysisId); }
-    catch { throw new RepositoryAnalysisError('Repository analysis storage is unavailable.', 'REPOSITORY_ANALYSIS_FAILED', 503); }
+    try { deleted = existing.projectId ? await this.projectLease.run(String(existing.projectId), remove) : await remove(); }
+    catch (error) {
+      if (error instanceof ProjectError) throw error;
+      throw new RepositoryAnalysisError('Repository analysis storage is unavailable.', 'REPOSITORY_ANALYSIS_FAILED', 503);
+    }
     if (!deleted) throw new RepositoryAnalysisError('Repository analysis not found.', 'REPOSITORY_ANALYSIS_NOT_FOUND', 404);
   }
 }

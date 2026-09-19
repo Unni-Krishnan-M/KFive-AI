@@ -12,6 +12,23 @@ const baseEnvironment = {
 };
 
 describe('parseEnvironment', () => {
+  it('accepts an optional absolute Ollama Unix socket path', () => {
+    expect(parseEnvironment({ ...baseEnvironment, OLLAMA_SOCKET_PATH: '/run/kfive/ollama.sock' }))
+      .toMatchObject({ ollamaSocketPath: '/run/kfive/ollama.sock' });
+  });
+
+  it.each(['relative.sock', '/run/../ollama.sock', '/run/./ollama.sock', '/run//ollama.sock',
+    '/run/ollama\n.sock', '/run/ollama\0.sock', '/', '/run/ollama/', `/${'a'.repeat(100)}`,
+    `/${'é'.repeat(50)}`])('rejects unsafe Ollama socket path %j', (socketPath) => {
+    expect(() => parseEnvironment({ ...baseEnvironment, OLLAMA_SOCKET_PATH: socketPath }))
+      .toThrow(/OLLAMA_SOCKET_PATH/);
+  });
+
+  it('rejects a socket path for a non-Ollama provider', () => {
+    expect(() => parseEnvironment({ ...baseEnvironment, AI_PROVIDER: 'openai', OPENAI_API_KEY: 'test',
+      OLLAMA_SOCKET_PATH: '/run/kfive/ollama.sock' })).toThrow(/OLLAMA_SOCKET_PATH.*Ollama/);
+  });
+
   it('parses local Ollama configuration', () => {
     const config = parseEnvironment(baseEnvironment);
     expect(config.kfiveMode).toBe('local');

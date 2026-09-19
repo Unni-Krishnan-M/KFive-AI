@@ -54,6 +54,7 @@ export function createAiProvider(config: EnvironmentConfig = getEnvironment()): 
     case 'ollama':
       return new OllamaProvider({
         baseUrl: config.ollamaBaseUrl || '',
+        socketPath: config.ollamaSocketPath,
         defaultModel: config.aiDefaultModel,
         maxOutputTokens: config.aiMaxOutputTokens,
         timeoutMs: config.aiTimeoutMs,

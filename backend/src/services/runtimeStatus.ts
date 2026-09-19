@@ -36,7 +36,7 @@ function classifyUrl(url: string | undefined): ServiceLocation {
 function providerLocation(config: EnvironmentConfig): ServiceLocation {
   switch (config.aiProvider) {
     case 'ollama':
-      return classifyUrl(config.ollamaBaseUrl);
+      return config.ollamaSocketPath ? 'local' : classifyUrl(config.ollamaBaseUrl);
     case 'openai':
     case 'anthropic':
       return 'remote';
@@ -85,6 +85,7 @@ export function buildRuntimeStatus(config: EnvironmentConfig) {
       id: config.aiProvider,
       configured: true,
       location: providerLocation(config),
+      transport: config.aiProvider === 'ollama' && config.ollamaSocketPath ? 'unix-socket' : 'http',
       liveSwitchSupported: false,
       restartRequired: true,
     },
@@ -94,6 +95,7 @@ export function buildRuntimeStatus(config: EnvironmentConfig) {
       'KFIVE_MODE',
       'AI_PROVIDER',
       'OLLAMA_BASE_URL',
+      'OLLAMA_SOCKET_PATH',
       'OPENAI_BASE_URL',
       'OPENAI_API_KEY',
       'ANTHROPIC_API_KEY',

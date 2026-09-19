@@ -6,11 +6,11 @@ import {
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  MAX_PDF_PAGE_SELECTION_CHARS, extractPdfPages, mergePdfs, pdfOutputFilename,
-  publicPdfToolError, readBrowserPdfInputs, rotatePdfPages,
+  MAX_PDF_PAGE_SELECTION_CHARS, deletePdfPages, extractPdfPages, mergePdfs, pdfOutputFilename,
+  publicPdfToolError, readBrowserPdfInputs, rotatePdfPages, reorderPdfPages, duplicatePdfPages,
 } from '@/services/pdfTools';
 
-type ToolId = 'merge' | 'extract' | 'rotate';
+type ToolId = 'merge' | 'extract' | 'rotate' | 'delete' | 'reorder' | 'duplicate';
 type RotationAngle = 90 | 180 | 270;
 
 interface Tool {
@@ -31,6 +31,9 @@ const TOOLS: Tool[] = [
   { id: 'merge', name: 'Merge PDF', description: 'Combine 2–10 PDFs in the order you choose.', icon: Combine, multiple: true },
   { id: 'extract', name: 'Extract Pages', description: 'Create a new PDF from selected pages of one PDF.', icon: Scissors, multiple: false },
   { id: 'rotate', name: 'Rotate Pages', description: 'Rotate selected pages by 90, 180, or 270 degrees.', icon: RotateCw, multiple: false },
+  { id: 'delete', name: 'Delete Pages', description: 'Remove selected pages in a new PDF, keeping the original unchanged.', icon: Trash2, multiple: false },
+  { id: 'reorder', name: 'Reorder Pages', description: 'List every page exactly once in a new order. The original stays unchanged.', icon: ArrowUp, multiple: false },
+  { id: 'duplicate', name: 'Duplicate Pages', description: 'Add one copy immediately after each selected page in a new PDF.', icon: Combine, multiple: false },
 ];
 
 export default function FileActionsPage() {
@@ -60,7 +63,7 @@ export default function FileActionsPage() {
     setFiles([]);
     setIsDragging(false);
     setProcessing(false);
-    setPageSelection('all');
+    setPageSelection(requestedTool === 'delete' ? '' : 'all');
     setRotationAngle(90);
     setError(undefined);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -125,7 +128,7 @@ export default function FileActionsPage() {
       return;
     }
     if (activeTool.id !== 'merge' && files.length !== 1) {
-      setError(`Select one PDF to ${activeTool.id === 'extract' ? 'extract pages from' : 'rotate'}.`);
+      setError('Select one PDF to process.');
       return;
     }
     if (activeTool.id !== 'merge' && !pageSelection.trim()) {
@@ -144,7 +147,13 @@ export default function FileActionsPage() {
         ? await mergePdfs(inputs)
         : activeTool.id === 'extract'
           ? await extractPdfPages(inputs[0], pageSelection)
-          : await rotatePdfPages(inputs[0], pageSelection, rotationAngle);
+          : activeTool.id === 'delete'
+            ? await deletePdfPages(inputs[0], pageSelection)
+            : activeTool.id === 'reorder'
+              ? await reorderPdfPages(inputs[0], pageSelection)
+              : activeTool.id === 'duplicate'
+                ? await duplicatePdfPages(inputs[0], pageSelection)
+                : await rotatePdfPages(inputs[0], pageSelection, rotationAngle);
       if (operationIdRef.current !== operationId) return;
       const bytes = new Uint8Array(output.bytes);
       const url = URL.createObjectURL(new Blob([bytes.buffer], { type: 'application/pdf' }));
@@ -170,7 +179,7 @@ export default function FileActionsPage() {
           <motion.div key="tools" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mx-auto w-full max-w-6xl flex-1 space-y-8 overflow-y-auto pb-10">
             <header>
               <h1 className="flex items-center gap-3 text-3xl font-bold text-white"><FolderOpen className="h-8 w-8 text-primary" />PDF Utilities</h1>
-              <p className="mt-2 text-gray-400">These three operations run locally in this browser. Inputs are not uploaded, and results are downloads—not saved to Documents or Projects.</p>
+              <p className="mt-2 text-gray-400">These operations run locally in this browser. Inputs are not uploaded, and results are downloads—not saved to Documents or Projects.</p>
               <p className="mt-2 max-w-3xl text-sm text-amber-300">Structural PDF changes do not sanitize links, actions, attachments, or other active content. Treat every generated PDF as untrusted.</p>
             </header>
             <div className="grid gap-5 md:grid-cols-3">
@@ -220,11 +229,13 @@ export default function FileActionsPage() {
 
                   {activeTool.id !== 'merge' && files.length === 1 ? (
                     <div className="grid gap-4 rounded-xl border border-white/10 bg-black/20 p-4 sm:grid-cols-2">
-                      <label className="text-sm font-medium text-gray-300">Pages<input maxLength={MAX_PDF_PAGE_SELECTION_CHARS} value={pageSelection} onChange={(event) => { setPageSelection(event.target.value); setError(undefined); }} placeholder="all or 1-3,5" className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-primary/50" /><span className="mt-1 block text-xs font-normal text-gray-500">Use all or a list such as 1-3,5 (maximum 4096 characters).</span></label>
-                      {activeTool.id === 'rotate' ? <label className="text-sm font-medium text-gray-300">Rotation<select value={rotationAngle} onChange={(event) => setRotationAngle(Number(event.target.value) as RotationAngle)} className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-primary/50"><option value={90}>90° clockwise</option><option value={180}>180°</option><option value={270}>270° clockwise</option></select></label> : <div className="text-sm text-gray-500 sm:pt-7">The selected pages are copied into one new PDF in the specified order.</div>}
+                      <label className="text-sm font-medium text-gray-300">{activeTool.id === 'delete' ? 'Pages to remove' : 'Pages'}<input maxLength={MAX_PDF_PAGE_SELECTION_CHARS} value={pageSelection} onChange={(event) => { setPageSelection(event.target.value); setError(undefined); }} placeholder={activeTool.id === 'delete' ? '1-3,5' : 'all or 1-3,5'} className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-primary/50" /><span className="mt-1 block text-xs font-normal text-gray-500">{activeTool.id === 'delete' ? 'Keep at least one page. Use a list such as 1-3,5 (maximum 4096 characters).' : 'Use all or a list such as 1-3,5 (maximum 4096 characters).'}</span></label>
+                      {activeTool.id === 'rotate' ? <label className="text-sm font-medium text-gray-300">Rotation<select value={rotationAngle} onChange={(event) => setRotationAngle(Number(event.target.value) as RotationAngle)} className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-primary/50"><option value={90}>90° clockwise</option><option value={180}>180°</option><option value={270}>270° clockwise</option></select></label> : <div className="text-sm text-gray-500 sm:pt-7">{activeTool.id === 'delete' ? 'Remaining pages keep their original order in a new PDF. The original is unchanged. This is not secure redaction or sanitization.' : 'The selected pages are copied into one new PDF in the specified order.'}</div>}
                     </div>
                   ) : null}
 
+                  {activeTool.id === 'reorder' ? <p className="text-sm text-gray-400">Include every page exactly once, for example 3,1-2 for a three-page PDF. Use all to keep the original order. Duplicate or missing pages are rejected. Drag reordering and thumbnails are not available yet.</p> : null}
+                  {activeTool.id === 'duplicate' ? <p className="text-sm text-gray-400">Each selected page gets one extra copy immediately after it. Repeating a page number does not add more copies. Original page order is preserved; all doubles the page count. Output is limited to 500 pages.</p> : null}
                   {error ? <div role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">{error}</div> : null}
                   <div className="flex justify-end gap-3 border-t border-white/10 pt-5"><button onClick={resetState} disabled={!files.length} className="rounded-xl border border-white/10 px-5 py-2.5 text-sm font-medium text-gray-300 disabled:opacity-40">Reset</button><button onClick={() => void processFiles()} disabled={!canProcess} className="rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40">{activeTool.name}</button></div>
                 </div>

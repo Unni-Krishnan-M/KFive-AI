@@ -1,4 +1,5 @@
 import { EnvironmentConfig } from '@/config/environment';
+import axios from 'axios';
 import { createAiProvider } from './factory';
 import { OllamaProvider } from './providers/ollamaProvider';
 import { OpenAiCompatibleProvider } from './providers/openAiCompatibleProvider';
@@ -30,6 +31,14 @@ const baseConfig: EnvironmentConfig = {
 };
 
 describe('createAiProvider', () => {
+  it('passes the configured Ollama socket transport to its adapter', () => {
+    const create = jest.spyOn(axios, 'create');
+    try {
+      createAiProvider({ ...baseConfig, ollamaSocketPath: '/run/kfive/ollama.sock' });
+      expect(create).toHaveBeenCalledWith(expect.objectContaining({ socketPath: '/run/kfive/ollama.sock' }));
+    } finally { create.mockRestore(); }
+  });
+
   it('creates the selected Ollama adapter', () => {
     expect(createAiProvider(baseConfig)).toBeInstanceOf(OllamaProvider);
   });

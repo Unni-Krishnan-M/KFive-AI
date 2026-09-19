@@ -1,0 +1,89 @@
+- generic [ref=f1e4]:
+  - complementary [ref=f1e5]:
+    - generic [ref=f1e6]:
+      - generic [ref=f1e7]: KFive AI
+      - button "Collapse sidebar" [ref=f1e13] [cursor=pointer]
+    - generic [ref=f1e17]:
+      - generic [ref=f1e18] [cursor=pointer]:
+        - generic [ref=f1e19]: Search
+        - generic [ref=f1e24]:
+          - generic [ref=f1e25]: ⌘
+          - generic [ref=f1e26]: K
+      - navigation [ref=f1e27]:
+        - link "Dashboard" [ref=f1e28] [cursor=pointer]:
+          - /url: /app/dashboard
+        - link "AI Chat" [ref=f1e36] [cursor=pointer]:
+          - /url: /app/chat
+        - link "Code Lab" [ref=f1e41] [cursor=pointer]:
+          - /url: /app/code
+        - link "Agents" [ref=f1e48] [cursor=pointer]:
+          - /url: /app/agents
+        - link "Documents" [ref=f1e54] [cursor=pointer]:
+          - /url: /app/documents
+        - link "Knowledge / RAG" [ref=f1e60] [cursor=pointer]:
+          - /url: /app/knowledge
+        - link "Repository Analyzer" [ref=f1e66] [cursor=pointer]:
+          - /url: /app/repositories
+        - link "Workflows" [ref=f1e73] [cursor=pointer]:
+          - /url: /app/workflows
+        - link "Dataset Lab" [ref=f1e81] [cursor=pointer]:
+          - /url: /app/datasets
+        - link "Model Benchmarks" [ref=f1e88] [cursor=pointer]:
+          - /url: /app/benchmarks
+        - link "Notebooks" [ref=f1e94] [cursor=pointer]:
+          - /url: /app/notebooks
+        - link "Voice Assistant" [ref=f1e100] [cursor=pointer]:
+          - /url: /app/voice
+        - link "Models" [ref=f1e106] [cursor=pointer]:
+          - /url: /app/models
+        - link "Projects" [ref=f1e119] [cursor=pointer]:
+          - /url: /app/projects
+        - link "Workspace" [ref=f1e124] [cursor=pointer]:
+          - /url: /app/workspace
+        - link "PDF Utilities" [ref=f1e130] [cursor=pointer]:
+          - /url: /app/files
+    - generic [ref=f1e136]:
+      - generic [ref=f1e137]:
+        - generic [ref=f1e138]: P
+        - generic [ref=f1e140]:
+          - paragraph [ref=f1e141]: PDF QA
+          - paragraph [ref=f1e142]: pdf-qa@example.invalid
+      - generic [ref=f1e143]:
+        - link "Profile" [ref=f1e144] [cursor=pointer]:
+          - /url: /app/profile
+        - link "Settings" [ref=f1e148] [cursor=pointer]:
+          - /url: /app/settings
+        - button "Toggle theme" [ref=f1e152] [cursor=pointer]
+        - button "Sign out" [ref=f1e159] [cursor=pointer]
+  - main [ref=f1e163]:
+    - generic [ref=f1e166]:
+      - button "Back to PDF Utilities" [ref=f1e167] [cursor=pointer]
+      - generic [ref=f1e170]:
+        - generic [ref=f1e175]:
+          - heading "Reorder Pages" [level=1] [ref=f1e176]
+          - paragraph [ref=f1e177]: List every page exactly once in a new order. The original stays unchanged.
+          - paragraph [ref=f1e178]: Processed locally. The output is not added to your KFive document library.
+        - generic [ref=f1e179]:
+          - generic [ref=f1e180]:
+            - paragraph [ref=f1e184]: Drop a PDF file here
+            - paragraph [ref=f1e185]: or choose files from this device
+            - button "Choose PDF" [active] [ref=f1e186] [cursor=pointer]
+          - generic [ref=f1e191]:
+            - heading "Selected files (1)" [level=2] [ref=f1e193]
+            - generic [ref=f1e194]:
+              - generic [ref=f1e198]:
+                - paragraph [ref=f1e199]: source.pdf
+                - paragraph [ref=f1e200]: 0.00 MB
+              - button "Remove source.pdf" [ref=f1e201] [cursor=pointer]
+          - generic [ref=f1e205]:
+            - generic [ref=f1e206]:
+              - text: Pages
+              - textbox "Pages Use all or a list such as 1-3,5 (maximum 4096 characters)." [ref=f1e207]:
+                - /placeholder: all or 1-3,5
+                - text: all
+              - generic [ref=f1e208]: Use all or a list such as 1-3,5 (maximum 4096 characters).
+            - generic [ref=f1e209]: The selected pages are copied into one new PDF in the specified order.
+          - paragraph [ref=f1e187]: Include every page exactly once, for example 3,1-2 for a three-page PDF. Use all to keep the original order. Duplicate or missing pages are rejected. Drag reordering and thumbnails are not available yet.
+          - generic [ref=f1e188]:
+            - button "Reset" [ref=f1e189] [cursor=pointer]
+            - button "Reorder Pages" [ref=f1e190] [cursor=pointer]

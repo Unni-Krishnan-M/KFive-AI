@@ -8,6 +8,7 @@ import {
   DockerOutputLimitError,
 } from '../src/dockerCli';
 import { DockerCodeExecutor } from '../src/executor';
+import { getRuntime, sourceArguments } from '../src/runtimeRegistry';
 import { DEFAULT_RUNNER_LIMITS, RunnerLimits, RunnerValidationError } from '../src/types';
 
 const CONTAINER_ID = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
@@ -70,6 +71,7 @@ test('creates Python with the exact hardened, server-owned Docker arguments', as
   assert.equal(result.stdout, 'hello\n');
   assert.deepEqual(docker.calls[0].args, [
     'create',
+    '--interactive',
     '--pull', 'never',
     '--name', 'kfive-run-run_python_1',
     '--label', 'com.kfive.code-run=true',
@@ -98,13 +100,12 @@ test('creates Python with the exact hardened, server-owned Docker arguments', as
     '--stop-timeout', '1',
     '--init',
     'python:3.12-alpine',
-    'python3', '-I', '-B', '/workspace/main.py',
+    ...getRuntime('python').command,
+    ...sourceArguments('print(input())'),
   ]);
-  assert.equal(docker.calls[1].args[0], 'cp');
-  assert.match(String(docker.calls[1].args[1]), /kfive-run-[^/]+\/workspace\/\.$/);
-  assert.equal(docker.calls[1].args[2], `${CONTAINER_ID}:/workspace`);
-  assert.deepEqual(docker.calls[2].args, ['start', '--attach', '--interactive', CONTAINER_ID]);
-  assert.equal(docker.calls[2].options.stdin, 'safe\n');
+  assert.equal(docker.calls.some(call => call.args[0] === 'cp'), false);
+  assert.deepEqual(docker.calls[1].args, ['start', '--attach', '--interactive', CONTAINER_ID]);
+  assert.equal(docker.calls[1].options.stdin, 'safe\n');
   assert.deepEqual(docker.calls.at(-2)?.args, ['kill', CONTAINER_ID]);
   assert.deepEqual(docker.calls.at(-1)?.args, ['rm', '--force', '--volumes', CONTAINER_ID]);
 
@@ -121,12 +122,10 @@ test('uses the fixed JavaScript 22 permission-mode command', async () => {
   const result = await executor.execute({ runId: 'js-1', language: 'javascript', source: 'console.log(1)' });
 
   assert.equal(result.runtimeVersion, '22');
-  assert.deepEqual(docker.calls[0].args.slice(-5), [
+  assert.deepEqual(docker.calls[0].args.slice(-7), [
     'node:22-alpine',
-    'node',
-    '--permission',
-    '--allow-fs-read=/workspace/main.js',
-    '/workspace/main.js',
+    ...getRuntime('javascript').command,
+    ...sourceArguments('console.log(1)'),
   ]);
 });
 
@@ -245,10 +244,10 @@ test('caps output, marks truncation, and cleans the container', async () => {
   assert.deepEqual(docker.calls.at(-1)?.args, ['rm', '--force', '--volumes', CONTAINER_ID]);
 });
 
-test('cleans a created container when source copy fails', async () => {
+test('cleans a created container when start fails', async () => {
   const docker = new FakeDockerAdapter(async (args) => {
     if (args[0] === 'create') return commandResult({ stdout: CONTAINER_ID });
-    if (args[0] === 'cp') throw new Error('copy failed');
+    if (args[0] === 'start') throw new Error('start failed');
     return commandResult();
   });
   const executor = new DockerCodeExecutor(docker);

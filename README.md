@@ -4,7 +4,7 @@ KFive AI is an existing browser-based, local-first AI workspace under active dev
 
 ## Verified baseline
 
-Latest follow-up (2026-09-16): RAG identity/lifecycle and refreshed archive controls pass 453 backend and 103 frontend tests, all lint targets, and frontend/backend production builds. Full RAG provider E2E remains pending; see [STATUS.md](STATUS.md).
+Latest follow-up (2026-09-17): backend tests pass 486 checks; frontend's preceding run passed 107. The opt-in [Linux host Ollama bridge](docs/OLLAMA_HOST_BRIDGE.md) passed 11 tests and deployed-backend model listing, real embeddings, and streaming chat without exposing Ollama on the LAN. Local browser TXT ingestion, cited RAG answers, unknown-answer behavior, reload and cleanup also passed ([evidence](output/verification/rag-browser-2026-09-17.md)). A fresh rebuild encountered Docker Hub DNS failure; existing verified images restarted successfully. See [STATUS.md](STATUS.md).
 
 As of 2026-09-15:
 

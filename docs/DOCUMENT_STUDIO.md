@@ -8,7 +8,10 @@ The **PDF Utilities** page exposes only operations backed by the installed `pdf-
 
 - merge 2–10 PDFs in explicit file order;
 - extract an ordered selection such as `3,1-2` into one new PDF;
-- rotate selected pages by 90, 180, or 270 degrees.
+- rotate selected pages by 90, 180, or 270 degrees;
+- delete selected pages while retaining at least one page;
+- reorder every page exactly once into a new PDF;
+- insert one adjacent duplicate of each selected page, within the 500-page output limit.
 
 These operations execute in the browser. Source files are not uploaded, generated PDFs are offered as downloads, and results are not automatically added to Documents or Projects. The Documents page links to PDF Utilities but explains that the user must select the local source file again.
 
@@ -24,7 +27,7 @@ The browser utility validates file count, metadata, `.pdf` filenames, an empty o
 | Pages per operation | 500 |
 | Generated output | 100 MiB |
 
-Encrypted/password-protected and malformed PDFs fail with stable, non-parser-specific messages. Page selections are one-based, preserve the requested order, de-duplicate repeated pages, and support `all`.
+Encrypted/password-protected and malformed PDFs fail with stable, non-parser-specific messages. Page selections are one-based and support `all`. Extraction follows the requested order and ignores repeats; reordering requires every page exactly once. Deletion and duplication preserve source order, treating repeated selections as one selected page.
 
 Page expressions are additionally bounded to 4,096 characters and 500 tokens. Unexpected internal errors are replaced with one fixed public message, and generated filenames are normalized, length-bounded, and stripped of path separators, control characters, and bidirectional controls.
 
@@ -44,6 +47,61 @@ Merge, extract, and rotate are structural transformations, not sanitizers. They 
 
 LibreOffice/Office conversion should remain an optional heavy profile. Password protection/decryption requires a reviewed tool such as qpdf and must never bypass authorization. Compression/rendering/text extraction need separately tested native tooling and must not be inferred from the current structural PDF slice.
 
-## Planned operations
+## Additional verified structural operations
 
-Preview/thumbnails, split-to-multiple-files, reorder/delete/duplicate pages, compression, page numbers, watermark, images-to/from-PDF, text/Markdown/Office conversion, batch jobs, protection, OCR, structured extraction, summaries, comparison, and RAG are Planned until their real paths and failure cases are executed.
+### Verified page deletion (2026-09-17)
+
+The source now includes Delete Pages in PDF Utilities and the command palette.
+Users choose pages to remove; the remaining pages are copied into a new PDF in
+original order. The original file is unchanged. Removing every page is rejected,
+and the selection starts empty. This operation is **not secure redaction** and
+does not sanitize active content or guarantee removal of shared/referenced data.
+
+Tests create and reopen actual PDF bytes to check kept-page dimensions, rotation,
+ordering, duplicate selections, original-byte immutability, invalid selections,
+all-page rejection and a safe filename. A local production-build browser preview
+executed rejection/recovery and downloaded the two retained pages; independent
+reopening verified dimensions, order, rotations and the unchanged four-page source.
+The Docker rebuild failed on a dependency-download timeout, and the prior frontend
+container was restored. A subsequent frontend-only Docker build and deployment
+succeeded; the container is healthy and its PDF utility bundle has the identical
+SHA-256 to the browser-tested production artifact. Coverage passes enforced 80% thresholds using
+`npm run test:pdf --workspace frontend`: 90.25% lines/statements, 85.4% branches,
+100% functions for the PDF utility. This fourth structural operation is
+**Implemented**; the wider Document Studio remains Experimental. See
+[evidence](../output/verification/pdf-delete.tdd.md).
+
+### Page reordering — Implemented (verified 2026-09-18)
+
+Source UI and command palette now include Reorder Pages. Enter every page exactly
+once (for example `3,1-2` for a three-page PDF); `all` retains the original order.
+Omitted, duplicated and overlapping pages are rejected. The result is a separate
+download and the original remains unchanged. Existing PDF/file/output limits apply.
+Automated tests reopen output to verify order, rotation and input immutability.
+Browser download verification and deployed-bundle equivalence passed; no thumbnail
+or drag-reordering interface is claimed. See [TDD evidence](../output/verification/pdf-reorder.tdd.md).
+
+Follow-up 2026-09-18: isolated production-preview browser verified invalid-order
+rejection/recovery and the actual Blob download. Independent reopening confirmed
+four pages in order `4,2,1,3`, dimensions and rotations. Browser state was synthetic
+with API traffic blocked, so this is only the local PDF path. A successful
+frontend-only Compose rebuild deployed the identical PDF bundle; the container
+is healthy and worker-artifact comparison passed. This expression-based structural
+utility is Implemented; Document Studio remains Experimental.
+
+### Duplicate Pages — Implemented (verified 2026-09-18)
+
+The source UI adds one extra copy immediately after each selected page, retaining
+the original page order. Repeated selections add only one copy; `all` doubles
+the page count. Results exceeding 500 pages are rejected before copying. Tests
+reopen output to verify count/order/rotation, independently mutable copied pages,
+and unchanged input bytes. Isolated production-preview browser now verifies
+invalid-page rejection/recovery and an actual download independently reopened to
+confirm order `1,1,2,3,3,4`. Synthetic session state and blocked API requests mean
+this is only the browser-local PDF path. Frontend-only Compose deployment passed,
+the deployed PDF bundle matches the browser-tested SHA-256 exactly, and container
+health/proxied readiness/served worker comparisons passed. This narrow utility
+is Implemented; Document Studio remains Experimental.
+See [TDD evidence](../output/verification/pdf-duplicate.tdd.md).
+
+Preview/thumbnails, split-to-multiple-files, compression, page numbers, watermark, images-to/from-PDF, text/Markdown/Office conversion, batch jobs, protection, OCR, structured extraction, summaries, comparison, and RAG are Planned until their real paths and failure cases are executed.

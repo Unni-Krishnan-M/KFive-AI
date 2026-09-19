@@ -1,0 +1,11 @@
+// Migration for the former API runtime cache. Never clear unrelated caches or
+// the static precache. No API caching route is installed by the new worker.
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.delete('api-cache').catch(() => {
+      // A storage error must not prevent the safer worker from taking over.
+      // Do not log cached responses or request URLs, which may be private.
+      console.warn('KFive could not remove the legacy API cache. Clear site data to remove it.');
+    })
+  );
+});

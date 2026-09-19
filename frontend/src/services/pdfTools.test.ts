@@ -8,13 +8,83 @@ import {
   PdfInput,
   PdfToolError,
   extractPdfPages,
+  deletePdfPages,
   mergePdfs,
   pdfOutputFilename,
   parsePageSelection,
   publicPdfToolError,
   readBrowserPdfInputs,
   rotatePdfPages,
+  reorderPdfPages,
+  duplicatePdfPages,
 } from './pdfTools';
+
+describe('duplicate PDF pages', () => {
+  it('adds one independent adjacent copy per selected page and preserves input', async () => {
+    const input = await makePdf('source.pdf', [[100, 200], [200, 300], [300, 400]], [90, 0, 180]);
+    const original = Uint8Array.from(input.bytes);
+    const result = await duplicatePdfPages(input, '3,1,1');
+    const pdf = await PDFDocument.load(result.bytes);
+    expect(result.pageCount).toBe(5);
+    expect(pdf.getPages().map(page => [page.getWidth(), page.getRotation().angle])).toEqual([[100, 90], [100, 90], [200, 0], [300, 180], [300, 180]]);
+    pdf.getPage(1).setRotation(degrees(270));
+    expect(pdf.getPage(0).getRotation().angle).toBe(90);
+    expect(input.bytes).toEqual(original);
+  });
+
+  it('supports all and rejects invalid or oversized selections', async () => {
+    const input = await makePdf('source.pdf', [[100, 200]]);
+    expect((await duplicatePdfPages(input, 'all')).pageCount).toBe(2);
+    for (const selection of ['', '0', '2', '1,'.repeat(3000)]) {
+      await expect(duplicatePdfPages(input, selection)).rejects.toBeInstanceOf(PdfToolError);
+    }
+    expect(pdfOutputFilename('duplicate', '../source.pdf')).toBe('-source-duplicated.pdf');
+  });
+
+  it('enforces the resulting page limit before copying', async () => {
+    const input = await makePdf('source.pdf', Array.from({ length: 500 }, () => [10, 10] as const));
+    const copy = vi.spyOn(PDFDocument.prototype, 'copyPages');
+    try {
+      await expect(duplicatePdfPages(input, '1')).rejects.toMatchObject({ code: 'PAGE_LIMIT_EXCEEDED' });
+      expect(copy).not.toHaveBeenCalled();
+    } finally { copy.mockRestore(); }
+  });
+
+  it('allows exactly 500 output pages', async () => {
+    const input = await makePdf('source.pdf', Array.from({ length: 250 }, () => [10, 10] as const));
+    const result = await duplicatePdfPages(input, 'all');
+    expect(result.pageCount).toBe(500);
+    expect((await PDFDocument.load(result.bytes)).getPageCount()).toBe(500);
+  });
+});
+
+describe('reorder PDF pages', () => {
+  it('copies every page exactly once in the requested order without changing input', async () => {
+    const input = await makePdf('source.pdf', [[100, 200], [200, 300], [300, 400]], [0, 90, 180]);
+    const original = Uint8Array.from(input.bytes);
+    const result = await reorderPdfPages(input, '3,1-2');
+    const reopened = await PDFDocument.load(result.bytes);
+    expect(result.pageCount).toBe(3);
+    expect(reopened.getPages().map(page => [page.getWidth(), page.getRotation().angle])).toEqual([[300, 180], [100, 0], [200, 90]]);
+    expect(input.bytes).toEqual(original);
+  });
+
+  it('rejects missing, duplicated, and overlapping pages rather than silently extracting', async () => {
+    const input = await makePdf('source.pdf', [[100, 200], [200, 300], [300, 400]]);
+    for (const order of ['1,2', '1,2,3,1', '1-3,2', 'all,1']) {
+      await expect(reorderPdfPages(input, order)).rejects.toBeInstanceOf(PdfToolError);
+    }
+  });
+
+  it('supports unchanged all order and rejects invalid or excessive expressions', async () => {
+    const input = await makePdf('source.pdf', [[100, 200]]);
+    expect((await reorderPdfPages(input, 'all')).pageCount).toBe(1);
+    for (const order of ['', '0', '2', '2-1', '1,'.repeat(3000)]) {
+      await expect(reorderPdfPages(input, order)).rejects.toBeInstanceOf(PdfToolError);
+    }
+    expect(pdfOutputFilename('reorder', '../source.pdf')).toBe('-source-reordered.pdf');
+  });
+});
 
 async function makePdf(
   name: string,
@@ -68,6 +138,47 @@ function replaceAscii(bytes: Uint8Array, before: string, after: string): Uint8Ar
   output.set(bytes.subarray(index + needle.length), index + replacement.length);
   return output;
 }
+
+describe('delete PDF pages', () => {
+  it('applies signature validation and selection bounds before producing output', async () => {
+    await expect(deletePdfPages({ name: 'bad.pdf', mimeType: 'application/pdf', bytes: new Uint8Array([1, 2, 3]) }, '1'))
+      .rejects.toMatchObject({ code: 'INVALID_PDF_SIGNATURE' });
+    const input = await makePdf('source.pdf', [[100, 200], [200, 300]]);
+    await expect(deletePdfPages(input, '1'.repeat(MAX_PDF_PAGE_SELECTION_CHARS + 1)))
+      .rejects.toMatchObject({ code: 'PAGE_SELECTION_TOO_LARGE' });
+  });
+
+  it('uses a safe descriptive filename and keeps the remaining boundary page', async () => {
+    expect(pdfOutputFilename('delete', '../secret.pdf')).toBe('-secret-pages-removed.pdf');
+    const result = await deletePdfPages(await makePdf('source.pdf', [[100, 200], [200, 300], [300, 400]]), '1-2');
+    expect((await reload(result.bytes)).getPages().map(page => page.getWidth())).toEqual([300]);
+  });
+
+  it('removes selected pages while preserving remaining order, rotation and input bytes', async () => {
+    const input = await makePdf('source.pdf', [[100, 200], [200, 300], [300, 400], [400, 500]], [90, 0, 180, 270]);
+    const original = Uint8Array.from(input.bytes);
+    const result = await deletePdfPages(input, '4,2,2');
+    const document = await reload(result.bytes);
+    expect(result.pageCount).toBe(2);
+    expect(document.getPages().map(page => page.getWidth())).toEqual([100, 300]);
+    expect(document.getPages().map(page => page.getRotation().angle)).toEqual([90, 180]);
+    expect(input.bytes).toEqual(original);
+  });
+
+  it('rejects deleting every page, including a one-page source', async () => {
+    const input = await makePdf('source.pdf', [[100, 200], [200, 300]]);
+    await expect(deletePdfPages(input, 'all')).rejects.toMatchObject({ code: 'EMPTY_OUTPUT' });
+    await expect(deletePdfPages(input, '2,1')).rejects.toMatchObject({ code: 'EMPTY_OUTPUT' });
+    await expect(deletePdfPages(await makePdf('one.pdf', [[100, 200]]), '1')).rejects.toMatchObject({ code: 'EMPTY_OUTPUT' });
+  });
+
+  it('rejects invalid, out-of-range and empty selections', async () => {
+    const input = await makePdf('source.pdf', [[100, 200], [200, 300]]);
+    for (const selection of ['', '0', '3', '2-1', '1,,2']) {
+      await expect(deletePdfPages(input, selection)).rejects.toBeInstanceOf(PdfToolError);
+    }
+  });
+});
 
 describe('page selection parsing', () => {
   it('supports all, ordered ranges, whitespace, and stable de-duplication', () => {

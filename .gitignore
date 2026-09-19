@@ -72,6 +72,9 @@ dist
 # Gatsby files
 .cache/
 public
+!frontend/public/
+frontend/public/*
+!frontend/public/sw-private-cache-cleanup.js
 
 # Storybook build outputs
 .out

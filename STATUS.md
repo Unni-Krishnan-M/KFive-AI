@@ -1,12 +1,86 @@
 # KFive AI Status
 
+## 2026-09-18 PDF duplication deployment
+
+- Frontend-only rebuild/deployment passed; the healthy container serves the exact browser-tested PDF bundle. Proxied readiness and service-worker artifact checks passed, with existing persistent volumes preserved.
+- Duplicate Pages is Implemented as a browser-local structural operation. Rechecked 24 PDF tests and coverage thresholds passed; wider Document Studio remains Experimental.
+- Open `http://127.0.0.1:3002/app/files?tool=duplicate`. Select pages to add one adjacent copy of each; repeated selections add no additional copies. Historical pending-deployment notes below are superseded. [Evidence](output/verification/pdf-duplicate.tdd.md).
+
+## 2026-09-18 PDF duplicate browser verification
+
+- Isolated production preview passed invalid-page rejection/recovery and a real Blob download for `3,1,1`. Independent reopening verified six pages in order `1,1,2,3,3,4` with preserved dimensions/rotations. No user records or PDFs changed; browser session was synthetic and API traffic blocked.
+- Added `scripts/verify-pdf-duplicate-output.cjs`. Deployment remains pending; the operation stays Experimental. [Evidence](output/verification/pdf-duplicate.tdd.md).
+
+## 2026-09-18 PDF duplicate source slice — Experimental
+
+- Added Duplicate Pages to the source utility and command palette: one adjacent copy per selected page, original untouched, duplicates in the selection ignored, 500 output pages maximum.
+- TDD RED/GREEN executed: four new failures for missing implementation, then 24 PDF tests passed. PDF utility coverage: 87.97% lines/statements, 85.89% branches, 100% functions. Browser download verification and deployment remain pending. [Evidence](output/verification/pdf-duplicate.tdd.md).
+- Full frontend regression: 129 tests passed; production build and lint passed. Run `npm run test:pdf --workspace frontend` to reproduce PDF coverage verification.
+
+## 2026-09-18 PDF reorder deployment
+
+- Frontend-only Compose rebuild succeeded. The healthy deployed frontend's PDF bundle SHA-256 matches the browser-tested artifact exactly; served worker files match the local build and proxied API readiness passes. Preserved existing data volumes.
+- Expression-based Reorder Pages is now Implemented as a browser-local structural utility. Document Studio remains Experimental; thumbnails/drag reorder and isolated processing are not implemented. Recheck passed all 20 PDF tests and coverage thresholds.
+- Open **PDF Utilities → Reorder Pages** at `http://127.0.0.1:3002/app/files?tool=reorder`; include every source page once. Historical pending-deployment entries below are superseded by this result. [Evidence](output/verification/pdf-reorder.tdd.md).
+
+## 2026-09-18 PDF reorder browser verification
+
+- Isolated production-preview browser passed missing/duplicate rejection, recovery and real Blob download. Independent reopening confirmed four pages in order `4,2,1,3`, dimensions/rotations and unchanged source geometry. Synthetic browser-only session with blocked API traffic; not an authentication/backend E2E test.
+- Added `scripts/verify-pdf-reorder-output.cjs` for generated-fixture/output verification. The narrow local reorder path is verified; container deployment remains pending, so the source operation stays Experimental for now. [Evidence](output/verification/pdf-reorder.tdd.md).
+
+## 2026-09-17 PDF reorder slice — Experimental
+
+- Added strict page reordering in the PDF utilities and command palette: every page must appear exactly once; output is a new download. Existing extract/rotate/delete selection behavior is preserved.
+- TDD: three new tests failed for missing implementation, then all 20 PDF tests passed. Generated output was reopened to verify order, rotation and unchanged input bytes. PDF utility coverage passes 80% thresholds; all 125 frontend tests passed.
+- Browser download E2E and deployment remain pending, so this operation is not marked Implemented. Thumbnails and drag reordering remain planned. See [evidence](output/verification/pdf-reorder.tdd.md).
+- Frontend production compilation and lint passed. Verification commands: `npm run test:pdf --workspace frontend`, `npm run test --workspace frontend`, `npm run build:frontend`, `npm run lint:frontend`.
+
+## 2026-09-17 security follow-up
+
+- Axios deployment follow-up: rebuilt and started frontend/backend with the host-Ollama override and preserved volumes. All six baseline containers are healthy; deployed backend resolves Axios 1.18.0 and readiness returns HTTP 200. Served worker artifacts match the tested local build. Read-only browser smoke loaded landing and login pages with zero console errors/warnings (an autocomplete advisory remains). This does not verify authenticated Chat/upload journeys or unconfigured Code Runner/Document Processor/OCR services.
+
+- Axios runtime update: frontend/backend now pin 1.18.0; current root audit is **38 findings / 0 critical / 17 high**, with no Axios finding. Added real HTTP provider streaming/cancellation regression and frontend auth-refresh/multipart transport tests; 21 provider tests and 122 frontend tests passed. Container rebuild and browser regressions for this update remain pending.
+- Final Axios verification: full backend **73 suites / 487 tests passed**; all three production builds and root lint passed. New transport tests exercise real loopback HTTP for provider streaming and controlled adapters for frontend requests, not full browser E2E.
+
+- Root tooling follow-up: locked `concurrently -> shell-quote` updated to 1.10.0; three targeted regression/smoke tests passed and are included in root `npm test`. Full-root audit now reports **39 findings / 0 critical** (18 high, 19 moderate, 2 low). This supersedes the historical critical count for the current source dependency graph, not existing container images. No full-platform security or completion claim.
+- Verification rerun: full root test command passed (710 passed, 3 notebook integration cases skipped); all three production builds and root lint passed. Backend parallel Jest emitted a worker teardown warning; frontend build retains a large Chat chunk warning.
+- Backend serial open-handle diagnostic subsequently passed all 486 tests with no handle report after allowing temporary local socket binding; the initial sandbox-only `EPERM` failure is documented in the triage report. Parallel teardown warning was not reproduced, not claimed fixed.
+
+- Deployment follow-up: frontend-only Compose build succeeded; HTTP worker-artifact verification passed against the tested local build. Existing stopped services were restored using preserved volumes. Legacy cache migration takes effect when the new worker activates. Broader container-build audit reports 30 findings / 1 critical, distinct from the frontend-scoped audit below; further triage remains required.
+
+- Frontend-scoped npm audit reduced from 32 findings / 2 critical to **29 findings / 0 critical** after matched Vitest/coverage updates and scoped nested Prism correction. **17 high findings remain**; no clean-security claim.
+- Removed authenticated remote API response caching and added a legacy-cache migration that preserves unrelated caches. Real preview-browser activation verified cleanup using synthetic entries; no real user cache data was used in testing.
+- **120 frontend tests passed**, lint/build passed, PDF coverage thresholds passed. Remaining dependency remediation and post-deployment Chat/auth/upload browser regression checks are pending. See [triage and evidence](docs/SECURITY_TRIAGE_2026-09-17.md).
+
+## 2026-09-17 PDF deletion slice
+
+- Follow-up frontend-only Docker build/deployment succeeded and the container is healthy. Deployed PDF bundle SHA-256 matches the production-preview browser-tested artifact exactly. Delete Pages is now Implemented as a structural browser utility; Document Studio remains Experimental. The build reported 33 dependency advisories (2 low, 11 moderate, 17 high, 3 critical), requiring separate reachability/version triage; no production-security certification is implied.
+
+- Coverage follow-up resolved the missing plugin with a version-matched development dependency and lockfile update. `npm run test:pdf --workspace frontend` passes 17 tests and enforced 80% thresholds (90.25% lines/statements, 85.4% branches, 100% functions for the PDF utility only). Full frontend regression: **112 tests passed**; lint passed. The preceding missing-plugin limitation below is historical.
+
+- Added Delete Pages utility and command-palette entry. The new PDF preserves retained-page order/rotation and does not overwrite the original. All-page deletion is rejected; UI starts with an empty selection and warns this is not secure redaction.
+- Executed RED/GREEN tests using generated PDFs and reopened outputs. Frontend production build and lint passed. Production-preview browser download was independently reopened and verified (two retained pages, correct dimensions/order/rotation, original four-page fixture preserved). Coverage measurement is blocked by missing `@vitest/coverage-v8`; no coverage claim. Docker deployment remains pending after npm download timeout; the original frontend container was restored and disposable QA accounts removed. See [TDD evidence](output/verification/pdf-delete.tdd.md).
+
+## 2026-09-17 host Ollama connection
+
+- **Live browser RAG passed:** registration, TXT selection/indexing, ready 384-dimensional embeddings, correct cited answer/source excerpt, source survival after reload, unknown response for absent information, and fixture deletion. Independent Mongo/Chroma checks confirmed zero fixture sources/vectors; the disposable account was removed. [Evidence and limits](output/verification/rag-browser-2026-09-17.md). PDF/OCR ingestion, GPU and remote operation remain unverified by this test.
+
+- Added opt-in Linux Compose bridge using a restricted Unix socket, with no new TCP listener or changes to host Ollama binding. Backend and workers retain normal container networking. See [setup and security boundary](docs/OLLAMA_HOST_BRIDGE.md).
+- Executed model listing, real `all-minilm:22m` embeddings (384 dimensions), and completed streamed `phi3:latest` inference from the deployed backend through the bridge. Ollama remained bound to `127.0.0.1:11434`; bridge inspection confirmed UID/GID 1000, read-only root filesystem, dropped capabilities and 96 MiB limit.
+- Backend verification: **72 suites / 486 tests passed**; build and lint passed. Bridge: **11 tests passed**, including output bounds, disconnect cancellation, request limits, redirect denial and concurrency release. Bridge tests now participate in root `npm test`.
+- Configured this host's installed `all-minilm:22m` embedding model explicitly in its ignored `.env`. No credentials or existing data were changed. These results do not establish GPU use, remote deployment, or browser ingestion/query completion.
+- Follow-up restart: Docker Hub DNS timed out during rebuild. Existing verified images started successfully with preserved volumes; backend provider health/model listing and embedding configuration passed after restart. Added and executed `scripts/kfive-up.sh --with-host-ollama --no-build` for local-image startup. This is not a successful fresh rebuild claim.
+
 ## 2026-09-16 RAG lifecycle follow-up
 
+- Real standalone loopback API integration passed with host Ollama `all-minilm:22m` (384-dimensional embeddings) and `phi3:latest`: correct cited answer, refusal to invent missing information, source references, owner/project boundaries, archive guards, Mongo reconnect/server reopen persistence, recovery, and vector cleanup. `scripts/verify-rag-live.cjs --allow-live-test` reproduces it using isolated fixtures. Those fixtures were removed; the small embedding model remains installed. This is not production Compose routing, browser inference, GPU, or process-crash proof.
 - Fixed mixed-case ObjectId divergence between MongoDB and case-sensitive vector metadata/collection hashes.
 - Recheck project state under the shared in-process mutation lease before creating indexing metadata and publishing ready sources. Archive/delete during indexing triggers cleanup and failed metadata instead of ready publication.
 - Indexing-source deletion now returns a structured `409 RAG_SOURCE_BUSY`; refreshed server archive state controls the Knowledge page's mutation buttons and banner.
-- Verification: backend **71 suites / 453 tests passed**, frontend **18 files / 103 tests passed**, all lint targets passed, and frontend/backend production Compose builds and startup passed. These regression tests use controlled provider/vector implementations; they do not prove live embeddings or distributed concurrency safety.
-- Runtime diagnosis: embedding model remains unset; the backend's configured Ollama connection failed, while host Ollama was active on loopback only. No AI/network configuration was changed. Full ingestion/query E2E, deleted-project knowledge recovery, and indexing crash reconciliation remain outstanding. See [RAG](docs/RAG.md).
+- Added owner-scoped deleted-project knowledge recovery with fail-closed scope validation, read-only recovery UI, and vector-before-metadata deletion. A live synthetic-fixture browser/API/MongoDB/ChromaDB test passed archive protection, recovery discovery, second-user rejection, full stop/start persistence, and selected-owner deletion preserving another owner's vectors. Disposable accounts and fixture data were removed; this is not an AI ingestion/query test.
+- Chat choices now exclude explicitly non-chat models while retaining unknown legacy metadata. Smart routing explains when a reported preference does not support chat instead of claiming it is absent.
+- Verification: backend **71 suites / 468 tests passed**, frontend **18 files / 107 tests passed**, all lint targets passed, and frontend/backend production Compose builds and startup passed. Automated lifecycle regressions use controlled provider/vector implementations; they do not prove live embeddings or distributed concurrency safety.
+- Normal deployment diagnosis: embedding model configuration remains unset; the backend's configured Ollama connection failed, while host Ollama was active on loopback only. No deployment AI/network configuration was changed. Production browser/Compose ingestion-query E2E, pagination/quotas, and indexing crash reconciliation remain outstanding. See [RAG](docs/RAG.md).
 
 The dated baseline below records the preceding verification run, not updated totals for this follow-up.
 

@@ -47,6 +47,7 @@ export type PdfToolErrorCode =
   | 'MALFORMED_PDF'
   | 'ENCRYPTED_PDF'
   | 'INVALID_ROTATION'
+  | 'EMPTY_OUTPUT'
   | 'PROCESSING_FAILED';
 
 export class PdfToolError extends Error {
@@ -130,7 +131,7 @@ export function publicPdfToolError(error: unknown): string {
   return error instanceof PdfToolError ? error.message : PDF_TOOL_GENERIC_ERROR;
 }
 
-export function pdfOutputFilename(tool: 'merge' | 'extract' | 'rotate', inputName?: string): string {
+export function pdfOutputFilename(tool: 'merge' | 'extract' | 'rotate' | 'delete' | 'reorder' | 'duplicate', inputName?: string): string {
   if (tool === 'merge') return 'kfive-merged.pdf';
   const rawBase = typeof inputName === 'string' ? inputName.replace(/\.pdf$/i, '') : '';
   const withoutControls = Array.from(rawBase.normalize('NFC'))
@@ -150,7 +151,7 @@ export function pdfOutputFilename(tool: 'merge' | 'extract' | 'rotate', inputNam
     .trim()
     .replace(/^\.+|\.+$/g, '');
   const base = Array.from(normalized || 'document').slice(0, 80).join('');
-  return `${base}-${tool === 'extract' ? 'extracted' : 'rotated'}.pdf`;
+  return `${base}-${tool === 'extract' ? 'extracted' : tool === 'delete' ? 'pages-removed' : tool === 'reorder' ? 'reordered' : tool === 'duplicate' ? 'duplicated' : 'rotated'}.pdf`;
 }
 
 function hasPdfSignature(bytes: Uint8Array): boolean {
@@ -228,7 +229,7 @@ async function saveResult(document: PDFDocument, pageCount: number): Promise<Pdf
   }
 }
 
-export function parsePageSelection(expression: string, pageCount: number): number[] {
+export function parsePageSelection(expression: string, pageCount: number, duplicates: 'ignore' | 'reject' = 'ignore'): number[] {
   if (!Number.isSafeInteger(pageCount) || pageCount < 1 || pageCount > MAX_PDF_PAGE_COUNT) {
     fail('PAGE_OUT_OF_RANGE', 'The PDF page count is outside the supported range.');
   }
@@ -265,6 +266,9 @@ export function parsePageSelection(expression: string, pageCount: number): numbe
     }
     for (let page = start; page <= end; page += 1) {
       const zeroBasedPage = page - 1;
+      if (duplicates === 'reject' && seen.has(zeroBasedPage)) {
+        fail('INVALID_PAGE_SELECTION', 'Include every page exactly once. Repeated pages are not allowed when reordering.');
+      }
       if (!seen.has(zeroBasedPage)) {
         seen.add(zeroBasedPage);
         orderedPages.push(zeroBasedPage);
@@ -315,6 +319,64 @@ export async function extractPdfPages(input: PdfInput, selection: string): Promi
   } catch (error) {
     if (error instanceof PdfToolError) throw error;
     fail('PROCESSING_FAILED', 'The selected pages could not be extracted. Try another valid PDF.');
+  }
+}
+
+export async function reorderPdfPages(input: PdfInput, selection: string): Promise<PdfToolResult> {
+  const source = await loadPdf(input);
+  const order = parsePageSelection(selection, source.getPageCount(), 'reject');
+  if (order.length !== source.getPageCount()) {
+    fail('INVALID_PAGE_SELECTION', 'Include every page exactly once. Use Extract Pages to keep only some pages.');
+  }
+  try {
+    const output = await PDFDocument.create();
+    const pages = await output.copyPages(source, order);
+    pages.forEach(page => output.addPage(page));
+    return await saveResult(output, pages.length);
+  } catch (error) {
+    if (error instanceof PdfToolError) throw error;
+    fail('PROCESSING_FAILED', 'The pages could not be reordered. Try another valid PDF.');
+  }
+}
+
+export async function duplicatePdfPages(input: PdfInput, selection: string): Promise<PdfToolResult> {
+  const source = await loadPdf(input);
+  const selected = parsePageSelection(selection, source.getPageCount());
+  const pageCount = source.getPageCount() + selected.length;
+  if (pageCount > MAX_PDF_PAGE_COUNT) {
+    fail('PAGE_LIMIT_EXCEEDED', 'Duplicating these pages would exceed the 500-page output limit. Choose fewer pages.');
+  }
+  try {
+    const output = await PDFDocument.create();
+    const originals = await output.copyPages(source, source.getPageIndices());
+    // Separate copy pass creates independent page dictionaries for duplicates.
+    const copies = await output.copyPages(source, selected);
+    const copiesByIndex = new Map(selected.map((index, position) => [index, copies[position]]));
+    originals.forEach((page, index) => {
+      output.addPage(page);
+      const copy = copiesByIndex.get(index);
+      if (copy) output.addPage(copy);
+    });
+    return await saveResult(output, pageCount);
+  } catch (error) {
+    if (error instanceof PdfToolError) throw error;
+    fail('PROCESSING_FAILED', 'The pages could not be duplicated. Try another valid PDF.');
+  }
+}
+
+export async function deletePdfPages(input: PdfInput, selection: string): Promise<PdfToolResult> {
+  const source = await loadPdf(input);
+  const removed = new Set(parsePageSelection(selection, source.getPageCount()));
+  const kept = source.getPageIndices().filter(index => !removed.has(index));
+  if (kept.length === 0) fail('EMPTY_OUTPUT', 'Keep at least one page. You cannot delete every page.');
+  try {
+    const output = await PDFDocument.create();
+    const pages = await output.copyPages(source, kept);
+    pages.forEach(page => output.addPage(page));
+    return await saveResult(output, pages.length);
+  } catch (error) {
+    if (error instanceof PdfToolError) throw error;
+    fail('PROCESSING_FAILED', 'The selected pages could not be removed. Try another valid PDF.');
   }
 }
 

@@ -1,0 +1,55 @@
+# Explicit Linux-only opt-in: docker compose -f docker-compose.yml -f docker-compose.ollama-host.yml up -d
+services:
+  ollama-bridge:
+    build:
+      context: ./services/ollama-bridge
+    network_mode: host
+    user: "1000:1000"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 96m
+    cpus: 0.5
+    restart: "no"
+    environment:
+      KFIVE_OLLAMA_HOST_URL: ${KFIVE_OLLAMA_HOST_URL:-http://127.0.0.1:11434}
+      OLLAMA_SOCKET_PATH: /run/ollama-bridge/ollama.sock
+    volumes:
+      - ollama_bridge_socket:/run/ollama-bridge
+    healthcheck:
+      test: [CMD, node, healthcheck.cjs]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  backend:
+    environment:
+      OLLAMA_SOCKET_PATH: /run/ollama-bridge/ollama.sock
+    volumes:
+      - ollama_bridge_socket:/run/ollama-bridge:ro
+    depends_on:
+      ollama-bridge:
+        condition: service_healthy
+
+  benchmark-worker:
+    environment:
+      OLLAMA_SOCKET_PATH: /run/ollama-bridge/ollama.sock
+    volumes:
+      - ollama_bridge_socket:/run/ollama-bridge:ro
+    depends_on:
+      ollama-bridge:
+        condition: service_healthy
+
+  notebook-worker:
+    environment:
+      OLLAMA_SOCKET_PATH: /run/ollama-bridge/ollama.sock
+    volumes:
+      - ollama_bridge_socket:/run/ollama-bridge:ro
+    depends_on:
+      ollama-bridge:
+        condition: service_healthy
+
+volumes:
+  ollama_bridge_socket:

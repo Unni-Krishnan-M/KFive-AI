@@ -4,6 +4,7 @@ import { DockerCodeExecutor } from './executor';
 import { BullMqWorkerFactory } from './queueWorker';
 import { parseRedisUrl } from './redisConfig';
 import { StaleCodeRunReaper } from './reaper';
+import { ReaperLoop } from './reaperLoop';
 import { CodeRunnerWorkerHost } from './workerHost';
 
 function log(level: 'info' | 'error', event: string): void {
@@ -30,13 +31,14 @@ async function main(): Promise<void> {
   const executor = new DockerCodeExecutor(docker);
   const host = new CodeRunnerWorkerHost(workerFactory, coordinator, executor, { concurrency, onError });
   const reaper = new StaleCodeRunReaper(docker, { onError });
+  const reaperLoop = new ReaperLoop(() => reaper.reap(), onError);
 
   let shuttingDown = false;
   const shutdown = async (signal: string): Promise<void> => {
     if (shuttingDown) return;
     shuttingDown = true;
     log('info', `shutdown-${signal.toLowerCase()}`);
-    await host.stop();
+    await Promise.all([host.stop(), reaperLoop.stop()]);
   };
   const requestShutdown = (signal: string): void => {
     void shutdown(signal).catch(() => {
@@ -48,7 +50,13 @@ async function main(): Promise<void> {
   process.once('SIGINT', () => requestShutdown('SIGINT'));
 
   await reaper.reap();
+  if (shuttingDown) return;
   await host.start();
+  if (shuttingDown) {
+    await host.stop();
+    return;
+  }
+  reaperLoop.start();
   log('info', 'worker-ready');
 }
 

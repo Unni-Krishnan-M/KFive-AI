@@ -1,0 +1,31 @@
+{
+  "runId": "0c144a4a5627f217",
+  "database": "kfive_rag_verify_0c144a4a5627f217",
+  "startedAt": "2026-09-16T14:14:25.322Z",
+  "status": "passed",
+  "checkpoints": [
+    {
+      "checkpoint": "isolated-database-created",
+      "database": "kfive_rag_verify_0c144a4a5627f217",
+      "inference": "host-loopback Ollama; device selection is not certified by this verifier"
+    },
+    {
+      "checkpoint": "real-ingestion-query",
+      "embeddingModel": "all-minilm:22m",
+      "dimension": 384,
+      "answer": "The Cedar station access code is VIOLET-739. [S1]",
+      "unknownAnswer": "The station author's exact date of birth is unknown.",
+      "references": 1,
+      "scopeAndOwnerIsolation": true
+    },
+    {
+      "checkpoint": "reconnect-recovery-cleanup",
+      "mongoReconnectPersistence": true,
+      "vectorDeletion": true,
+      "limitations": "Standalone loopback API; no Compose-provider routing, browser, GPU, process-crash or distributed proof."
+    },
+    {
+      "cleanup": "isolated test database and recorded vector collections removed"
+    }
+  ]
+}

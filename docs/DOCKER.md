@@ -15,6 +15,10 @@ docker compose config --quiet
 
 ## Opt-in Code Lab profile
 
+Host-loopback Ollama has a separate opt-in [Unix-socket bridge](OLLAMA_HOST_BRIDGE.md):
+`./scripts/kfive-up.sh --with-host-ollama`. Add `--no-build` to reuse previously
+built local images; omit it when deploying source changes.
+
 Code Lab runs a trusted broker that creates one disposable, restricted runtime container per code run. It is available only through the `code-lab` Compose profile and is never started by the default command.
 
 Before enabling it, configure the broker's Docker endpoint in `.env`. For the standard system daemon:

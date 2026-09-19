@@ -24,6 +24,7 @@ import {
 
 export interface OllamaProviderConfig {
   baseUrl: string;
+  socketPath?: string;
   defaultModel: string;
   maxOutputTokens: number;
   timeoutMs: number;
@@ -97,7 +98,10 @@ export class OllamaProvider implements AiProviderClient {
 
   constructor(private readonly config: OllamaProviderConfig, client?: AxiosInstance) {
     this.client = client || axios.create({
-      baseURL: config.baseUrl.replace(/\/$/, ''),
+      // A local bridge is HTTP regardless of any previously configured remote URL.
+      // Never follow a redirect or use an environment proxy to escape that bridge.
+      baseURL: config.socketPath ? 'http://localhost' : config.baseUrl.replace(/\/$/, ''),
+      ...(config.socketPath ? { socketPath: config.socketPath, proxy: false as const, maxRedirects: 0 } : {}),
       timeout: config.timeoutMs,
       headers: { 'Content-Type': 'application/json' },
     });

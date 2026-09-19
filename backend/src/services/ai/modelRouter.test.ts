@@ -39,4 +39,13 @@ describe('routeModel', () => {
       provider: 'ollama', models, task: 'coding', preferredModel: 'missing:latest',
     })).toThrow('No model or provider fallback was attempted');
   });
+
+  it('distinguishes a listed embedding-only preference from an absent model', () => {
+    const embedding: AiModel = { id: 'all-minilm:22m', name: 'all-minilm:22m', provider: 'ollama', capabilities: { chat: false, embeddings: true } };
+    for (const catalog of [[embedding], [...models, embedding]]) {
+      expect(() => routeModel({ provider: 'ollama', models: catalog, task: 'general-chat', preferredModel: embedding.id }))
+        .toThrow('does not support chat');
+    }
+    expect(routeModel({ provider: 'ollama', models: [...models, embedding], task: 'general-chat' }).model).not.toBe(embedding.id);
+  });
 });

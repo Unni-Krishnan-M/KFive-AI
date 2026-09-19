@@ -8,6 +8,41 @@ The source implementation is **Experimental** and disabled by default. It includ
 
 Real untrusted-code execution is not considered implemented until the host-Docker isolation suite below has passed. Do not enable Code Lab on a public deployment based only on unit tests.
 
+### Live verification findings (2026-09-19)
+
+The opt-in `scripts/verify-code-runner-live.cjs` initially reproduced a
+source-delivery failure: `docker cp` rejected copying source into the read-only
+container root filesystem. This is now fixed without relaxing read-only
+isolation. Fixed, allowlisted interpreter bootstraps decode bounded base64
+arguments and execute the source in memory; no host temporary source file or
+`docker cp` is used. Native stdin remains dedicated to the submitted input.
+
+Live verification passed Python stdin/EOF, main-module behavior, Unicode and
+multi-chunk source; JavaScript stdin and main-module behavior; stderr/nonzero
+exit; timeout; and output-cap termination. The verifier inspected the actual
+container configuration and confirmed removal after each case. These checks
+do not establish the full isolation suite: memory/PID pressure, behavioral
+network/filesystem denial, explicit cancellation, broker crash/restart,
+queue/history persistence, and the authenticated browser execution path
+remain unverified. Code Lab remains Experimental and disabled by default.
+
+Container creation now enables stdin explicitly (unit regression verified).
+A serial reaper scheduler now repeats sweeps every 30 seconds after the prior
+sweep finishes, so containers younger than the two-minute stale threshold at
+startup are revisited. Scheduler retry, non-overlap, and shutdown tests pass;
+actual broker crash/restart verification remains pending. An interrupted Docker
+create can still lose the container ID, delaying cleanup until a later sweep.
+
+Repeat the live checks with pre-pulled `python:3.12-alpine` and `node:22-alpine`:
+
+```bash
+npm run build --workspace @kfive/code-runner
+node scripts/verify-code-runner-live.cjs --allow-live-test
+```
+
+This creates disposable resource-limited test containers; it does not enable
+the application Code Lab profile or modify saved runs.
+
 ## Trust boundary
 
 ```text
@@ -22,9 +57,10 @@ Browser
 - Runtime image, command, filename, resource limits, Docker flags, and network policy are server-owned allowlist values.
 - Only the trusted runner broker controls Docker. User runtime containers do not receive a Docker socket, host mount, device, GPU, published port, or KFive secret.
 - Runtime containers are non-root, read-only, networkless, IPC-isolated, capability-free, and constrained by CPU, memory, PID, file, output, and time limits.
-- Source is copied under a fixed filename through a broker-created temporary workspace and removed after the run.
+- Source is delivered as bounded base64 argv chunks to fixed interpreter bootstraps, without shell interpolation, host temporary source files, or container-copy operations. Base64 is encoding, not encryption; source is visible to authorized host process inspection and Docker metadata inspection until the container is removed.
+- `/workspace/main.py` and `/workspace/main.js` are virtual source filenames used for entry-module identity and diagnostics, not readable source files. Code that tries to reopen its own source file is not supported. Native stdin is passed separately and closed at EOF.
 - The runner is a separately started component and has no public HTTP port.
-- On startup, the broker reaps only validated containers carrying its exact label and older than two minutes; it never performs a daemon-wide prune.
+- On startup and subsequent serial sweeps, the broker reaps only validated containers carrying its exact label and older than two minutes; it never performs a daemon-wide prune.
 
 A Docker daemon socket gives the broker control over that daemon. For production, use a dedicated runner host or rootless/dedicated Docker daemon rather than the KFive application daemon.
 
@@ -69,7 +105,7 @@ Create payloads accept only `language`, `source`, optional `stdin`, and optional
 
 ## Data handling
 
-Run source and stdin are stored in MongoDB for history. The first queue implementation also carries source/stdin in Redis until the job is removed according to queue retention. Do not submit secrets. A later privacy/retention control should allow disabling stdin/source history and move queue payload retrieval behind an internal authenticated API.
+Run source and stdin are stored in MongoDB for history. The first queue implementation also carries source/stdin in Redis until the job is removed according to queue retention. Encoded source also appears in the host Docker CLI arguments and container command metadata; it is not a secret transport. Do not submit secrets. A later privacy/retention control should allow disabling stdin/source history and move queue payload retrieval behind an internal authenticated API.
 
 ## Mandatory host-Docker verification
 

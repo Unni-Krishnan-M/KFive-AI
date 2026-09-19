@@ -10,7 +10,7 @@ import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { getToken } from '@/utils/getToken';
 import { apiUrl } from '@/config/runtime';
 import { readSseResponse } from '@/utils/sse';
-import { ModelInfo, normalizeModelCatalog } from '@/services/modelManager';
+import { chatModelOptions, ModelInfo, normalizeModelCatalog } from '@/services/modelManager';
 import { readableApiError, unwrapApiData } from '@/services/runtimeSettings';
 import { PROJECT_ARCHIVED_MESSAGE, projectContextPath, projectNavigationState } from '@/services/projectContext';
 import { useProjectContext } from '@/hooks/useProjectContext';
@@ -114,9 +114,10 @@ export default function ChatPage() {
   useEffect(() => {
     modelApi.getCatalog().then((response) => {
       const catalog = normalizeModelCatalog(response.data);
-      setModelOptions(catalog.models);
+      const options = chatModelOptions(catalog.models);
+      setModelOptions(options);
       setSelectedProvider(catalog.provider);
-      setSelectedModel((current) => catalog.models.some((model) => model.id === current) ? current : '');
+      setSelectedModel((current) => options.some((model) => model.id === current) ? current : '');
     }).catch(() => {
       setModelOptions([]);
       setSelectedProvider('provider');

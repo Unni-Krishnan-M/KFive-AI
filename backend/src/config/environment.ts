@@ -21,6 +21,7 @@ export interface EnvironmentConfig {
   redisUrl: string;
   chromaUrl?: string;
   ollamaBaseUrl?: string;
+  ollamaSocketPath?: string;
   openaiBaseUrl?: string;
   openaiApiKey?: string;
   openAiCompatibleSupportsEmbeddings: boolean;
@@ -60,6 +61,15 @@ const schema = Joi.object({
   REDIS_URL: Joi.string().uri({ scheme: ['redis', 'rediss'] }).required(),
   CHROMA_URL: Joi.string().uri({ scheme: ['http', 'https'] }).allow(''),
   OLLAMA_BASE_URL: Joi.string().uri({ scheme: ['http', 'https'] }).allow(''),
+  OLLAMA_SOCKET_PATH: Joi.string().max(100).allow('').custom((value, helpers) => {
+    // sockaddr_un limits are bytes, not JavaScript characters. Reject ambiguous paths.
+    if (!value.startsWith('/') || Buffer.byteLength(value, 'utf8') > 100
+      || [...value].some((character: string) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)
+      || value.slice(1).split('/').some((part: string) => !part || part === '.' || part === '..')) {
+      return helpers.error('any.custom', { message: 'OLLAMA_SOCKET_PATH must be an absolute normalized Unix socket path of at most 100 bytes without control characters' });
+    }
+    return value;
+  }),
   OPENAI_BASE_URL: Joi.string().uri({ scheme: ['http', 'https'] }).allow(''),
   OPENAI_API_KEY: Joi.string().allow(''),
   OPENAI_COMPATIBLE_SUPPORTS_EMBEDDINGS: Joi.boolean().truthy('true').falsy('false').default(false),
@@ -122,6 +132,9 @@ const schema = Joi.object({
   }
 
   const provider = value.AI_PROVIDER;
+  if (value.OLLAMA_SOCKET_PATH && !['ollama', 'local-ollama', 'remote-ollama'].includes(provider)) {
+    return helpers.error('any.custom', { message: 'OLLAMA_SOCKET_PATH is only supported by the Ollama provider' });
+  }
   for (const key of ['OLLAMA_BASE_URL', 'OPENAI_BASE_URL', 'ANTHROPIC_BASE_URL', 'CUSTOM_LLM_BASE_URL']) {
     const raw = value[key];
     if (raw) {
@@ -195,6 +208,7 @@ export function parseEnvironment(source: NodeJS.ProcessEnv): EnvironmentConfig {
     redisUrl: value.REDIS_URL,
     chromaUrl: cleanOptional(value.CHROMA_URL),
     ollamaBaseUrl: cleanOptional(value.OLLAMA_BASE_URL),
+    ollamaSocketPath: cleanOptional(value.OLLAMA_SOCKET_PATH),
     openaiBaseUrl: cleanOptional(value.OPENAI_BASE_URL),
     openaiApiKey: cleanOptional(value.OPENAI_API_KEY),
     openAiCompatibleSupportsEmbeddings: value.OPENAI_COMPATIBLE_SUPPORTS_EMBEDDINGS,

@@ -8,6 +8,7 @@ export interface ModelInfo {
   modifiedAt?: string;
   contextWindow?: number;
   capabilities: string[];
+  chatSupported?: boolean;
 }
 
 export interface ModelCatalog {
@@ -43,9 +44,15 @@ export function normalizeModelCatalog(payload: unknown): ModelCatalog {
         modifiedAt: typeof model.modifiedAt === 'string' ? model.modifiedAt : typeof model.modified_at === 'string' ? model.modified_at : undefined,
         contextWindow: typeof model.contextWindow === 'number' ? model.contextWindow : undefined,
         capabilities: Object.entries(capabilities).filter(([, enabled]) => enabled === true).map(([name]) => name),
+        chatSupported: typeof capabilities.chat === 'boolean' ? capabilities.chat : undefined,
       };
     }).filter((model) => Boolean(model.id)),
   };
+}
+
+/** Keep unknown legacy metadata selectable, but never offer known non-chat models. */
+export function chatModelOptions(models: ModelInfo[]): ModelInfo[] {
+  return models.filter((model) => model.chatSupported !== false);
 }
 
 export function formatBytes(bytes?: number): string {

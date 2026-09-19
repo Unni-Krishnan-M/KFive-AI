@@ -57,6 +57,14 @@ function modelSizeMiB(model: AiModel): number | undefined {
 }
 
 export function routeModel(request: ModelRoutingRequest): ModelRoutingDecision {
+  const reportedPreference = request.preferredModel
+    ? request.models.find((model) => model.id === request.preferredModel || model.name === request.preferredModel)
+    : undefined;
+  if (reportedPreference?.capabilities?.chat === false) {
+    throw new ModelRoutingError(
+      `Preferred model '${request.preferredModel}' does not support chat according to provider '${request.provider}'. No model or provider fallback was attempted.`
+    );
+  }
   const candidates = request.models.filter((model) => model.capabilities?.chat !== false);
   if (!candidates.length) {
     throw new ModelRoutingError(`Provider '${request.provider}' reported no chat-capable models. No provider fallback was attempted.`);

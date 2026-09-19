@@ -60,6 +60,9 @@ const searchableItems = [
   { name: 'Merge PDF', type: 'PDF Utility', href: '/app/files?tool=merge', icon: FolderOpen },
   { name: 'Extract PDF Pages', type: 'PDF Utility', href: '/app/files?tool=extract', icon: FolderOpen },
   { name: 'Rotate PDF Pages', type: 'PDF Utility', href: '/app/files?tool=rotate', icon: FolderOpen },
+  { name: 'Delete PDF Pages', type: 'PDF Utility', href: '/app/files?tool=delete', icon: FolderOpen },
+  { name: 'Reorder PDF Pages', type: 'PDF Utility', href: '/app/files?tool=reorder', icon: FolderOpen },
+  { name: 'Duplicate PDF Pages', type: 'PDF Utility', href: '/app/files?tool=duplicate', icon: FolderOpen },
 ];
 
 export function AppLayout({ children }: AppLayoutProps) {

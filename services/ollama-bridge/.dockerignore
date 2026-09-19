@@ -1,0 +1,5 @@
+*
+!server.cjs
+!server.test.cjs
+!healthcheck.cjs
+!Dockerfile

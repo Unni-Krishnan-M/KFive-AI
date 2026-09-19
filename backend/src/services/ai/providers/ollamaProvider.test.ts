@@ -1,5 +1,9 @@
 import { Readable } from 'stream';
-import { AxiosInstance } from 'axios';
+import { createServer } from 'http';
+import { mkdtemp, rm } from 'fs/promises';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import axios, { AxiosInstance } from 'axios';
 import { AiProviderAbortedError, AiProviderResponseError, AiProviderUnavailableError } from '../errors';
 import { AiStreamEvent } from '../types';
 import { OllamaProvider } from './ollamaProvider';
@@ -22,6 +26,61 @@ function createProvider(client: ReturnType<typeof createClient>): OllamaProvider
 }
 
 describe('OllamaProvider', () => {
+  it('performs real Unix-socket requests and rejects redirects without escaping to TCP', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'kfive-ollama-'));
+    const socketPath = join(directory, 'http.sock');
+    let redirect = false;
+    const requests: string[] = [];
+    const server = createServer((request, response) => {
+      requests.push(request.url || '');
+      if (redirect) {
+        response.writeHead(302, { Location: 'http://127.0.0.1:1/escape' });
+        response.end();
+      } else {
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify({ models: [{ name: 'socket-model', capabilities: ['completion'] }] }));
+      }
+    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        server.once('error', reject);
+        server.listen(socketPath, resolve);
+      });
+      const provider = new OllamaProvider({ baseUrl: 'https://unused.invalid', socketPath,
+        defaultModel: 'socket-model', maxOutputTokens: 32, timeoutMs: 1000 });
+      await expect(provider.listModels()).resolves.toEqual([expect.objectContaining({ id: 'socket-model' })]);
+      redirect = true;
+      await expect(provider.listModels()).rejects.toMatchObject({
+        code: 'PROVIDER_ERROR', cause: { response: { status: 302 } },
+      });
+      expect(requests).toEqual(['/api/tags', '/api/tags']);
+    } finally {
+      if (server.listening) await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('pins Unix socket requests to HTTP without environment proxies or redirects', () => {
+    const create = jest.spyOn(axios, 'create');
+    try {
+      new OllamaProvider({ baseUrl: 'https://remote.invalid/prefix', socketPath: '/run/kfive/ollama.sock',
+        defaultModel: 'phi3', maxOutputTokens: 32, timeoutMs: 1000 });
+      expect(create).toHaveBeenCalledWith(expect.objectContaining({
+        baseURL: 'http://localhost', socketPath: '/run/kfive/ollama.sock', proxy: false, maxRedirects: 0,
+      }));
+    } finally { create.mockRestore(); }
+  });
+
+  it('retains the configured TCP origin when no socket is configured', () => {
+    const create = jest.spyOn(axios, 'create');
+    try {
+      new OllamaProvider({ baseUrl: 'https://remote.invalid/prefix/',
+        defaultModel: 'phi3', maxOutputTokens: 32, timeoutMs: 1000 });
+      expect(create.mock.calls[0][0]).toMatchObject({ baseURL: 'https://remote.invalid/prefix' });
+      expect(create.mock.calls[0][0]).not.toHaveProperty('socketPath');
+    } finally { create.mockRestore(); }
+  });
+
   it('normalizes model records while retaining legacy Ollama aliases', async () => {
     const client = createClient();
     client.get.mockResolvedValue({

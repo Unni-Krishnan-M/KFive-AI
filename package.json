@@ -3,6 +3,11 @@
   "version": "1.0.0",
   "description": "Production-Level Offline Full Stack AI Assistant",
   "private": true,
+  "overrides": {
+    "refractor": {
+      "prismjs": "1.30.0"
+    }
+  },
   "workspaces": [
     "frontend",
     "backend",
@@ -21,7 +26,9 @@
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f",
     "install:all": "npm install",
-    "test": "npm run test:frontend && npm run test:backend && npm run test:code-runner && npm run test:notebook-runtime",
+    "test": "npm run test:tooling-security && npm run test:frontend && npm run test:backend && npm run test:code-runner && npm run test:notebook-runtime && npm run test:ollama-bridge",
+    "test:tooling-security": "node --test scripts/tooling-security.test.cjs",
+    "test:ollama-bridge": "node --test services/ollama-bridge/server.test.cjs",
     "test:frontend": "cd frontend && npm run test",
     "test:backend": "cd backend && npm run test",
     "test:code-runner": "npm run test --workspace @kfive/code-runner",

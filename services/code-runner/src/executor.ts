@@ -1,13 +1,10 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import {
   DockerCommandAbortedError,
   DockerCommandAdapter,
   DockerCommandResult,
   DockerOutputLimitError,
 } from './dockerCli';
-import { getRuntime, RuntimeDefinition } from './runtimeRegistry';
+import { getRuntime, RuntimeDefinition, sourceArguments } from './runtimeRegistry';
 import {
   DEFAULT_RUNNER_LIMITS,
   ExecutionRequest,
@@ -96,10 +93,11 @@ function requireSuccess(result: DockerCommandResult, operation: string): DockerC
   return result;
 }
 
-function createArguments(runtime: RuntimeDefinition, runId: string, limits: RunnerLimits): string[] {
+function createArguments(runtime: RuntimeDefinition, runId: string, limits: RunnerLimits, source: string): string[] {
   const memory = String(limits.memoryBytes);
   return [
     'create',
+    '--interactive',
     '--pull', 'never',
     '--name', `kfive-run-${runId}`,
     '--label', 'com.kfive.code-run=true',
@@ -129,6 +127,7 @@ function createArguments(runtime: RuntimeDefinition, runId: string, limits: Runn
     '--init',
     runtime.image,
     ...runtime.command,
+    ...sourceArguments(source),
   ];
 }
 
@@ -167,8 +166,6 @@ export class DockerCodeExecutor {
       return { ...result, status: 'cancelled', errorCode: 'CANCELLED' };
     }
 
-    const workspaceRoot = await mkdtemp(join(tmpdir(), 'kfive-run-'));
-    const workspace = join(workspaceRoot, 'workspace');
     let containerId: string | undefined;
     const controller = new AbortController();
     let timedOut = false;
@@ -186,20 +183,12 @@ export class DockerCodeExecutor {
     timer.unref();
 
     try {
-      await mkdir(workspace, { mode: 0o755 });
-      await writeFile(join(workspace, runtime.filename), request.source, { encoding: 'utf8', mode: 0o444, flag: 'wx' });
-
       const created = requireSuccess(await this.docker.run(
-        createArguments(runtime, request.runId, this.limits),
+        createArguments(runtime, request.runId, this.limits, request.source),
         { signal: controller.signal, maxOutputBytes: 64 * 1024 }
       ), 'create');
       containerId = created.stdout.trim();
       if (!/^[a-f0-9]{12,64}$/i.test(containerId)) throw new Error('Docker returned an invalid container identifier.');
-
-      requireSuccess(await this.docker.run(
-        ['cp', `${workspace}/.`, `${containerId}:/workspace`],
-        { signal: controller.signal, maxOutputBytes: 64 * 1024 }
-      ), 'copy');
 
       const executed = await this.docker.run(
         ['start', '--attach', '--interactive', containerId],
@@ -252,7 +241,6 @@ export class DockerCodeExecutor {
           { maxOutputBytes: 64 * 1024, timeoutMs: 5_000 }
         ).catch(() => undefined);
       }
-      await rm(workspaceRoot, { recursive: true, force: true });
       result.durationMs = Math.max(0, Date.now() - startedAt);
     }
 

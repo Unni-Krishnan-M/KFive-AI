@@ -1,0 +1,102 @@
+- generic [ref=e26]:
+  - complementary [ref=e27]:
+    - generic [ref=e28]:
+      - generic [ref=e29]: KFive AI
+      - button "Collapse sidebar" [ref=e35] [cursor=pointer]
+    - generic [ref=e39]:
+      - generic [ref=e40] [cursor=pointer]:
+        - generic [ref=e41]: Search
+        - generic [ref=e46]:
+          - generic [ref=e47]: ⌘
+          - generic [ref=e48]: K
+      - navigation [ref=e49]:
+        - link "Dashboard" [ref=e50] [cursor=pointer]:
+          - /url: /app/dashboard
+        - link "AI Chat" [ref=e59] [cursor=pointer]:
+          - /url: /app/chat
+        - link "Code Lab" [ref=e64] [cursor=pointer]:
+          - /url: /app/code
+        - link "Agents" [ref=e71] [cursor=pointer]:
+          - /url: /app/agents
+        - link "Documents" [ref=e77] [cursor=pointer]:
+          - /url: /app/documents
+        - link "Knowledge / RAG" [ref=e83] [cursor=pointer]:
+          - /url: /app/knowledge
+        - link "Repository Analyzer" [ref=e89] [cursor=pointer]:
+          - /url: /app/repositories
+        - link "Workflows" [ref=e96] [cursor=pointer]:
+          - /url: /app/workflows
+        - link "Dataset Lab" [ref=e104] [cursor=pointer]:
+          - /url: /app/datasets
+        - link "Model Benchmarks" [ref=e111] [cursor=pointer]:
+          - /url: /app/benchmarks
+        - link "Notebooks" [ref=e117] [cursor=pointer]:
+          - /url: /app/notebooks
+        - link "Voice Assistant" [ref=e123] [cursor=pointer]:
+          - /url: /app/voice
+        - link "Models" [ref=e129] [cursor=pointer]:
+          - /url: /app/models
+        - link "Projects" [ref=e142] [cursor=pointer]:
+          - /url: /app/projects
+        - link "Workspace" [ref=e147] [cursor=pointer]:
+          - /url: /app/workspace
+        - link "PDF Utilities" [ref=e153] [cursor=pointer]:
+          - /url: /app/files
+    - generic [ref=e158]:
+      - generic [ref=e159]:
+        - generic [ref=e160]: r
+        - generic [ref=e162]:
+          - paragraph [ref=e163]: rag_recovery_a_20260916
+          - paragraph [ref=e164]: rag-recovery-a-20260916@example.test
+      - generic [ref=e165]:
+        - link "Profile" [ref=e166] [cursor=pointer]:
+          - /url: /app/profile
+        - link "Settings" [ref=e170] [cursor=pointer]:
+          - /url: /app/settings
+        - button "Toggle theme" [ref=e174] [cursor=pointer]
+        - button "Sign out" [ref=e181] [cursor=pointer]
+  - main [ref=e185]:
+    - generic [ref=e187]:
+      - generic [ref=e188]:
+        - heading "Welcome back, rag_recovery_a_20260916!" [level=1] [ref=e189]
+        - paragraph [ref=e190]: Here's what's happening with your AI workspace today.
+      - generic [ref=e191]:
+        - paragraph [ref=e196]: AI Conversations
+        - paragraph [ref=e205]: Documents Uploaded
+        - paragraph [ref=e215]: Tokens Used
+      - generic [ref=e221]:
+        - heading "Recent Activity" [level=2] [ref=e224]
+        - generic [ref=e244]:
+          - heading "Quick Actions" [level=2] [ref=e246]
+          - generic [ref=e249]:
+            - button [ref=e250] [cursor=pointer]:
+              - paragraph [ref=e253]: New Chat
+              - paragraph [ref=e254]: Start AI conversation
+            - button [ref=e255] [cursor=pointer]:
+              - paragraph [ref=e259]: Upload Doc
+              - paragraph [ref=e260]: Store a document
+            - button [ref=e261] [cursor=pointer]:
+              - paragraph [ref=e265]: Run Agent
+              - paragraph [ref=e266]: Execute AI task
+            - button [ref=e267] [cursor=pointer]:
+              - paragraph [ref=e270]: Voice AI
+              - paragraph [ref=e271]: Start voice session
+      - generic [ref=e273]:
+        - heading "Recent Conversations" [level=2] [ref=e274]
+        - button "View All" [ref=e275] [cursor=pointer]
+      - generic [ref=e282]:
+        - heading "AI System Status" [level=2] [ref=e284]
+        - generic [ref=e286]:
+          - generic [ref=e287]:
+            - generic [ref=e288]: Ollama Models
+            - paragraph [ref=e291]: Ollama connection failed
+          - generic [ref=e292]:
+            - generic [ref=e293]:
+              - generic [ref=e294]: Vector Database
+              - generic [ref=e295]: Not checked
+            - paragraph [ref=e296]: See backend readiness for dependency status
+          - generic [ref=e297]:
+            - generic [ref=e298]:
+              - generic [ref=e299]: Real-time Sync
+              - generic [ref=e300]: Active
+            - paragraph [ref=e301]: WebSocket connected

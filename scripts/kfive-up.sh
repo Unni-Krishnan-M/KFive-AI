@@ -6,16 +6,20 @@ cd "$repo_dir"
 
 with_code_lab=0
 with_notebook=0
+with_host_ollama=0
+build_args=(--build)
 while (( $# > 0 )); do
   case "$1" in
     --with-code-lab) with_code_lab=1 ;;
     --with-notebook) with_notebook=1 ;;
+    --with-host-ollama) with_host_ollama=1 ;;
+    --no-build) build_args=(--no-build) ;;
     --help|-h)
-      echo "Usage: $0 [--with-code-lab] [--with-notebook]"
+      echo "Usage: $0 [--with-code-lab] [--with-notebook] [--with-host-ollama] [--no-build]"
       exit 0
       ;;
     *)
-      echo "Usage: $0 [--with-code-lab] [--with-notebook]" >&2
+      echo "Usage: $0 [--with-code-lab] [--with-notebook] [--with-host-ollama] [--no-build]" >&2
       exit 2
       ;;
   esac
@@ -29,6 +33,7 @@ fi
 
 run_compose() {
   local args=() code_mode=disabled notebook_enabled=false
+  if (( with_host_ollama )); then args+=(-f docker-compose.yml -f docker-compose.ollama-host.yml); fi
   if (( with_code_lab )); then args+=(--profile code-lab); code_mode=container; fi
   if (( with_notebook )); then args+=(--profile notebook); notebook_enabled=true; fi
   env COMPOSE_PROFILES= CODE_RUNNER_MODE=$code_mode NOTEBOOK_EXECUTION_ENABLED=$notebook_enabled \
@@ -51,6 +56,19 @@ read_env_value() {
     env_value=${env_value:1:${#env_value}-2}
   fi
 }
+
+if (( with_host_ollama )); then
+  if [[ $(uname -s) != Linux ]]; then
+    echo "The host Ollama bridge requires Linux host networking." >&2
+    exit 1
+  fi
+  provider=${AI_PROVIDER:-}
+  if [[ -z $provider ]]; then read_env_value AI_PROVIDER; provider=${env_value:-ollama}; fi
+  if [[ $provider != ollama ]]; then
+    echo "--with-host-ollama requires AI_PROVIDER=ollama; provider was not changed." >&2
+    exit 1
+  fi
+fi
 
 if (( with_code_lab )); then
   docker_socket=${CODE_RUNNER_DOCKER_SOCKET:-}
@@ -151,8 +169,10 @@ if (( with_notebook )); then
     echo "Notebook runtime and verifier image names must be distinct." >&2
     exit 1
   fi
-  docker --host "$notebook_host" build --target runtime -t "$notebook_runtime_image" services/notebook-runtime
-  docker --host "$notebook_host" build --target verifier -t "$notebook_verifier_image" services/notebook-runtime
+  if [[ ${build_args[0]} == --build ]]; then
+    docker --host "$notebook_host" build --target runtime -t "$notebook_runtime_image" services/notebook-runtime
+    docker --host "$notebook_host" build --target verifier -t "$notebook_verifier_image" services/notebook-runtime
+  fi
   runtime_id=$(docker --host "$notebook_host" image inspect --format '{{.Id}}' "$notebook_runtime_image")
   verifier_id=$(docker --host "$notebook_host" image inspect --format '{{.Id}}' "$notebook_verifier_image")
   if [[ -z $runtime_id || -z $verifier_id || $runtime_id == "$verifier_id" ]]; then
@@ -161,5 +181,5 @@ if (( with_notebook )); then
   fi
 fi
 
-run_compose up --build -d
+run_compose up "${build_args[@]}" -d
 run_compose ps

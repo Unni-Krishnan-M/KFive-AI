@@ -1,8 +1,8 @@
 import { Server } from 'socket.io';
-import jwt from 'jsonwebtoken';
 import { logger } from '@/utils/logger';
 import { Conversation } from '@/models/Conversation';
 import { isValidObjectId } from 'mongoose';
+import { verifyAccessToken } from '@/middleware/auth';
 
 export function setupSocketHandlers(io: Server): void {
   // Authentication middleware
@@ -14,14 +14,7 @@ export function setupSocketHandlers(io: Server): void {
         return next(new Error('Authentication error: No token provided'));
       }
 
-      const decoded = jwt.verify(token, process.env.JWT_SECRET!, {
-        algorithms: ['HS256'],
-        issuer: 'kfive-ai',
-        audience: 'kfive-web',
-      });
-      if (typeof decoded === 'string' || typeof decoded.userId !== 'string' || typeof decoded.email !== 'string') {
-        return next(new Error('Authentication error: Invalid token payload'));
-      }
+      const decoded = verifyAccessToken(token);
       socket.data.userId = decoded.userId;
       socket.data.email = decoded.email;
       

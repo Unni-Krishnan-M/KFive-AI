@@ -155,9 +155,10 @@ process.once('uncaughtException', (error) => {
 async function startServer(): Promise<void> {
   try {
     await connectDatabase();
-    const interruptedAgentRuns = await agentRunService.recoverInterrupted();
+    // Every active record predates this process and has no local controller.
+    const interruptedAgentRuns = await agentRunService.recoverInterrupted(0);
     if (interruptedAgentRuns > 0) logger.warn('Recovered interrupted agent runs', { count: interruptedAgentRuns });
-    const interruptedWorkflowRuns = await workflowRunService.recoverInterrupted();
+    const interruptedWorkflowRuns = await workflowRunService.recoverInterrupted(0);
     if (interruptedWorkflowRuns > 0) logger.warn('Recovered interrupted workflow runs', { count: interruptedWorkflowRuns });
     const interruptedChatGenerations = await chatService.recoverInterrupted();
     if (interruptedChatGenerations > 0) {

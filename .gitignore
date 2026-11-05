@@ -10,6 +10,7 @@ lerna-debug.log*
 .env
 .env.*
 !.env.example
+!.env.production.example
 !**/.env.example
 .env.local
 .env.development.local
@@ -26,6 +27,7 @@ pids
 *.pid
 *.seed
 *.pid.lock
+kfive-backups/
 
 # Coverage directory used by tools like istanbul
 coverage/
@@ -87,6 +89,9 @@ temp/
 # Logs
 logs
 *.log
+core
+core.*
+*.core
 
 # Runtime data
 pids

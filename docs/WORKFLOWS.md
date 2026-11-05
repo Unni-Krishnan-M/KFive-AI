@@ -1,6 +1,6 @@
-# Experimental Workflows
+# Workflows
 
-The Phase 10 Workflow source slice is **implemented and Experimental**. It is a server-validated, fixed text pipeline:
+The local, workspace-scoped, single-backend-replica fixed-text critical path is **Implemented**. Overall Workflows remain **Experimental** because the general builder, additional nodes, distributed execution, and remote/Kubernetes acceptance are not implemented or verified. The implemented pipeline is:
 
 ```text
 Input -> Prompt -> LLM -> Output
@@ -19,7 +19,7 @@ It is not a general-purpose workflow builder, automation service, or agent runti
 - Project deletion is non-cascading. If the associated project is already gone, retained terminal runs and then the run-free workflow definition remain owner-deletable so they do not permanently consume retention.
 - Model output is always inert text. It is displayed and stored, never evaluated or interpreted as a command, authorization, tool call, workflow definition, or instruction to another subsystem.
 
-The browser page, strict response contracts, authenticated API mount, persistence models, execution service, and recovery wiring exist in source. This document describes that intentionally narrow contract, not a claim that the target-host path has passed end-to-end verification.
+The production browser path has passed local Ollama success, real UI cancellation, MongoDB history/detail, deletion, and backend-restart persistence. See [the live verification record](../output/verification/workflow-live.md).
 
 ## API
 
@@ -57,7 +57,7 @@ Adding any of those capabilities requires a separately designed and reviewed ver
 - Submitted input, stored prompt templates, and stored system prompts are each limited to 16 KiB of UTF-8 text.
 - The template must contain `{{input}}` exactly once; after substitution, the rendered user prompt is limited to 32 KiB.
 - Persisted output is limited to 256 KiB. Output beyond the bound is not retained as a successful result.
-- A run has a 30-second service timeout.
+- A run uses the validated `AI_TIMEOUT_MS` provider deadline (30 seconds by default).
 - Each owner may store at most 100 workflow definitions. The backend enforces this with a count-then-create sequence rather than an atomic database quota, so concurrent requests or replicas can exceed it.
 - Each owner may retain at most 500 workflow runs. The current count-then-create check is process-local and non-atomic across replicas.
 - History is exposed in pages of at most 50 summaries and at most ten pages.
@@ -72,14 +72,13 @@ Workflow input, generated output, prompt templates, and system prompts are store
 
 Do not place secrets, credentials, regulated data, or other sensitive content in workflow inputs, templates, or system prompts. Restrict access to the provider, MongoDB, and backups and use appropriate storage and transport encryption for the deployment.
 
-## Pending verification
+## Remaining verification
 
-The complete target-host path remains pending: browser definition management, authenticated owner/project authorization, active-versus-archived behavior, real configured-provider SSE streaming, MongoDB persistence and restart behavior, cancellation, timeout/output bounds, pagination/detail, and terminal deletion. External-provider smoke tests must remain opt-in so ordinary verification cannot make billable requests.
+The local workspace critical path has passed browser definition management, authenticated configured-provider SSE, success, cancellation, MongoDB history/detail, terminal deletion, and backend-restart persistence. Project archive behavior, second-owner live acceptance, live timeout/output bounds, pagination limits, external providers, multiple replicas, remote deployment, and Kubernetes remain pending. External-provider smoke tests must remain opt-in so ordinary verification cannot make billable requests.
 
 ## Source verification
 
-- 30 focused backend model/service/route tests pass.
-- 7 focused frontend contract tests pass.
-- The complete repository gate passes 331 tests: 59 frontend, 266 backend, and 6 Code Runner tests.
-- Frontend, backend, and Code Runner lint/build targets pass.
-- Default and Code Lab profile Compose configuration, lifecycle-script shell syntax, and repository diff checks pass.
+- 33 focused backend model/service/route tests pass.
+- 18 focused frontend Workflow/model/transport/Nginx tests pass.
+- Frontend and backend production builds pass.
+- The deployed production browser passed success, durable cancellation readiness, cancellation reconciliation, cleanup, and restart persistence on 2026-09-21.

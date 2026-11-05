@@ -7,6 +7,7 @@ import { repositoryApi } from '@/services/api';
 import {
   REPOSITORY_ARCHIVE_LIMIT_BYTES,
   RepositoryAnalysis,
+  RepositoryAnalysisPage,
   RepositoryAnalysisSummary,
   RepositoryStatus,
   canCreateRepositoryAnalysis,
@@ -14,7 +15,7 @@ import {
   effectiveRepositoryProjectStatus,
   formatBytes,
   isRepositoryScopeRequestCurrent,
-  normalizeRepositoryAnalyses,
+  normalizeRepositoryAnalysisPage,
   normalizeRepositoryAnalysis,
   normalizeRepositoryStatus,
   repositoryAnalysisScopeKey,
@@ -29,6 +30,8 @@ function reportFilename(analysis: RepositoryAnalysis): string {
   const safe = analysis.name.replace(/[^a-z0-9._-]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'repository';
   return `${safe}-analysis.json`;
 }
+
+const emptyPagination: RepositoryAnalysisPage['pagination'] = { page: 1, pageSize: 50, total: 0, totalPages: 1, maxPages: 10 };
 
 export default function RepositoryAnalyzerPage() {
   const navigate = useNavigate();
@@ -50,6 +53,7 @@ export default function RepositoryAnalyzerPage() {
   const mountedRef = useRef(true);
   const [status, setStatus] = useState<RepositoryStatus>();
   const [analyses, setAnalyses] = useState<RepositoryAnalysisSummary[]>([]);
+  const [pagination, setPagination] = useState(emptyPagination);
   const [selected, setSelected] = useState<RepositoryAnalysis>();
   const [loading, setLoading] = useState(false);
   const [statusError, setStatusError] = useState<string>();
@@ -72,12 +76,14 @@ export default function RepositoryAnalyzerPage() {
     mountedRef.current && isRepositoryScopeRequestCurrent(scopeKeyRef.current, requestScopeKey, currentRequestId, requestId)
   ), []);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (page = 1) => {
     const requestScopeKey = scopeKey;
     const requestId = ++requestRef.current;
+    detailRequestRef.current += 1;
     if (!projectValid) {
       setStatus(undefined);
       setAnalyses([]);
+      setPagination(emptyPagination);
       setSelected(undefined);
       setStatusError(undefined);
       setHistoryError(undefined);
@@ -87,7 +93,7 @@ export default function RepositoryAnalyzerPage() {
     setLoading(true);
     const [statusResult, historyResult] = await Promise.allSettled([
       repositoryApi.getStatus(projectId),
-      repositoryApi.getAnalyses(projectId, orphaned ? 'orphaned' : undefined),
+      repositoryApi.getAnalyses(projectId, orphaned ? 'orphaned' : undefined, page),
     ]);
     if (!requestIsCurrent(requestScopeKey, requestRef.current, requestId)) return;
     if (statusResult.status === 'fulfilled') {
@@ -98,12 +104,21 @@ export default function RepositoryAnalyzerPage() {
       setStatusError(readableApiError(statusResult.reason, 'Repository Analyzer availability could not be checked.'));
     }
     if (historyResult.status === 'fulfilled') {
-      const next = normalizeRepositoryAnalyses(historyResult.value.data);
-      setAnalyses(next);
-      setSelected((current) => current && next.some((item) => item.id === current.id) ? current : undefined);
-      setHistoryError(undefined);
+      const next = normalizeRepositoryAnalysisPage(historyResult.value.data);
+      if (next) {
+        setAnalyses(next.analyses);
+        setPagination(next.pagination);
+        setSelected((current) => current && next.analyses.some((item) => item.id === current.id) ? current : undefined);
+        setHistoryError(undefined);
+      } else {
+        setAnalyses([]);
+        setPagination(emptyPagination);
+        setSelected(undefined);
+        setHistoryError('The repository service returned invalid history pagination.');
+      }
     } else {
       setAnalyses([]);
+      setPagination(emptyPagination);
       setSelected(undefined);
       setHistoryError(readableApiError(historyResult.reason, 'Repository analyses could not be loaded.'));
     }
@@ -131,6 +146,7 @@ export default function RepositoryAnalyzerPage() {
     fileSelectionRef.current += 1;
     setStatus(undefined);
     setAnalyses([]);
+    setPagination(emptyPagination);
     setSelected(undefined);
     setStatusError(undefined);
     setHistoryError(undefined);
@@ -199,7 +215,7 @@ export default function RepositoryAnalyzerPage() {
       setAnalysisName('');
       if (fileInputRef.current) fileInputRef.current.value = '';
       toast.success('Repository analysis completed.');
-      await refresh();
+      await refresh(1);
       if (!requestIsCurrent(requestScopeKey, uploadRequestRef.current, requestId)) return;
       setSelected(normalized);
     } catch (error) {
@@ -247,7 +263,8 @@ export default function RepositoryAnalyzerPage() {
       await repositoryApi.deleteAnalysis(selected.id);
       if (!requestIsCurrent(requestScopeKey, deleteRequestRef.current, requestId)) return;
       setSelected(undefined);
-      await refresh();
+      const targetPage = analyses.length === 1 && pagination.page > 1 ? pagination.page - 1 : pagination.page;
+      await refresh(targetPage);
       if (!requestIsCurrent(requestScopeKey, deleteRequestRef.current, requestId)) return;
       toast.success('Repository analysis deleted.');
     } catch (error) {
@@ -268,7 +285,7 @@ export default function RepositoryAnalyzerPage() {
   } : undefined, [selected]);
 
   return <div className="mx-auto max-w-7xl space-y-6 p-6 md:p-8">
-    <header className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="flex items-center gap-3 text-3xl font-bold text-white"><GitBranch className="text-primary" />Repository Analyzer</h1><p className="mt-2 text-gray-400">Upload a bounded ZIP and inspect the deterministic report returned by KFive.</p></div><button onClick={() => void refresh()} disabled={loading || !projectValid} className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-gray-200 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Refresh</button></header>
+    <header className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="flex items-center gap-3 text-3xl font-bold text-white"><GitBranch className="text-primary" />Repository Analyzer</h1><p className="mt-2 text-gray-400">Upload a bounded ZIP and inspect the deterministic report returned by KFive.</p></div><button onClick={() => void refresh(pagination.page)} disabled={loading || !projectValid} className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-gray-200 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Refresh</button></header>
 
     <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4 text-sm text-cyan-100"><ShieldCheck className="mr-2 inline h-4 w-4" />Analysis is read-only: KFive inventories the uploaded ZIP without modifying its source files. It does not clone repositories, execute code, install packages, or generate an AI report.</div>
     {projectLoading ? <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-gray-400">Verifying project context…</div> : null}
@@ -284,7 +301,7 @@ export default function RepositoryAnalyzerPage() {
       <aside className="space-y-5">
         <section className="rounded-2xl border border-white/10 bg-white/5 p-5"><h2 className="font-semibold text-white">Analyze ZIP</h2><p className="mt-2 text-sm text-gray-500">One ZIP, up to {formatBytes(maximumBytes)}. The archive is sent to the KFive backend.</p><input ref={fileInputRef} type="file" accept=".zip,application/zip,application/x-zip-compressed,application/octet-stream" onChange={(event) => void selectArchive(event)} disabled={!createAllowed || uploading} className="hidden" /><button onClick={() => fileInputRef.current?.click()} disabled={!createAllowed || uploading} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-gray-200 disabled:cursor-not-allowed disabled:opacity-40"><FileArchive className="h-4 w-4" />Choose ZIP</button>{archive ? <div className="mt-3 space-y-3"><p className="truncate text-sm text-white">{archive.name} <span className="text-gray-500">({formatBytes(archive.size)})</span></p><label className="block text-xs text-gray-400">Report name<input value={analysisName} onChange={(event) => setAnalysisName(event.target.value)} maxLength={200} className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white" /></label><button onClick={() => void analyze()} disabled={!createAllowed || uploading} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}{uploading ? 'Analyzing…' : 'Analyze repository'}</button></div> : null}{projectStatus === 'archived' ? <p className="mt-3 text-sm text-amber-300">{PROJECT_ARCHIVED_MESSAGE}</p> : status && !status.canAnalyze ? <p className="mt-3 text-sm text-amber-300">New analyses are unavailable. Check the status above.</p> : null}{archiveError ? <p role="alert" className="mt-3 rounded-lg bg-red-500/10 p-3 text-sm text-red-200">{archiveError}</p> : null}</section>
 
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-5"><h2 className="font-semibold text-white">Saved reports</h2>{historyError ? <p role="alert" className="mt-3 text-sm text-red-300">{historyError}</p> : null}<div className="mt-3 space-y-2">{analyses.map((analysis) => <button key={analysis.id} onClick={() => void openAnalysis(analysis)} disabled={deleting} className={`w-full rounded-xl border p-3 text-left disabled:cursor-not-allowed disabled:opacity-50 ${selected?.id === analysis.id ? 'border-primary/50 bg-primary/10' : 'border-white/10 bg-black/20'}`}><p className="truncate text-sm font-medium text-white">{analysis.name}</p><p className="mt-1 truncate text-xs text-gray-500">{analysis.source.originalName}</p><p className="mt-1 text-xs capitalize text-emerald-300">{analysis.status}</p></button>)}{!loading && !analyses.length && !historyError ? <p className="py-6 text-center text-sm text-gray-500">No saved analyses in this scope.</p> : null}</div></section>
+        <section className="rounded-2xl border border-white/10 bg-white/5 p-5"><div className="flex items-center justify-between"><h2 className="font-semibold text-white">Saved reports</h2><span className="text-xs text-gray-500">{pagination.total}</span></div>{historyError ? <p role="alert" className="mt-3 text-sm text-red-300">{historyError}</p> : null}<div className="mt-3 space-y-2">{analyses.map((analysis) => <button key={analysis.id} onClick={() => void openAnalysis(analysis)} disabled={deleting} className={`w-full rounded-xl border p-3 text-left disabled:cursor-not-allowed disabled:opacity-50 ${selected?.id === analysis.id ? 'border-primary/50 bg-primary/10' : 'border-white/10 bg-black/20'}`}><p className="truncate text-sm font-medium text-white">{analysis.name}</p><p className="mt-1 truncate text-xs text-gray-500">{analysis.source.originalName}</p><p className="mt-1 text-xs capitalize text-emerald-300">{analysis.status}</p></button>)}{!loading && !analyses.length && !historyError ? <p className="py-6 text-center text-sm text-gray-500">No saved analyses in this scope.</p> : null}</div><div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3"><button onClick={() => void refresh(pagination.page - 1)} disabled={loading || pagination.page <= 1} className="rounded-lg border border-white/10 px-2 py-1 text-xs text-gray-300 disabled:opacity-30">Previous</button><span className="text-xs text-gray-500">{pagination.page} / {pagination.totalPages}</span><button onClick={() => void refresh(pagination.page + 1)} disabled={loading || pagination.page >= pagination.totalPages} className="rounded-lg border border-white/10 px-2 py-1 text-xs text-gray-300 disabled:opacity-30">Next</button></div></section>
       </aside>
 
       <main className="rounded-2xl border border-white/10 bg-white/5 p-5">{detailError ? <p role="alert" className="mb-4 rounded-lg bg-red-500/10 p-3 text-sm text-red-200">{detailError}</p> : null}{selected && reportSections ? <div className="space-y-6"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-xl font-semibold text-white">{selected.name}</h2><p className="mt-1 text-sm text-gray-500">{selected.source.originalName} · SHA-256 {selected.source.sha256}</p></div><div className="flex flex-wrap gap-2"><button onClick={downloadReport} className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm text-gray-200"><Download className="h-4 w-4" />Download JSON</button><button onClick={() => void deleteAnalysis()} disabled={!deleteAllowed || deleting} className="inline-flex items-center gap-2 rounded-lg border border-red-500/30 px-3 py-2 text-sm text-red-200 disabled:cursor-not-allowed disabled:opacity-40">{deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}Delete report</button></div></div>

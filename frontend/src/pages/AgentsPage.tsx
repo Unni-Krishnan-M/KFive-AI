@@ -22,9 +22,10 @@ import {
   normalizeAgentRunPage,
   normalizeAgentRunUsage,
   isTerminalAgentRun,
+  waitForTerminalAgentRun,
 } from '@/services/agentModel';
 import { agentApi, modelApi } from '@/services/api';
-import { ModelCatalog, normalizeModelCatalog } from '@/services/modelManager';
+import { chatModelOptions, ModelCatalog, normalizeModelCatalog } from '@/services/modelManager';
 import { PROJECT_ARCHIVED_MESSAGE } from '@/services/projectContext';
 import { readableApiError } from '@/services/runtimeSettings';
 import { getToken } from '@/utils/getToken';
@@ -253,7 +254,19 @@ export default function AgentsPage() {
 
   const cancelExecution = async (active: ActiveExecution) => {
     try {
-      if (active.runId) await agentApi.cancelRun(active.agentId, active.runId);
+      if (active.runId) {
+        const response = await agentApi.cancelRun(active.agentId, active.runId);
+        const requested = normalizeAgentRunDetail(response.data);
+        if (!requested || requested.id !== active.runId) throw new Error('The server returned an invalid cancellation result.');
+        setSelectedRun(requested);
+        active.controller.abort();
+        if (!isTerminalAgentRun(requested)) {
+          const terminal = await waitForTerminalAgentRun(
+            async () => (await agentApi.getRun(active.agentId, active.runId as string)).data
+          );
+          setSelectedRun(terminal);
+        }
+      }
     } catch (error) {
       toast.error(readableApiError(error, 'The run cancellation request failed.'));
     } finally {
@@ -369,17 +382,18 @@ export default function AgentsPage() {
   };
 
   const filteredAgents = agents.filter((agent) => agent.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const chatModels = chatModelOptions(catalog.models);
   const currentModel = editingAgent?.aiModel || editingAgent?.model || '';
-  const modelOptions = currentModel && !catalog.models.some((model) => model.id === currentModel)
-    ? [{ id: currentModel, name: `${currentModel} (current)` }, ...catalog.models]
-    : catalog.models;
+  const modelOptions = currentModel && !chatModels.some((model) => model.id === currentModel)
+    ? [{ id: currentModel, name: `${currentModel} (current)`, provider: catalog.provider, capabilities: [], chatSupported: undefined }, ...chatModels]
+    : chatModels;
 
   return <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="space-y-8 p-6 md:p-8">
     <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
       <div><h1 className="flex items-center gap-3 text-3xl font-bold tracking-tight text-white"><Bot className="h-8 w-8 text-primary" />AI Agents</h1><p className="mt-1 text-gray-400">Create specialized assistants and inspect their durable run history.</p></div>
       <div className="flex w-full items-center gap-3 md:w-auto">
         <div className="relative flex-1 md:w-64"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" /><input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search agents..." className="w-full rounded-xl border border-white/10 bg-black/40 py-2 pl-9 pr-4 text-sm text-white focus:border-primary/50 focus:outline-none" /></div>
-        <button onClick={() => { setEditingAgent({ name: '', description: '', systemPrompt: '', aiModel: catalog.models[0]?.id ?? '', temperature: 0.7, tools: [] }); setIsSlideOverOpen(true); }} disabled={!projectMutationsAllowed || projectLoading} className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2 font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"><Plus className="h-4 w-4" /><span className="hidden sm:inline">Create Agent</span></button>
+        <button onClick={() => { setEditingAgent({ name: '', description: '', systemPrompt: '', aiModel: '', temperature: 0.7, tools: [] }); setIsSlideOverOpen(true); }} disabled={!projectMutationsAllowed || projectLoading} className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2 font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"><Plus className="h-4 w-4" /><span className="hidden sm:inline">Create Agent</span></button>
       </div>
     </div>
 
@@ -423,6 +437,7 @@ export default function AgentsPage() {
           {runDetailLoading ? <div className="mt-6 flex items-center gap-2 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" />Loading run details…</div> : selectedRun ? <div className="mt-6 space-y-4">
             <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4"><div className="rounded-lg bg-white/5 p-3"><p className="text-xs text-gray-500">Status</p><p className="mt-1 capitalize text-white">{statusLabel(selectedRun.status)}</p></div><div className="rounded-lg bg-white/5 p-3"><p className="text-xs text-gray-500">Provider</p><p className="mt-1 truncate text-white">{selectedRun.provider ?? 'Pending'}</p></div><div className="rounded-lg bg-white/5 p-3"><p className="text-xs text-gray-500">Model</p><p className="mt-1 truncate text-white">{selectedRun.model ?? selectedRun.agent.requestedModel}</p></div><div className="rounded-lg bg-white/5 p-3"><p className="text-xs text-gray-500">Usage</p><p className="mt-1 text-white">{selectedRun.usage?.totalTokens?.toLocaleString() ?? 'Unavailable'} tokens</p><p className="mt-1 text-xs text-gray-500">{selectedRun.usage?.inputTokens?.toLocaleString() ?? '?'} in · {selectedRun.usage?.outputTokens?.toLocaleString() ?? '?'} out{selectedRun.usage?.totalDurationMs !== undefined ? ` · ${selectedRun.usage.totalDurationMs.toLocaleString()} ms` : ''}</p></div></div>
             {selectedRun.error ? <div role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{selectedRun.error.message} <span className="text-xs text-red-300">({selectedRun.error.code})</span></div> : null}
+            <div className="rounded-xl border border-white/5 bg-black/40 p-5 font-mono text-sm text-gray-300"><p className="mb-3 font-sans text-xs uppercase tracking-wide text-gray-500">Prompt</p><pre className="whitespace-pre-wrap break-words font-inherit">{selectedRun.prompt}</pre></div>
             <div className="rounded-xl border border-white/5 bg-black/60 p-5 font-mono text-sm text-gray-300"><p className="mb-3 font-sans text-xs uppercase tracking-wide text-gray-500">Output · {selectedRun.outputBytes.toLocaleString()} bytes{selectedRun.outputTruncated ? ' · truncated' : ''}</p>{isExecuting && !selectedRun.output ? <span className="flex items-center gap-2 text-gray-500"><Loader2 className="h-4 w-4 animate-spin" />Waiting for output…</span> : <pre className="whitespace-pre-wrap break-words font-inherit">{selectedRun.output || 'No output was recorded.'}</pre>}</div>
             <div><h4 className="mb-3 text-sm font-medium text-gray-300">Timeline</h4><ol className="space-y-2">{selectedRun.timeline.map((event) => <li key={`${event.sequence}-${event.type}`} className="flex items-start gap-3 rounded-lg border border-white/5 bg-white/[0.03] p-3 text-sm"><Clock3 className="mt-0.5 h-4 w-4 text-primary" /><div><p className="capitalize text-gray-200">{statusLabel(event.type)}</p><p className="mt-1 text-xs text-gray-500">{dateTime(event.timestamp)}{event.provider ? ` · ${event.provider}` : ''}{event.model ? ` · ${event.model}` : ''}{event.code ? ` · ${event.code}` : ''}</p></div></li>)}</ol></div>
           </div> : <p className="mt-8 rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-gray-500">Select a recent run to inspect its output and timeline.</p>}

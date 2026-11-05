@@ -8,11 +8,14 @@ import documentRouter, {
   DOCUMENT_PROCESSOR_UNAVAILABLE_MESSAGE,
   DocumentRouteError,
   markDocumentProcessorUnavailable,
+  markOcrServiceUnavailable,
   persistUploadedDocument,
+  persistUploadedDocumentWithProjectLease,
   publicDocumentRecord,
   removeDocumentStorageFile,
   resolveDocumentStoragePath,
 } from './document';
+import { ProjectMutationLease } from '@/services/projectMutationLease';
 
 const ownerId = '64b000000000000000000001';
 const documentId = '64b000000000000000000501';
@@ -106,6 +109,31 @@ describe('document route safety stabilization', () => {
     expect(serialized).not.toHaveProperty('path');
     expect(serialized).not.toHaveProperty('content');
     expect(serialized).not.toHaveProperty('userId');
+  });
+
+  it('returns extracted text only from an owner-scoped completed detail record', async () => {
+    const findOne = jest.spyOn(DocumentModel, 'findOne').mockResolvedValue({
+      _id: documentId,
+      userId: ownerId,
+      originalName: 'report.pdf',
+      filename: 'private-random-name.pdf',
+      path: '/private/uploads/private-random-name.pdf',
+      content: 'owner-visible extracted text',
+      pageCount: 2,
+      mimeType: 'application/pdf',
+      size: 123,
+      status: 'completed',
+    } as any);
+
+    const response = await invoke(documentRouter, 'get', '/:id', { params: { id: documentId } });
+    expect(findOne).toHaveBeenCalledWith({ _id: documentId, userId: ownerId });
+    expect(response).toMatchObject({
+      status: 200,
+      body: { success: true, data: { _id: documentId, content: 'owner-visible extracted text', pageCount: 2 } },
+    });
+    expect((response.body as any).data).not.toHaveProperty('path');
+    expect((response.body as any).data).not.toHaveProperty('filename');
+    expect((response.body as any).data).not.toHaveProperty('userId');
   });
 
   it('rejects owner-scoped active deletion before touching storage', async () => {
@@ -234,6 +262,40 @@ describe('document safety helpers', () => {
     expect(removeFile).toHaveBeenCalledWith(file.path);
   });
 
+  it('revalidates a project inside its mutation lease before publishing an upload', async () => {
+    const projectId = '64b000000000000000000101';
+    const lease = new ProjectMutationLease();
+    let release!: () => void;
+    let markReady!: () => void;
+    const ready = new Promise<void>((resolve) => { markReady = resolve; });
+    const blocker = lease.run(projectId, () => {
+      markReady();
+      return new Promise<void>((resolve) => { release = resolve; });
+    });
+    await ready;
+    const archived = new ProjectError('Project is archived.', 'PROJECT_ARCHIVED', 409);
+    const resolveProject = jest.fn()
+      .mockResolvedValueOnce({ _id: projectId, name: 'Active', status: 'active' })
+      .mockRejectedValueOnce(archived);
+    const createDocument = jest.fn();
+    const removeFile = jest.fn().mockResolvedValue(undefined);
+    const file = {
+      path: '/tmp/project-race.pdf', originalname: 'race.pdf', filename: 'race.pdf',
+      mimetype: 'application/pdf', size: 100,
+    } as Express.Multer.File;
+
+    const upload = persistUploadedDocumentWithProjectLease(
+      ownerId, projectId, file, resolveProject, createDocument, removeFile, lease
+    );
+    release();
+
+    await expect(upload).rejects.toBe(archived);
+    await blocker;
+    expect(resolveProject).toHaveBeenCalledTimes(2);
+    expect(createDocument).not.toHaveBeenCalled();
+    expect(removeFile).toHaveBeenCalledWith(file.path);
+  });
+
   it('persists the fixed unavailable state without sending untrusted documents to an API worker', async () => {
     jest.spyOn(logger, 'warn').mockImplementation(() => logger);
     const save = jest.fn().mockResolvedValue(undefined);
@@ -254,6 +316,24 @@ describe('document safety helpers', () => {
     });
     expect(save).toHaveBeenCalledTimes(1);
     expect(logger.warn).toHaveBeenCalledWith('Document processor unavailable', { documentId });
+  });
+
+  it('persists a distinct OCR dependency error for image uploads', async () => {
+    jest.spyOn(logger, 'warn').mockImplementation(() => logger);
+    const save = jest.fn().mockResolvedValue(undefined);
+    const document = {
+      _id: documentId,
+      originalName: 'scan.png',
+      mimeType: 'image/png',
+      size: 100,
+      status: 'pending' as const,
+      save,
+    };
+
+    await markOcrServiceUnavailable(document);
+
+    expect(document).toMatchObject({ status: 'failed', errorMessage: 'OCR service is unavailable' });
+    expect(save).toHaveBeenCalledTimes(1);
   });
 
   it('allows only resolved files below the upload root and uses async deletion', async () => {

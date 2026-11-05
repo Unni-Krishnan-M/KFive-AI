@@ -1,0 +1,243 @@
+name: ${KFIVE_PRODUCTION_PROJECT:-kfive-production}
+
+services:
+  mongodb:
+    image: ${KFIVE_MONGODB_IMAGE:?Set an immutable KFIVE_MONGODB_IMAGE}
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:?Set MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?Set MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:?Set MONGO_DATABASE}
+      MONGO_APP_USERNAME: ${MONGO_APP_USERNAME:?Set MONGO_APP_USERNAME}
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD:?Set MONGO_APP_PASSWORD}
+    configs:
+      - source: mongodb-init-app-user
+        target: /docker-entrypoint-initdb.d/10-kfive-app-user.js
+    volumes:
+      - mongodb-data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --username \"$$MONGO_INITDB_ROOT_USERNAME\" --password \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --eval 'db.adminCommand({ping:1})' >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks: [data-internal]
+    restart: unless-stopped
+    pids_limit: 256
+    deploy:
+      resources:
+        limits: {cpus: "2.0", memory: 2G, pids: 256}
+        reservations: {cpus: "0.25", memory: 256M}
+    security_opt: [no-new-privileges:true]
+    logging: &bounded-logging
+      driver: local
+      options: {max-size: "10m", max-file: "5"}
+
+  redis:
+    image: ${KFIVE_REDIS_IMAGE:?Set an immutable KFIVE_REDIS_IMAGE}
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?Set REDIS_PASSWORD}"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [data-internal]
+    restart: unless-stopped
+    pids_limit: 128
+    deploy:
+      resources:
+        limits: {cpus: "1.0", memory: 768M, pids: 128}
+        reservations: {cpus: "0.1", memory: 128M}
+    security_opt: [no-new-privileges:true]
+    logging: *bounded-logging
+
+  chromadb:
+    image: ${KFIVE_CHROMADB_IMAGE:?Set an immutable KFIVE_CHROMADB_IMAGE}
+    environment:
+      CHROMA_SERVER_HOST: 0.0.0.0
+      CHROMA_SERVER_HTTP_PORT: 8000
+      ANONYMIZED_TELEMETRY: "false"
+    volumes:
+      - chromadb-data:/chroma/chroma
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/heartbeat', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
+    networks: [data-internal]
+    restart: unless-stopped
+    pids_limit: 256
+    deploy:
+      resources:
+        limits: {cpus: "2.0", memory: 2G, pids: 256}
+        reservations: {cpus: "0.25", memory: 256M}
+    security_opt: [no-new-privileges:true]
+    logging: *bounded-logging
+
+  backend:
+    image: ${KFIVE_BACKEND_IMAGE:?Set an immutable KFIVE_BACKEND_IMAGE}
+    environment:
+      NODE_ENV: production
+      KFIVE_PROCESS: api
+      PORT: 5000
+      API_VERSION: v1
+      KFIVE_MODE: ${KFIVE_MODE:?Set KFIVE_MODE to remote or hybrid}
+      AI_PROVIDER: ${AI_PROVIDER:?Set an authenticated remote AI_PROVIDER}
+      AI_DEFAULT_MODEL: ${AI_DEFAULT_MODEL:?Set AI_DEFAULT_MODEL}
+      AI_EMBEDDING_MODEL: ${AI_EMBEDDING_MODEL:-}
+      AI_MAX_OUTPUT_TOKENS: ${AI_MAX_OUTPUT_TOKENS:-2048}
+      AI_TIMEOUT_MS: ${AI_TIMEOUT_MS:-30000}
+      MONGODB_URL: mongodb://${MONGO_APP_USERNAME}:${MONGO_APP_PASSWORD}@mongodb:27017/${MONGO_DATABASE}?authSource=${MONGO_DATABASE}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      QUEUE_REDIS_URL: ${QUEUE_REDIS_URL:-}
+      CHROMA_URL: http://chromadb:8000
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Set JWT_REFRESH_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_COMPATIBLE_SUPPORTS_EMBEDDINGS: ${OPENAI_COMPATIBLE_SUPPORTS_EMBEDDINGS:-false}
+      OPENAI_COMPATIBLE_SUPPORTS_STRUCTURED_OUTPUT: ${OPENAI_COMPATIBLE_SUPPORTS_STRUCTURED_OUTPUT:-false}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-https://api.anthropic.com}
+      CUSTOM_LLM_BASE_URL: ${CUSTOM_LLM_BASE_URL:-}
+      CUSTOM_LLM_API_KEY: ${CUSTOM_LLM_API_KEY:-}
+      CUSTOM_LLM_SUPPORTS_EMBEDDINGS: ${CUSTOM_LLM_SUPPORTS_EMBEDDINGS:-false}
+      CUSTOM_LLM_SUPPORTS_STRUCTURED_OUTPUT: ${CUSTOM_LLM_SUPPORTS_STRUCTURED_OUTPUT:-false}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?Set PUBLIC_BASE_URL}
+      CORS_ORIGIN: ${CORS_ORIGIN:?Set CORS_ORIGIN}
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:?Set TRUST_PROXY_HOPS to 2}
+      CODE_RUNNER_MODE: disabled
+      NOTEBOOK_EXECUTION_ENABLED: "false"
+      LOG_FILE: /app/logs/app.log
+      QUEUE_CONCURRENCY: ${QUEUE_CONCURRENCY:-2}
+    depends_on:
+      mongodb: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      chromadb: {condition: service_healthy}
+    volumes:
+      - backend-uploads:/app/uploads
+      - backend-logs:/app/logs
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    read_only: true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks: [app-internal, data-internal, provider-egress]
+    restart: unless-stopped
+    init: true
+    pids_limit: 192
+    cap_drop: [ALL]
+    deploy:
+      resources:
+        limits: {cpus: "2.0", memory: 1G, pids: 192}
+        reservations: {cpus: "0.25", memory: 256M}
+    security_opt: [no-new-privileges:true]
+    logging: *bounded-logging
+
+  benchmark-worker:
+    image: ${KFIVE_BACKEND_IMAGE:?Set an immutable KFIVE_BACKEND_IMAGE}
+    command: ["node", "backend/dist/benchmarkWorkerMain.js"]
+    environment:
+      NODE_ENV: production
+      KFIVE_PROCESS: benchmark-worker
+      KFIVE_MODE: ${KFIVE_MODE:?Set KFIVE_MODE to remote or hybrid}
+      AI_PROVIDER: ${AI_PROVIDER:?Set an authenticated remote AI_PROVIDER}
+      AI_DEFAULT_MODEL: ${AI_DEFAULT_MODEL:?Set AI_DEFAULT_MODEL}
+      AI_MAX_OUTPUT_TOKENS: ${AI_MAX_OUTPUT_TOKENS:-2048}
+      AI_TIMEOUT_MS: ${AI_TIMEOUT_MS:-30000}
+      MONGODB_URL: mongodb://${MONGO_APP_USERNAME}:${MONGO_APP_PASSWORD}@mongodb:27017/${MONGO_DATABASE}?authSource=${MONGO_DATABASE}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_COMPATIBLE_SUPPORTS_EMBEDDINGS: ${OPENAI_COMPATIBLE_SUPPORTS_EMBEDDINGS:-false}
+      OPENAI_COMPATIBLE_SUPPORTS_STRUCTURED_OUTPUT: ${OPENAI_COMPATIBLE_SUPPORTS_STRUCTURED_OUTPUT:-false}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-https://api.anthropic.com}
+      CUSTOM_LLM_BASE_URL: ${CUSTOM_LLM_BASE_URL:-}
+      CUSTOM_LLM_API_KEY: ${CUSTOM_LLM_API_KEY:-}
+      CUSTOM_LLM_SUPPORTS_EMBEDDINGS: ${CUSTOM_LLM_SUPPORTS_EMBEDDINGS:-false}
+      CUSTOM_LLM_SUPPORTS_STRUCTURED_OUTPUT: ${CUSTOM_LLM_SUPPORTS_STRUCTURED_OUTPUT:-false}
+    depends_on:
+      mongodb: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m
+    healthcheck: {disable: true}
+    networks: [data-internal, provider-egress]
+    restart: unless-stopped
+    init: true
+    pids_limit: 128
+    cap_drop: [ALL]
+    deploy:
+      resources:
+        limits: {cpus: "1.0", memory: 512M, pids: 128}
+        reservations: {cpus: "0.1", memory: 128M}
+    security_opt: [no-new-privileges:true]
+    logging: *bounded-logging
+
+  frontend:
+    image: ${KFIVE_FRONTEND_IMAGE:?Set an immutable KFIVE_FRONTEND_IMAGE}
+    depends_on:
+      backend: {condition: service_healthy}
+    ports:
+      - ${KFIVE_EDGE_BIND_ADDRESS:-127.0.0.1}:${KFIVE_EDGE_HTTP_PORT:-8080}:8080
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=16m
+      - /var/cache/nginx:rw,noexec,nosuid,nodev,size=16m
+      - /var/run:rw,noexec,nosuid,nodev,size=4m
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    networks: [edge, app-internal]
+    restart: unless-stopped
+    pids_limit: 128
+    cap_drop: [ALL]
+    deploy:
+      resources:
+        limits: {cpus: "1.0", memory: 256M, pids: 128}
+        reservations: {cpus: "0.05", memory: 32M}
+    security_opt: [no-new-privileges:true]
+    logging: *bounded-logging
+
+configs:
+  mongodb-init-app-user:
+    file: ./deploy/mongodb/init-app-user.js
+
+volumes:
+  mongodb-data:
+    name: ${KFIVE_VOLUME_PREFIX:-kfive-production}_mongodb_data
+  redis-data:
+    name: ${KFIVE_VOLUME_PREFIX:-kfive-production}_redis_data
+  chromadb-data:
+    name: ${KFIVE_VOLUME_PREFIX:-kfive-production}_chromadb_data
+  backend-uploads:
+    name: ${KFIVE_VOLUME_PREFIX:-kfive-production}_backend_uploads
+  backend-logs:
+    name: ${KFIVE_VOLUME_PREFIX:-kfive-production}_backend_logs
+
+networks:
+  edge:
+    name: ${KFIVE_PRODUCTION_PROJECT:-kfive-production}_edge
+  app-internal:
+    name: ${KFIVE_PRODUCTION_PROJECT:-kfive-production}_app_internal
+    internal: true
+  data-internal:
+    name: ${KFIVE_PRODUCTION_PROJECT:-kfive-production}_data_internal
+    internal: true
+  provider-egress:
+    name: ${KFIVE_PRODUCTION_PROJECT:-kfive-production}_provider_egress

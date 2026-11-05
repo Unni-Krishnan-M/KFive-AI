@@ -1,6 +1,8 @@
 import bcrypt from 'bcryptjs';
 import jwt, { SignOptions } from 'jsonwebtoken';
+import { randomUUID } from 'crypto';
 import { HydratedDocument, Model, Schema, model } from 'mongoose';
+import { isAcceptedPassword } from '@/security/authPolicy';
 
 export interface UserUsage {
   conversationsCount: number;
@@ -29,7 +31,7 @@ export interface UserRecord {
 
 interface UserMethods {
   comparePassword(candidate: string): Promise<boolean>;
-  generateTokens(): { accessToken: string; refreshToken: string };
+  generateTokens(lifetimes: { access: string; refresh: string }): { accessToken: string; refreshToken: string };
 }
 
 type UserModel = Model<UserRecord, object, UserMethods>;
@@ -38,7 +40,15 @@ export type UserDocument = HydratedDocument<UserRecord, UserMethods>;
 const userSchema = new Schema<UserRecord, UserModel, UserMethods>({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   username: { type: String, required: true, unique: true, trim: true },
-  password: { type: String, required: true, minlength: 8, select: false },
+  password: {
+    type: String,
+    required: true,
+    select: false,
+    validate: {
+      validator: isAcceptedPassword,
+      message: 'Password must be between 8 and 72 UTF-8 bytes',
+    },
+  },
   firstName: { type: String, trim: true, maxlength: 50 },
   lastName: { type: String, trim: true, maxlength: 50 },
   role: { type: String, enum: ['user', 'admin'], default: 'user' },
@@ -65,26 +75,29 @@ userSchema.pre('save', async function hashPassword(next) {
 });
 
 userSchema.methods.comparePassword = function comparePassword(candidate: string): Promise<boolean> {
+  if (!isAcceptedPassword(candidate)) return Promise.resolve(false);
   return bcrypt.compare(candidate, this.password);
 };
 
-userSchema.methods.generateTokens = function generateTokens() {
+userSchema.methods.generateTokens = function generateTokens(lifetimes: { access: string; refresh: string }) {
   const payload = { userId: this._id.toString(), email: this.email, role: this.role };
   const accessOptions: SignOptions = {
-    expiresIn: (process.env.JWT_EXPIRES_IN || '15m') as SignOptions['expiresIn'],
+    expiresIn: lifetimes.access as SignOptions['expiresIn'],
     algorithm: 'HS256',
     issuer: 'kfive-ai',
     audience: 'kfive-web',
+    jwtid: randomUUID(),
   };
   const refreshOptions: SignOptions = {
-    expiresIn: (process.env.JWT_REFRESH_EXPIRES_IN || '7d') as SignOptions['expiresIn'],
+    expiresIn: lifetimes.refresh as SignOptions['expiresIn'],
     algorithm: 'HS256',
     issuer: 'kfive-ai',
     audience: 'kfive-web',
+    jwtid: randomUUID(),
   };
 
   return {
-    accessToken: jwt.sign(payload, process.env.JWT_SECRET!, accessOptions),
+    accessToken: jwt.sign({ ...payload, type: 'access' }, process.env.JWT_SECRET!, accessOptions),
     refreshToken: jwt.sign({ ...payload, type: 'refresh' }, process.env.JWT_REFRESH_SECRET!, refreshOptions),
   };
 };

@@ -26,7 +26,7 @@ const record: RepositoryAnalysisRecord = {
 
 function fakeRepository(overrides: Partial<RepositoryAnalysisRepository> = {}): RepositoryAnalysisRepository {
   return {
-    create: jest.fn().mockResolvedValue(record), list: jest.fn().mockResolvedValue([record]),
+    create: jest.fn().mockResolvedValue(record), list: jest.fn().mockResolvedValue({ records: [record], total: 1 }),
     findByOwnerAndId: jest.fn().mockResolvedValue(record), countByOwner: jest.fn().mockResolvedValue(0),
     deleteByOwnerAndId: jest.fn().mockResolvedValue(record), ...overrides,
   };
@@ -64,25 +64,57 @@ describe('RepositoryAnalysisService', () => {
     const service = new RepositoryAnalysisService(repository, projects as any, jest.fn(), () => true);
     const globalList = await service.list(ownerId);
     await service.list(ownerId, projectId);
-    expect(repository.list).toHaveBeenNthCalledWith(1, ownerId, undefined);
-    expect(repository.list).toHaveBeenNthCalledWith(2, ownerId, projectId);
+    expect(repository.list).toHaveBeenNthCalledWith(1, ownerId, undefined, false, 1);
+    expect(repository.list).toHaveBeenNthCalledWith(2, ownerId, projectId, false, 1);
     expect(projects.resolveOwnedProject).toHaveBeenLastCalledWith(ownerId, projectId);
-    expect(globalList[0]).not.toHaveProperty('tree');
-    expect(globalList[0]).not.toHaveProperty('dependencies');
+    expect(globalList.analyses[0]).not.toHaveProperty('tree');
+    expect(globalList.analyses[0]).not.toHaveProperty('dependencies');
+  });
+
+  it('returns a bounded page contract and forwards the requested page to owner-scoped storage', async () => {
+    const repository = fakeRepository({
+      list: jest.fn().mockResolvedValue({ records: [record], total: 100 }),
+    } as any);
+    const service = new RepositoryAnalysisService(repository, fakeProjects() as any, jest.fn(), () => true);
+
+    const result = await (service.list as any)(ownerId, undefined, undefined, '2');
+
+    expect(repository.list).toHaveBeenCalledWith(ownerId, undefined, false, 2);
+    expect(result).toMatchObject({
+      analyses: [expect.objectContaining({ id: analysisId })],
+      pagination: { page: 2, pageSize: 50, total: 100, totalPages: 2, maxPages: 10 },
+    });
+  });
+
+  it.each(['0', '-1', '01', '1.5', '11', ['1']])('rejects invalid repository history page %p before storage', async (page) => {
+    const repository = fakeRepository();
+    const service = new RepositoryAnalysisService(repository, fakeProjects() as any, jest.fn(), () => true);
+
+    await expect((service.list as any)(ownerId, undefined, undefined, page)).rejects.toMatchObject({
+      code: 'INVALID_REPOSITORY_INPUT', statusCode: 400,
+    });
+    expect(repository.list).not.toHaveBeenCalled();
   });
 
   it('uses an unscoped-only workspace storage filter and an exact project storage filter', async () => {
     const lean = jest.fn().mockResolvedValue([]);
     const limit = jest.fn().mockReturnValue({ lean });
-    const sort = jest.fn().mockReturnValue({ limit });
+    const skip = jest.fn().mockReturnValue({ limit });
+    const sort = jest.fn().mockReturnValue({ skip });
     const select = jest.fn().mockReturnValue({ sort });
     const find = jest.spyOn(RepositoryAnalysisModel, 'find').mockReturnValue({ select } as any);
+    const countDocuments = jest.spyOn(RepositoryAnalysisModel, 'countDocuments').mockResolvedValue(0);
 
-    await mongooseRepositoryAnalysisRepository.list(ownerId);
+    await mongooseRepositoryAnalysisRepository.list(ownerId, undefined, false, 1);
     expect(find).toHaveBeenLastCalledWith({ ownerId, projectId: { $exists: false } });
-    await mongooseRepositoryAnalysisRepository.list(ownerId, projectId);
+    expect(countDocuments).toHaveBeenLastCalledWith({ ownerId, projectId: { $exists: false } });
+    await mongooseRepositoryAnalysisRepository.list(ownerId, projectId, false, 2);
     expect(find).toHaveBeenLastCalledWith({ ownerId, projectId });
+    expect(countDocuments).toHaveBeenLastCalledWith({ ownerId, projectId });
+    expect(skip).toHaveBeenLastCalledWith(50);
+    expect(limit).toHaveBeenLastCalledWith(50);
     find.mockRestore();
+    countDocuments.mockRestore();
   });
 
   it('keeps deleted-project reports owner-scoped, listable by scope id, and deletable', async () => {
@@ -93,8 +125,8 @@ describe('RepositoryAnalysisService', () => {
     const repository = fakeRepository();
     const service = new RepositoryAnalysisService(repository, missingProject as any, jest.fn(), () => true);
 
-    await expect(service.list(ownerId, projectId)).resolves.toHaveLength(1);
-    expect(repository.list).toHaveBeenCalledWith(ownerId, projectId);
+    await expect(service.list(ownerId, projectId)).resolves.toMatchObject({ analyses: [expect.objectContaining({ id: analysisId })] });
+    expect(repository.list).toHaveBeenCalledWith(ownerId, projectId, false, 1);
     await expect(service.get(ownerId, analysisId)).resolves.toMatchObject({ id: analysisId, projectId });
     await expect(service.delete(ownerId, analysisId)).resolves.toBeUndefined();
     expect(repository.deleteByOwnerAndId).toHaveBeenCalledWith(ownerId, analysisId);
@@ -104,10 +136,11 @@ describe('RepositoryAnalysisService', () => {
     const repository = fakeRepository();
     const projects = fakeProjects();
     const service = new RepositoryAnalysisService(repository, projects as any, jest.fn(), () => true);
-    await expect(service.list(ownerId, undefined, 'orphaned')).resolves.toEqual([
-      expect.objectContaining({ id: analysisId, projectId }),
-    ]);
-    expect(repository.list).toHaveBeenCalledWith(ownerId, undefined, true);
+    await expect(service.list(ownerId, undefined, 'orphaned')).resolves.toMatchObject({
+      analyses: [expect.objectContaining({ id: analysisId, projectId })],
+      pagination: { page: 1, total: 1 },
+    });
+    expect(repository.list).toHaveBeenCalledWith(ownerId, undefined, true, 1);
     expect(projects.resolveOwnedProject).not.toHaveBeenCalled();
   });
 
@@ -123,15 +156,20 @@ describe('RepositoryAnalysisService', () => {
   it('owner-scopes orphan discovery before joining projects and returns bounded summaries', async () => {
     const aggregate = jest.spyOn(RepositoryAnalysisModel, 'aggregate').mockResolvedValue([record]);
     try {
-      await expect(mongooseRepositoryAnalysisRepository.list(ownerId, undefined, true)).resolves.toEqual([record]);
+      aggregate.mockResolvedValue([{ records: [record], metadata: [{ total: 1 }] }]);
+      await expect(mongooseRepositoryAnalysisRepository.list(ownerId, undefined, true, 1)).resolves.toEqual({ records: [record], total: 1 });
       const pipeline = aggregate.mock.calls[0][0] as any[];
       expect(String(pipeline[0].$match.ownerId)).toBe(ownerId);
       expect(pipeline[0].$match.projectId).toEqual({ $exists: true, $ne: null });
       expect(pipeline[1].$lookup).toMatchObject({ localField: 'projectId', foreignField: '_id' });
       expect(pipeline[2]).toEqual({ $match: { 'linkedProject.0': { $exists: false } } });
-      expect(pipeline).toContainEqual({ $limit: 50 });
-      expect(pipeline.at(-1).$project).not.toHaveProperty('ownerId');
-      expect(pipeline.at(-1).$project).not.toHaveProperty('tree');
+      expect(pipeline[3]).toEqual({ $sort: { createdAt: -1, _id: -1 } });
+      expect(pipeline.at(-1).$facet.metadata).toEqual([{ $count: 'total' }]);
+      expect(pipeline.at(-1).$facet.records).toContainEqual({ $skip: 0 });
+      expect(pipeline.at(-1).$facet.records).toContainEqual({ $limit: 50 });
+      const projection = pipeline.at(-1).$facet.records.at(-1).$project;
+      expect(projection).not.toHaveProperty('ownerId');
+      expect(projection).not.toHaveProperty('tree');
     } finally { aggregate.mockRestore(); }
   });
 

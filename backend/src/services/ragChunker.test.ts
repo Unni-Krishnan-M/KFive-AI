@@ -1,4 +1,5 @@
 import {
+  chunkDocumentContent,
   chunkRagContent,
   normalizeRagContent,
   RAG_CHUNK_CHARACTERS,
@@ -29,5 +30,19 @@ describe('RAG chunker', () => {
     expect(() => normalizeRagContent('safe\0unsafe')).toThrow(/NUL/);
     expect(() => normalizeRagContent('safe\u0001unsafe')).toThrow(/control/);
     expect(normalizeRagContent('safe\ttext\nnext')).toBe('safe\ttext\nnext');
+  });
+
+  it('chunks reliable PDF page separators without losing page provenance', () => {
+    const result = chunkDocumentContent('First page fact.\fSecond page orchid fact.\f', 2);
+    expect(result.content).toBe('First page fact.\n\nSecond page orchid fact.');
+    expect(result.chunks).toEqual([
+      expect.objectContaining({ index: 0, text: 'First page fact.', pageStart: 1, pageEnd: 1 }),
+      expect.objectContaining({ index: 1, text: 'Second page orchid fact.', pageStart: 2, pageEnd: 2 }),
+    ]);
+  });
+
+  it('does not fabricate page references when separators do not match the declared page count', () => {
+    const result = chunkDocumentContent('Flattened pages without separators.', 3);
+    expect(result.chunks).toEqual([expect.not.objectContaining({ pageStart: expect.anything() })]);
   });
 });

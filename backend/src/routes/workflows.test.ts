@@ -115,6 +115,8 @@ describe('workflow routes', () => {
     const result = await invokeSse(createWorkflowsRouter(workflows, runs));
     expect(result.status).toBe(200);
     expect(result.headers.get('content-type')).toBe('text/event-stream');
+    expect(result.headers.get('x-accel-buffering')).toBe('no');
+    expect(result.headers.get('x-content-type-options')).toBe('nosniff');
     expect(result.body).toContain('event: run');
     expect(result.body).toContain(`event: start\ndata: {"runId":"${runId}","provider":"ollama","model":"phi3"}`);
     expect(result.body).toContain(`event: delta\ndata: {"runId":"${runId}","content":"ok"}`);

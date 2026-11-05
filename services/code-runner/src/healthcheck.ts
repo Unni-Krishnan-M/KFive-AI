@@ -1,6 +1,6 @@
 import { createClient } from 'redis';
 import { redisClientOptions, RUNNER_HEARTBEAT_KEY } from './coordinator';
-import { parseRedisUrl } from './redisConfig';
+import { resolveRedisConfig } from './redisConfig';
 
 const DEFAULT_MAX_HEARTBEAT_AGE_MS = 15_000;
 const MAX_FUTURE_SKEW_MS = 5_000;
@@ -28,7 +28,7 @@ export async function assertFreshHeartbeat(
 }
 
 async function main(): Promise<void> {
-  const config = parseRedisUrl(process.env.REDIS_URL);
+  const config = resolveRedisConfig();
   const client = createClient(redisClientOptions(config)) as unknown as HeartbeatClient;
   client.on('error', () => undefined);
   try {

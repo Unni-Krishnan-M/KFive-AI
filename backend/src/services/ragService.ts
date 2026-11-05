@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 import { Types } from 'mongoose';
 import { ProjectModel } from '@/models/Project';
+import { DocumentModel } from '@/models/Document';
 import { RagSourceErrorCode, RagSourceMediaType, RagSourceModel, RagSourceStatus } from '@/models/RagSource';
 import { EnvironmentConfig, getEnvironment } from '@/config/environment';
 import { AiProviderClient, getAiProvider } from './aiProvider';
@@ -8,7 +9,7 @@ import { withProviderDiscoveryDeadline } from './ai/providerDeadline';
 import { ChromaClient, ChromaClientError, ChromaMetadata, ChromaQueryResult, ChromaWhere } from './chromaClient';
 import { ProjectError, ProjectRecord, projectService } from './projectService';
 import { projectMutationLease } from './projectMutationLease';
-import { chunkRagContent, normalizeRagContent, RAG_MAX_CHUNKS, RAG_MAX_SOURCE_BYTES } from './ragChunker';
+import { chunkDocumentContent, chunkRagContent, normalizeRagContent, RagChunk, RAG_MAX_CHUNKS, RAG_MAX_SOURCE_BYTES } from './ragChunker';
 
 const OBJECT_ID = /^[a-f\d]{24}$/i;
 const RAG_CHUNKING_VERSION = 1;
@@ -23,6 +24,9 @@ export type RagErrorCode =
   | 'RAG_SOURCE_LIMIT_EXCEEDED'
   | 'RAG_SOURCE_NOT_FOUND'
   | 'RAG_SOURCE_BUSY'
+  | 'RAG_DOCUMENT_NOT_FOUND'
+  | 'RAG_DOCUMENT_NOT_READY'
+  | 'RAG_DOCUMENT_UNSUPPORTED'
   | 'RAG_NO_READY_SOURCES'
   | 'RAG_EMBEDDING_MODEL_NOT_CONFIGURED'
   | 'RAG_EMBEDDINGS_UNSUPPORTED'
@@ -50,6 +54,10 @@ export interface RagSourceRecord {
   _id: unknown;
   ownerId: unknown;
   projectId?: unknown;
+  sourceKind?: 'text' | 'document';
+  documentId?: unknown;
+  documentPageCount?: number;
+  documentOcrApplied?: boolean;
   name: string;
   mediaType: RagSourceMediaType;
   status: RagSourceStatus;
@@ -72,6 +80,10 @@ export interface RagSourceRecord {
 export interface RagSourceCreateData {
   ownerId: string;
   projectId?: unknown;
+  sourceKind: 'text' | 'document';
+  documentId?: string;
+  documentPageCount?: number;
+  documentOcrApplied?: boolean;
   name: string;
   mediaType: RagSourceMediaType;
   status: 'indexing';
@@ -89,6 +101,7 @@ export interface RagSourceRepository {
   list(ownerId: string, projectId?: string, orphaned?: boolean): Promise<RagSourceRecord[]>;
   listReadyInScope(ownerId: string, projectId?: string): Promise<RagSourceRecord[]>;
   findByOwnerAndId(ownerId: string, sourceId: string): Promise<RagSourceRecord | null>;
+  findByOwnerAndDocumentId(ownerId: string, documentId: string): Promise<RagSourceRecord | null>;
   markReady(ownerId: string, sourceId: string, values: {
     chunkCount: number;
     embeddingDimension: number;
@@ -123,7 +136,8 @@ export const mongooseRagSourceRepository: RagSourceRepository = {
         { $sort: { createdAt: -1, _id: -1 } },
         { $limit: 200 },
         { $project: {
-          _id: 1, projectId: 1, name: 1, mediaType: 1, status: 1,
+          _id: 1, projectId: 1, sourceKind: 1, documentId: 1,
+          documentPageCount: 1, documentOcrApplied: 1, name: 1, mediaType: 1, status: 1,
           characterCount: 1, byteCount: 1, chunkCount: 1, errorCode: 1,
           embeddingProvider: 1, embeddingModel: 1, embeddingDimension: 1,
           indexedAt: 1, createdAt: 1, updatedAt: 1,
@@ -143,6 +157,9 @@ export const mongooseRagSourceRepository: RagSourceRepository = {
   },
   async findByOwnerAndId(ownerId, sourceId) {
     return RagSourceModel.findOne({ _id: sourceId, ownerId }).lean() as unknown as Promise<RagSourceRecord | null>;
+  },
+  async findByOwnerAndDocumentId(ownerId, documentId) {
+    return RagSourceModel.findOne({ ownerId, documentId }).lean() as unknown as Promise<RagSourceRecord | null>;
   },
   async markReady(ownerId, sourceId, values) {
     return RagSourceModel.findOneAndUpdate(
@@ -183,6 +200,10 @@ export interface RagVectorStore {
 export interface PublicRagSource {
   id: string;
   projectId?: string;
+  sourceKind: 'text' | 'document';
+  documentId?: string;
+  pageCount?: number;
+  ocrApplied?: boolean;
   name: string;
   mediaType: RagSourceMediaType;
   status: RagSourceStatus;
@@ -221,6 +242,25 @@ interface ValidatedSourceInput {
   mediaType: RagSourceMediaType;
   content: string;
   projectId?: string;
+}
+
+interface PreparedSourceInput extends ValidatedSourceInput {
+  sourceKind: 'text' | 'document';
+  documentId?: string;
+  documentPageCount?: number;
+  documentOcrApplied?: boolean;
+}
+
+export interface RagDocumentRecord {
+  _id: unknown;
+  userId: unknown;
+  projectId?: unknown;
+  originalName: string;
+  mimeType: string;
+  status: string;
+  content?: string;
+  pageCount?: number;
+  ocrApplied?: boolean;
 }
 
 function requireObjectId(value: unknown, label: string): string {
@@ -351,6 +391,10 @@ function publicSource(source: RagSourceRecord): PublicRagSource {
   return {
     id: String(source._id),
     ...(source.projectId ? { projectId: String(source.projectId) } : {}),
+    sourceKind: source.sourceKind === 'document' ? 'document' : 'text',
+    ...(source.documentId ? { documentId: String(source.documentId) } : {}),
+    ...(source.documentPageCount ? { pageCount: source.documentPageCount } : {}),
+    ...(source.documentOcrApplied !== undefined ? { ocrApplied: source.documentOcrApplied } : {}),
     name: source.name,
     mediaType: source.mediaType,
     status: source.status,
@@ -371,6 +415,14 @@ function publicSource(source: RagSourceRecord): PublicRagSource {
   };
 }
 
+async function findOwnedDocument(ownerId: string, documentId: string): Promise<RagDocumentRecord | null> {
+  return DocumentModel.findOne({ _id: documentId, userId: ownerId }).lean() as unknown as Promise<RagDocumentRecord | null>;
+}
+
+function isDuplicateKeyError(error: unknown): boolean {
+  return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 11000);
+}
+
 function defaultVectorStore(config: EnvironmentConfig): RagVectorStore | undefined {
   return config.chromaUrl ? new ChromaClient({ baseUrl: config.chromaUrl, timeoutMs: config.aiTimeoutMs }) : undefined;
 }
@@ -387,7 +439,8 @@ export class RagService {
       (ownerId, projectId) => projectService.resolveActiveProject(ownerId, projectId),
     private readonly resolveOwnedProject: (ownerId: string, projectId: unknown) => Promise<ProjectRecord | undefined> =
       (ownerId, projectId) => projectService.resolveOwnedProject(ownerId, projectId),
-    private readonly now: () => Date = () => new Date()
+    private readonly now: () => Date = () => new Date(),
+    private readonly resolveDocument: (ownerId: string, documentId: string) => Promise<RagDocumentRecord | null> = findOwnedDocument
   ) {
     this.vectorStore = vectorStore;
   }
@@ -455,16 +508,64 @@ export class RagService {
 
   async ingest(ownerIdValue: unknown, value: unknown): Promise<PublicRagSource> {
     const ownerId = requireObjectId(ownerIdValue, 'Owner id');
-    const input = validateRagSourceInput(value);
+    const validated = validateRagSourceInput(value);
+    const input: PreparedSourceInput = { ...validated, sourceKind: 'text' };
+    return (await this.ingestPrepared(ownerId, input, chunkRagContent(input.content))).source;
+  }
+
+  async ingestDocument(ownerIdValue: unknown, documentIdValue: unknown): Promise<{
+    source: PublicRagSource;
+    created: boolean;
+  }> {
+    const ownerId = requireObjectId(ownerIdValue, 'Owner id');
+    const documentId = requireObjectId(documentIdValue, 'Document id');
+    const document = await this.resolveDocument(ownerId, documentId);
+    if (!document) {
+      throw new RagServiceError('Document not found.', 'RAG_DOCUMENT_NOT_FOUND', 404);
+    }
+    if (document.status !== 'completed' || typeof document.content !== 'string' || !document.content.trim()) {
+      throw new RagServiceError('Document text is not ready for indexing.', 'RAG_DOCUMENT_NOT_READY', 409);
+    }
+    if (!['application/pdf', 'image/png', 'image/jpeg'].includes(document.mimeType)) {
+      throw new RagServiceError('Document type is not supported for knowledge indexing.', 'RAG_DOCUMENT_UNSUPPORTED', 409);
+    }
+    const existing = await this.repository.findByOwnerAndDocumentId(ownerId, documentId);
+    if (existing) return { source: publicSource(existing), created: false };
+
+    const prepared = chunkDocumentContent(document.content, document.pageCount);
+    const projectId = document.projectId ? requireObjectId(String(document.projectId), 'Project id') : undefined;
+    const safeName = typeof document.originalName === 'string' ? document.originalName.trim().slice(0, 200) : '';
+    if (!safeName) throw new RagServiceError('Document metadata is invalid.', 'RAG_DOCUMENT_NOT_READY', 409);
+    const input: PreparedSourceInput = {
+      name: safeName,
+      mediaType: document.mimeType as RagSourceMediaType,
+      content: prepared.content,
+      projectId,
+      sourceKind: 'document',
+      documentId,
+      ...(document.pageCount ? { documentPageCount: document.pageCount } : {}),
+      documentOcrApplied: document.ocrApplied === true,
+    };
+    return this.ingestPrepared(ownerId, input, prepared.chunks);
+  }
+
+  private async ingestPrepared(
+    ownerId: string,
+    input: PreparedSourceInput,
+    chunks: RagChunk[]
+  ): Promise<{ source: PublicRagSource; created: boolean }> {
     const project = await this.resolveActiveProject(ownerId, input.projectId);
     await this.assertDependencies();
     const model = this.config.aiEmbeddingModel as string;
-    const chunks = chunkRagContent(input.content);
     const create = async () => {
       if (input.projectId) await this.resolveActiveProject(ownerId, input.projectId);
       return this.repository.create({
         ownerId,
         ...(project ? { projectId: project._id } : {}),
+        sourceKind: input.sourceKind,
+        ...(input.documentId ? { documentId: input.documentId } : {}),
+        ...(input.documentPageCount ? { documentPageCount: input.documentPageCount } : {}),
+        ...(input.documentOcrApplied !== undefined ? { documentOcrApplied: input.documentOcrApplied } : {}),
         name: input.name,
         mediaType: input.mediaType,
         status: 'indexing',
@@ -477,7 +578,15 @@ export class RagService {
         embeddingModel: model,
       });
     };
-    const source = input.projectId ? await projectMutationLease.run(input.projectId, create) : await create();
+    let source: RagSourceRecord;
+    try {
+      source = input.projectId ? await projectMutationLease.run(input.projectId, create) : await create();
+    } catch (error) {
+      if (!input.documentId || !isDuplicateKeyError(error)) throw error;
+      const existing = await this.repository.findByOwnerAndDocumentId(ownerId, input.documentId);
+      if (!existing) throw error;
+      return { source: publicSource(existing), created: false };
+    }
     const sourceId = String(source._id);
     let collection: { id: string; name: string; metadata?: ChromaMetadata | null } | undefined;
     try {
@@ -525,6 +634,8 @@ export class RagService {
             chunkIndex: chunk.index,
             sourceName: input.name,
             chunkingVersion: RAG_CHUNKING_VERSION,
+            ...(input.documentId ? { documentId: input.documentId } : {}),
+            ...(chunk.pageStart ? { pageStart: chunk.pageStart, pageEnd: chunk.pageEnd } : {}),
           },
         })));
       }
@@ -545,7 +656,7 @@ export class RagService {
       if (!ready) {
         throw new RagServiceError('Knowledge source could not be finalized.', 'RAG_VECTOR_STORE_UNAVAILABLE', 503);
       }
-      return publicSource(ready);
+      return { source: publicSource(ready), created: true };
     } catch (error) {
       if (collection) {
         await this.vectorStore?.deleteWhere(
@@ -613,6 +724,9 @@ export class RagService {
       sourceName: string;
       mediaType: RagSourceMediaType;
       projectId?: string;
+      documentId?: string;
+      pageStart?: number;
+      pageEnd?: number;
       chunkIndex: number;
       snippet: string;
       distance?: number;
@@ -665,6 +779,9 @@ export class RagService {
       sourceName: string;
       mediaType: RagSourceMediaType;
       projectId?: string;
+      documentId?: string;
+      pageStart?: number;
+      pageEnd?: number;
       chunkIndex: number;
       snippet: string;
       distance?: number;
@@ -678,10 +795,27 @@ export class RagService {
       const chunkIndex = metadata.chunkIndex;
       if (typeof sourceId !== 'string') continue;
       const source = allowedSources.get(sourceId);
+      const documentId = source?.documentId ? String(source.documentId) : undefined;
+      const pageStart = metadata.pageStart;
+      const pageEnd = metadata.pageEnd;
+      const hasPageMetadata = pageStart !== undefined || pageEnd !== undefined;
+      const validPageMetadata = !hasPageMetadata || Boolean(
+        documentId
+        && source?.documentPageCount
+        && Number.isInteger(pageStart)
+        && Number.isInteger(pageEnd)
+        && (pageStart as number) >= 1
+        && (pageEnd as number) >= (pageStart as number)
+        && (pageEnd as number) <= source.documentPageCount
+      );
+      const validDocumentMetadata = documentId
+        ? metadata.documentId === documentId && validPageMetadata
+        : metadata.documentId === undefined && !hasPageMetadata;
       if (
         metadata.ownerId !== ownerId
         || metadata.scopeKey !== scopeKey(input.projectId)
         || !source
+        || !validDocumentMetadata
         || !Number.isInteger(chunkIndex)
         || (chunkIndex as number) < 0
         || (chunkIndex as number) >= source.chunkCount
@@ -699,6 +833,8 @@ export class RagService {
         sourceName: source.name,
         mediaType: source.mediaType,
         ...(source.projectId ? { projectId: String(source.projectId) } : {}),
+        ...(documentId ? { documentId } : {}),
+        ...(hasPageMetadata ? { pageStart: pageStart as number, pageEnd: pageEnd as number } : {}),
         chunkIndex: chunkIndex as number,
         snippet,
         distance,
@@ -708,7 +844,7 @@ export class RagService {
       throw new RagServiceError('The vector store returned no valid owned source references.', 'RAG_INVALID_VECTOR_RESPONSE', 502);
     }
     const untrustedContext = references.map((reference) => (
-      `${reference.marker} UNTRUSTED SOURCE DATA name=${JSON.stringify(reference.sourceName)}\n${reference.snippet}\nEND ${reference.marker}`
+      `${reference.marker} UNTRUSTED SOURCE DATA name=${JSON.stringify(reference.sourceName)}${reference.pageStart ? ` page=${reference.pageStart}` : ''}\n${reference.snippet}\nEND ${reference.marker}`
     )).join('\n\n');
     try {
       const response = await this.provider.chat({

@@ -1,6 +1,6 @@
 const leases = new Set<string>();
 
-function key(ownerId: string, workflowId: string): string { return `${ownerId}:${workflowId}`; }
+function key(ownerId: string, workflowId: string): string { return `${ownerId.toLowerCase()}:${workflowId.toLowerCase()}`; }
 
 export function tryAcquireWorkflowExecutionLease(ownerId: string, workflowId: string): boolean {
   const lease = key(ownerId, workflowId);

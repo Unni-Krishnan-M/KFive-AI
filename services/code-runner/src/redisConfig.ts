@@ -8,6 +8,10 @@ export interface ParsedRedisConfig {
   maxRetriesPerRequest: null;
 }
 
+export function resolveRedisConfig(env: NodeJS.ProcessEnv = process.env): ParsedRedisConfig {
+  return parseRedisUrl(env.QUEUE_REDIS_URL || env.REDIS_URL);
+}
+
 export function parseRedisUrl(raw: string | undefined): ParsedRedisConfig {
   if (!raw) throw new Error('REDIS_URL is required for the code-runner worker.');
   let parsed: URL;

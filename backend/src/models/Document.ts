@@ -10,6 +10,8 @@ const documentSchema = new Schema({
   path: { type: String, required: true },
   status: { type: String, enum: ['pending', 'processing', 'completed', 'failed'], default: 'pending' },
   content: { type: String, default: '' },
+  pageCount: { type: Number, min: 1, max: 500 },
+  ocrApplied: { type: Boolean, default: false },
   errorMessage: { type: String },
 }, { timestamps: true });
 

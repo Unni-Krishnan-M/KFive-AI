@@ -8,6 +8,13 @@ export interface RagChunk {
   text: string;
   startCharacter: number;
   endCharacter: number;
+  pageStart?: number;
+  pageEnd?: number;
+}
+
+export interface DocumentChunkResult {
+  content: string;
+  chunks: RagChunk[];
 }
 
 export class RagChunkError extends Error {
@@ -72,4 +79,42 @@ export function chunkRagContent(value: unknown): RagChunk[] {
   }
 
   return chunks;
+}
+
+export function chunkDocumentContent(value: unknown, pageCount?: number): DocumentChunkResult {
+  if (typeof value !== 'string') return { content: normalizeRagContent(value), chunks: [] };
+  const normalizedLineEndings = value.replace(/\r\n?/g, '\n').normalize('NFC');
+  const rawPages = normalizedLineEndings.split('\f');
+  while (rawPages.length > 1 && !rawPages[rawPages.length - 1].trim()) rawPages.pop();
+  const hasReliablePages = Number.isSafeInteger(pageCount) && pageCount! > 0 && rawPages.length === pageCount;
+
+  if (!hasReliablePages) {
+    const content = normalizeRagContent(normalizedLineEndings.replace(/\f/g, '\n\n'));
+    return { content, chunks: chunkRagContent(content) };
+  }
+
+  const pages = rawPages.map((page) => page.trim());
+  const content = normalizeRagContent(pages.join('\n\n'));
+  const chunks: RagChunk[] = [];
+  let characterOffset = 0;
+  for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {
+    const page = pages[pageIndex];
+    if (page) {
+      for (const chunk of chunkRagContent(page)) {
+        chunks.push({
+          ...chunk,
+          index: chunks.length,
+          startCharacter: characterOffset + chunk.startCharacter,
+          endCharacter: characterOffset + chunk.endCharacter,
+          pageStart: pageIndex + 1,
+          pageEnd: pageIndex + 1,
+        });
+        if (chunks.length > RAG_MAX_CHUNKS) {
+          throw new RagChunkError(`Knowledge source content must produce at most ${RAG_MAX_CHUNKS} chunks.`);
+        }
+      }
+    }
+    characterOffset += page.length + (pageIndex < pages.length - 1 ? 2 : 0);
+  }
+  return { content, chunks };
 }

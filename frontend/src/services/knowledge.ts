@@ -26,6 +26,10 @@ export interface KnowledgeStatus {
 export interface KnowledgeSource {
   id: string;
   projectId?: string;
+  sourceKind?: 'text' | 'document';
+  documentId?: string;
+  pageCount?: number;
+  ocrApplied?: boolean;
   name: string;
   mediaType: string;
   status: KnowledgeSourceStatus;
@@ -48,6 +52,9 @@ export interface KnowledgeReference {
   chunkId?: string;
   mediaType?: string;
   projectId?: string;
+  documentId?: string;
+  pageStart?: number;
+  pageEnd?: number;
   chunkIndex: number;
   excerpt: string;
   distance?: number;
@@ -164,6 +171,10 @@ export function normalizeKnowledgeSources(payload: unknown): KnowledgeSource[] {
     return [{
       id,
       projectId: text(value.projectId),
+      sourceKind: value.sourceKind === 'document' ? 'document' : value.sourceKind === 'text' ? 'text' : undefined,
+      documentId: text(value.documentId),
+      pageCount: nonNegativeInteger(value.pageCount),
+      ocrApplied: typeof value.ocrApplied === 'boolean' ? value.ocrApplied : undefined,
       name,
       mediaType,
       status: sourceStatus(value.status),
@@ -197,6 +208,10 @@ export function normalizeKnowledgeQuery(payload: unknown): KnowledgeQueryResult 
     const chunkIndex = value ? nonNegativeInteger(value.chunkIndex) : undefined;
     const excerpt = value ? text(value.excerpt ?? value.snippet) : undefined;
     if (!value || (!referenceId && !marker) || !sourceId || !sourceName || chunkIndex === undefined || !excerpt) return [];
+    const pageStart = nonNegativeInteger(value.pageStart);
+    const pageEnd = nonNegativeInteger(value.pageEnd);
+    const validPages = pageStart !== undefined && pageStart >= 1
+      && pageEnd !== undefined && pageEnd >= pageStart;
     return [{
       referenceId,
       marker,
@@ -205,6 +220,9 @@ export function normalizeKnowledgeQuery(payload: unknown): KnowledgeQueryResult 
       chunkId,
       mediaType: text(value.mediaType),
       projectId: text(value.projectId),
+      documentId: text(value.documentId),
+      pageStart: validPages ? pageStart : undefined,
+      pageEnd: validPages ? pageEnd : undefined,
       chunkIndex,
       excerpt: excerpt.slice(0, KNOWLEDGE_EXCERPT_LIMIT),
       distance: finiteNumber(value.distance),

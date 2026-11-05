@@ -1,0 +1,121 @@
+- generic [ref=e317]:
+  - complementary [ref=e318]:
+    - generic [ref=e319]:
+      - generic [ref=e320]: KFive AI
+      - button "Collapse sidebar" [ref=e326] [cursor=pointer]
+    - generic [ref=e330]:
+      - generic [ref=e331] [cursor=pointer]:
+        - generic [ref=e332]: Search
+        - generic [ref=e337]:
+          - generic [ref=e338]: ⌘
+          - generic [ref=e339]: K
+      - navigation [ref=e340]:
+        - link "Dashboard" [ref=e341] [cursor=pointer]:
+          - /url: /app/dashboard
+        - link "AI Chat" [ref=e349] [cursor=pointer]:
+          - /url: /app/chat
+        - link "Code Lab" [ref=e354] [cursor=pointer]:
+          - /url: /app/code
+        - link "Agents" [ref=e361] [cursor=pointer]:
+          - /url: /app/agents
+        - link "Documents" [ref=e368] [cursor=pointer]:
+          - /url: /app/documents
+        - link "Knowledge / RAG" [ref=e374] [cursor=pointer]:
+          - /url: /app/knowledge
+        - link "Repository Analyzer" [ref=e380] [cursor=pointer]:
+          - /url: /app/repositories
+        - link "Workflows" [ref=e387] [cursor=pointer]:
+          - /url: /app/workflows
+        - link "Dataset Lab" [ref=e395] [cursor=pointer]:
+          - /url: /app/datasets
+        - link "Model Benchmarks" [ref=e402] [cursor=pointer]:
+          - /url: /app/benchmarks
+        - link "Notebooks" [ref=e408] [cursor=pointer]:
+          - /url: /app/notebooks
+        - link "Voice Assistant" [ref=e414] [cursor=pointer]:
+          - /url: /app/voice
+        - link "Models" [ref=e420] [cursor=pointer]:
+          - /url: /app/models
+        - link "Projects" [ref=e433] [cursor=pointer]:
+          - /url: /app/projects
+        - link "Workspace" [ref=e438] [cursor=pointer]:
+          - /url: /app/workspace
+        - link "PDF Utilities" [ref=e444] [cursor=pointer]:
+          - /url: /app/files
+    - generic [ref=e449]:
+      - generic [ref=e450]:
+        - generic [ref=e451]: A
+        - generic [ref=e453]:
+          - paragraph [ref=e454]: Agent Browser
+          - paragraph [ref=e455]: agentbr_88432041@example.test
+      - generic [ref=e456]:
+        - link "Profile" [ref=e457] [cursor=pointer]:
+          - /url: /app/profile
+        - link "Settings" [ref=e461] [cursor=pointer]:
+          - /url: /app/settings
+        - button "Toggle theme" [ref=e465] [cursor=pointer]
+        - button "Sign out" [ref=e472] [cursor=pointer]
+  - main [ref=e476]:
+    - generic [ref=e478]:
+      - generic [ref=e479]:
+        - generic [ref=e480]:
+          - heading "AI Agents" [level=1] [ref=e481]
+          - paragraph [ref=e485]: Create specialized assistants and inspect their durable run history.
+        - generic [ref=e486]:
+          - textbox "Search agents..." [ref=e491]
+          - button "Create Agent" [ref=e492] [cursor=pointer]
+      - generic [ref=e495]:
+        - heading "Your Agents" [level=2] [ref=e496]
+        - article [ref=e498]:
+          - generic [ref=e499]:
+            - button "Edit Browser Agent 92126" [active] [ref=e500] [cursor=pointer]
+            - button "Delete Browser Agent 92126" [ref=e503] [cursor=pointer]
+          - heading "Browser Agent 92126" [level=3] [ref=e511]
+          - paragraph [ref=e512]: Disposable acceptance agent
+          - generic [ref=e513]:
+            - generic [ref=e517]: all-minilm:22m
+            - generic [ref=e518]: •
+            - generic [ref=e519]: "Temp: 0.7"
+          - generic [ref=e520]: Tools disabled
+          - button "Run & History" [ref=e523] [cursor=pointer]
+      - generic [ref=e527]:
+        - heading "Starter Templates" [level=2] [ref=e528]
+        - generic [ref=e529]:
+          - button [ref=e530] [cursor=pointer]:
+            - heading "Code Reviewer" [level=3] [ref=e534]
+            - paragraph [ref=e535]: Expert developer that reviews code for bugs and best practices.
+          - button [ref=e536] [cursor=pointer]:
+            - heading "Technical Writer" [level=3] [ref=e540]
+            - paragraph [ref=e541]: Creates clear, concise documentation from technical specs.
+          - button [ref=e542] [cursor=pointer]:
+            - heading "Data Analyst" [level=3] [ref=e546]
+            - paragraph [ref=e547]: Analyzes data structures and suggests insights.
+      - generic [ref=e549]:
+        - generic [ref=e550]:
+          - heading "Edit Agent" [level=2] [ref=e551]
+          - button "Close slide over" [ref=e552] [cursor=pointer]
+        - generic [ref=e557]:
+          - generic [ref=e558]:
+            - text: Name
+            - textbox "Name" [ref=e559]: Browser Agent 92126
+          - generic [ref=e560]:
+            - text: Description
+            - textbox "Description" [ref=e561]: Disposable acceptance agent
+          - generic [ref=e562]:
+            - text: System Prompt
+            - textbox "System Prompt" [ref=e563]: Follow the user instruction exactly. Never use tools. Return the requested verification token.
+          - generic [ref=e564]:
+            - generic [ref=e565]:
+              - text: Model
+              - combobox "Model ollama · installed" [ref=e566]:
+                - option "Provider default"
+                - option "all-minilm:22m (current)" [selected]
+                - option "phi3:latest"
+              - generic [ref=e567]: ollama · installed
+            - generic [ref=e568]:
+              - generic [ref=e569]:
+                - generic [ref=e570]: Temperature
+                - generic [ref=e571]: "0.7"
+              - slider "Temperature 0.7" [ref=e572] [cursor=pointer]: "0.7"
+          - generic [ref=e573]: Tools are disabled for agents in this release.
+          - button "Save Agent" [ref=e576] [cursor=pointer]

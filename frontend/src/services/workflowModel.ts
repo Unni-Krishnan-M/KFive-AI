@@ -373,6 +373,26 @@ export function normalizeWorkflowRunDeletion(value: unknown): WorkflowRunDeletio
 
 export const isActiveWorkflowRun = (run?: WorkflowRunSummary): boolean => Boolean(run && (run.status === 'queued' || run.status === 'running' || run.status === 'cancel-requested'));
 export const isTerminalWorkflowRun = (run?: WorkflowRunSummary): boolean => Boolean(run && !isActiveWorkflowRun(run));
+export async function waitForTerminalWorkflowRun(
+  read: () => Promise<unknown>,
+  options: {
+    attempts?: number;
+    delayMs?: number;
+    sleep?: (milliseconds: number) => Promise<void>;
+  } = {}
+): Promise<WorkflowRunDetail> {
+  const attempts = options.attempts ?? 40;
+  const delayMs = options.delayMs ?? 250;
+  const sleep = options.sleep ?? ((milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds)));
+  let latest: WorkflowRunDetail | undefined;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    latest = normalizeWorkflowRunDetail(await read());
+    if (!latest) throw new Error('The server returned an invalid workflow run.');
+    if (isTerminalWorkflowRun(latest)) return latest;
+    if (attempt + 1 < attempts) await sleep(delayMs);
+  }
+  throw new Error(`Workflow run ${latest?.id ?? ''} did not reach a terminal state.`.trim());
+}
 export function normalizeWorkflowStreamIdentity(provider: unknown, model: unknown): { provider: string; model: string } | undefined {
   const safeProvider = boundedString(provider, 100);
   const safeModel = boundedString(model, 200);

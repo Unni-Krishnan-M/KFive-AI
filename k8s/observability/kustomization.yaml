@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - storage.yaml
+  - prometheus.yaml
+  - alertmanager.yaml
+  - subsystem-prober.yaml
+  - grafana.yaml
+  - loki.yaml
+  - fluent-bit.yaml
+  - traefik-routes.yaml
+  - network-policies.yaml

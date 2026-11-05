@@ -252,3 +252,24 @@ export function isActiveAgentRun(run: AgentRunSummary | undefined): boolean {
 export function isTerminalAgentRun(run: AgentRunSummary | undefined): boolean {
   return Boolean(run && !isActiveAgentRun(run));
 }
+
+export async function waitForTerminalAgentRun(
+  read: () => Promise<unknown>,
+  options: {
+    attempts?: number;
+    delayMs?: number;
+    sleep?: (milliseconds: number) => Promise<void>;
+  } = {}
+): Promise<AgentRunDetail> {
+  const attempts = options.attempts ?? 12;
+  const delayMs = options.delayMs ?? 100;
+  const sleep = options.sleep ?? ((milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds)));
+  let latest: AgentRunDetail | undefined;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    latest = normalizeAgentRunDetail(await read());
+    if (!latest) throw new Error('The server returned an invalid agent run.');
+    if (isTerminalAgentRun(latest)) return latest;
+    if (attempt + 1 < attempts) await sleep(delayMs);
+  }
+  throw new Error(`Agent run ${latest?.id ?? ''} did not reach a terminal state.`.trim());
+}

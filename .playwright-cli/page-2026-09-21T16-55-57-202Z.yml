@@ -1,0 +1,164 @@
+- generic [ref=e317]:
+  - complementary [ref=e318]:
+    - generic [ref=e319]:
+      - generic [ref=e320]: KFive AI
+      - button "Collapse sidebar" [ref=e326] [cursor=pointer]
+    - generic [ref=e330]:
+      - generic [ref=e331] [cursor=pointer]:
+        - generic [ref=e332]: Search
+        - generic [ref=e337]:
+          - generic [ref=e338]: ⌘
+          - generic [ref=e339]: K
+      - navigation [ref=e340]:
+        - link "Dashboard" [ref=e341] [cursor=pointer]:
+          - /url: /app/dashboard
+        - link "AI Chat" [ref=e349] [cursor=pointer]:
+          - /url: /app/chat
+        - link "Code Lab" [ref=e354] [cursor=pointer]:
+          - /url: /app/code
+        - link "Agents" [ref=e361] [cursor=pointer]:
+          - /url: /app/agents
+        - link "Documents" [ref=e368] [cursor=pointer]:
+          - /url: /app/documents
+        - link "Knowledge / RAG" [ref=e374] [cursor=pointer]:
+          - /url: /app/knowledge
+        - link "Repository Analyzer" [ref=e380] [cursor=pointer]:
+          - /url: /app/repositories
+        - link "Workflows" [ref=e387] [cursor=pointer]:
+          - /url: /app/workflows
+        - link "Dataset Lab" [ref=e395] [cursor=pointer]:
+          - /url: /app/datasets
+        - link "Model Benchmarks" [ref=e402] [cursor=pointer]:
+          - /url: /app/benchmarks
+        - link "Notebooks" [ref=e408] [cursor=pointer]:
+          - /url: /app/notebooks
+        - link "Voice Assistant" [ref=e414] [cursor=pointer]:
+          - /url: /app/voice
+        - link "Models" [ref=e420] [cursor=pointer]:
+          - /url: /app/models
+        - link "Projects" [ref=e433] [cursor=pointer]:
+          - /url: /app/projects
+        - link "Workspace" [ref=e438] [cursor=pointer]:
+          - /url: /app/workspace
+        - link "PDF Utilities" [ref=e444] [cursor=pointer]:
+          - /url: /app/files
+    - generic [ref=e449]:
+      - generic [ref=e450]:
+        - generic [ref=e451]: A
+        - generic [ref=e453]:
+          - paragraph [ref=e454]: Agent Browser
+          - paragraph [ref=e455]: agentbr_88432041@example.test
+      - generic [ref=e456]:
+        - link "Profile" [ref=e457] [cursor=pointer]:
+          - /url: /app/profile
+        - link "Settings" [ref=e461] [cursor=pointer]:
+          - /url: /app/settings
+        - button "Toggle theme" [ref=e465] [cursor=pointer]
+        - button "Sign out" [ref=e472] [cursor=pointer]
+  - main [ref=e476]:
+    - generic [ref=e478]:
+      - generic [ref=e479]:
+        - generic [ref=e480]:
+          - heading "AI Agents" [level=1] [ref=e481]
+          - paragraph [ref=e485]: Create specialized assistants and inspect their durable run history.
+        - generic [ref=e486]:
+          - textbox "Search agents..." [ref=e491]
+          - button "Create Agent" [ref=e492] [cursor=pointer]
+      - generic [ref=e495]:
+        - heading "Your Agents" [level=2] [ref=e496]
+        - article [ref=e498]:
+          - generic [ref=e499]:
+            - button "Edit Browser Agent 92126" [ref=e500] [cursor=pointer]
+            - button "Delete Browser Agent 92126" [ref=e503] [cursor=pointer]
+          - heading "Browser Agent 92126" [level=3] [ref=e511]
+          - paragraph [ref=e512]: Disposable acceptance agent
+          - generic [ref=e513]:
+            - generic [ref=e517]: phi3:latest
+            - generic [ref=e518]: •
+            - generic [ref=e519]: "Temp: 0.7"
+          - generic [ref=e520]: Tools disabled
+          - button "Run & History" [ref=e523] [cursor=pointer]
+      - generic [ref=e527]:
+        - heading "Starter Templates" [level=2] [ref=e528]
+        - generic [ref=e529]:
+          - button [ref=e530] [cursor=pointer]:
+            - heading "Code Reviewer" [level=3] [ref=e534]
+            - paragraph [ref=e535]: Expert developer that reviews code for bugs and best practices.
+          - button [ref=e536] [cursor=pointer]:
+            - heading "Technical Writer" [level=3] [ref=e540]
+            - paragraph [ref=e541]: Creates clear, concise documentation from technical specs.
+          - button [ref=e542] [cursor=pointer]:
+            - heading "Data Analyst" [level=3] [ref=e546]
+            - paragraph [ref=e547]: Analyzes data structures and suggests insights.
+      - generic [ref=e584]:
+        - generic [ref=e585]:
+          - generic [ref=e586]:
+            - heading "Browser Agent 92126" [level=3] [ref=e587]
+            - paragraph [ref=e590]: Durable runs · tools disabled
+          - button "Close run history" [ref=e591] [cursor=pointer]: ×
+        - generic [ref=e592]:
+          - generic [ref=e593]:
+            - generic [ref=e594]:
+              - text: Prompt
+              - textbox "Prompt" [ref=e595]:
+                - /placeholder: Enter input for the agent...
+                - text: Reply with exactly BROWSER_AGENT_SUCCESS_92126 and nothing else.
+            - button "Run Agent" [active] [ref=e597] [cursor=pointer]
+            - generic [ref=e614]:
+              - generic [ref=e615]:
+                - generic [ref=e616]:
+                  - paragraph [ref=e617]: Status
+                  - paragraph [ref=e618]: succeeded
+                - generic [ref=e619]:
+                  - paragraph [ref=e620]: Provider
+                  - paragraph [ref=e621]: ollama
+                - generic [ref=e622]:
+                  - paragraph [ref=e623]: Model
+                  - paragraph [ref=e624]: phi3:latest
+                - generic [ref=e625]:
+                  - paragraph [ref=e626]: Usage
+                  - paragraph [ref=e627]: 72 tokens
+                  - paragraph [ref=e628]: 56 in · 16 out · 4,720 ms
+              - generic [ref=e629]:
+                - paragraph [ref=e630]: Prompt
+                - generic [ref=e631]: Reply with exactly BROWSER_AGENT_SUCCESS_92126 and nothing else.
+              - generic [ref=e632]:
+                - paragraph [ref=e633]: Output · 27 bytes
+                - generic [ref=e634]: BROWSER_AGENT_SUCCESS_92126
+              - generic [ref=e635]:
+                - heading "Timeline" [level=4] [ref=e636]
+                - list [ref=e637]:
+                  - listitem [ref=e638]:
+                    - generic [ref=e642]:
+                      - paragraph [ref=e643]: created
+                      - paragraph [ref=e644]: 9/21/2026, 10:25:51 PM
+                  - listitem [ref=e645]:
+                    - generic [ref=e649]:
+                      - paragraph [ref=e650]: started
+                      - paragraph [ref=e651]: 9/21/2026, 10:25:51 PM
+                  - listitem [ref=e652]:
+                    - generic [ref=e656]:
+                      - paragraph [ref=e657]: provider selected
+                      - paragraph [ref=e658]: 9/21/2026, 10:25:56 PM · ollama · phi3:latest
+                  - listitem [ref=e659]:
+                    - generic [ref=e663]:
+                      - paragraph [ref=e664]: completed
+                      - paragraph [ref=e665]: 9/21/2026, 10:25:56 PM
+          - complementary [ref=e601]:
+            - generic [ref=e602]:
+              - generic [ref=e603]:
+                - heading "Recent runs" [level=4] [ref=e604]
+                - generic [ref=e605]: 1 for this agent
+              - paragraph [ref=e606]: "Owner retention cap: 500. Delete terminal runs to reclaim capacity."
+            - generic [ref=e667]:
+              - button "6ab16197859c35a0c874ac4a succeeded 9/21/2026, 10:25:51 PM ollama · phi3:latest" [ref=e668] [cursor=pointer]:
+                - generic [ref=e669]:
+                  - generic [ref=e670]: 6ab16197859c35a0c874ac4a
+                  - generic [ref=e671]: succeeded
+                - paragraph [ref=e672]: 9/21/2026, 10:25:51 PM
+                - paragraph [ref=e673]: ollama · phi3:latest
+              - button "Delete run 6ab16197859c35a0c874ac4a" [ref=e674] [cursor=pointer]
+            - generic [ref=e608]:
+              - button "Previous" [disabled] [ref=e609]
+              - generic [ref=e610]: Page 1 of 1
+              - button "Next" [disabled] [ref=e611]

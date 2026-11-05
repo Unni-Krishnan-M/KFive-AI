@@ -50,6 +50,8 @@ export function createAgentRouter(service: AgentService = agentService, runs: Ag
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.flushHeaders?.();
     const connection = new AbortController();
     res.once('close', () => {

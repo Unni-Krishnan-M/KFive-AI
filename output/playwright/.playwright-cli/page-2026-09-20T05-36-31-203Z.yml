@@ -1,0 +1,26 @@
+- generic [ref=f2e6]:
+  - generic [ref=f2e7]:
+    - heading "Join KFive AI" [level=1] [ref=f2e12]
+    - paragraph [ref=f2e13]: Create your AI workspace account
+  - generic [ref=f2e14]:
+    - generic [ref=f2e15]:
+      - generic [ref=f2e16]:
+        - generic [ref=f2e17]: First Name
+        - textbox "John" [ref=f2e18]
+      - generic [ref=f2e19]:
+        - generic [ref=f2e20]: Last Name
+        - textbox "Doe" [ref=f2e21]
+    - generic [ref=f2e22]:
+      - generic [ref=f2e23]: Username *
+      - textbox "johndoe" [ref=f2e24]
+    - generic [ref=f2e25]:
+      - generic [ref=f2e26]: Email *
+      - textbox "john@example.com" [ref=f2e27]
+    - generic [ref=f2e28]:
+      - generic [ref=f2e29]: Password *
+      - textbox "Create a strong password" [ref=f2e30]
+    - button "Create Account" [ref=f2e31] [cursor=pointer]
+  - paragraph [ref=f2e34]:
+    - text: Already have an account?
+    - link "Sign in" [ref=f2e35] [cursor=pointer]:
+      - /url: /login

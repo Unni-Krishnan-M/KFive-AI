@@ -11,6 +11,7 @@ import {
   CodeRunService,
   validateCodeRunInput,
 } from './codeRunService';
+import { CodeRunReconciler } from './codeRunReconciler';
 
 const ownerId = '64b000000000000000000001';
 const otherOwnerId = '64b000000000000000000002';
@@ -246,23 +247,36 @@ describe('CodeRunService', () => {
     });
   });
 
-  it('uses a deterministic internal_error when a terminal queue job missed reconciliation', async () => {
-    const transition = jest.fn(repository().transition);
+  it('keeps a terminal queue job pending so delayed Mongo reconciliation can preserve its result', async () => {
+    let saved = { ...queued };
+    const transition = jest.fn(async (_owner, _id, from, changes) => {
+      if (!from.includes(saved.status)) return null;
+      saved = { ...saved, ...changes };
+      return saved;
+    });
     const service = new CodeRunService(
       'container', repository({ transition }), dispatcher({ cancel: async () => 'terminal' }), jest.fn(), jest.fn(), () => now
     );
     await expect(service.cancel(ownerId, runId)).resolves.toMatchObject({
-      run: { status: 'internal_error' }, idempotent: false,
+      run: { status: 'cancel-requested' }, idempotent: false,
     });
     expect(transition).toHaveBeenCalledWith(ownerId, runId, ['queued', 'running'], {
-      status: 'internal_error',
+      status: 'cancel-requested',
       cancelRequestedAt: now,
-      completedAt: now,
-      result: {
-        errorCode: 'RECONCILIATION_MISSED',
-        errorMessage: 'The runner job finished before its result could be reconciled.',
-      },
     });
+    const reconciler = new CodeRunReconciler({
+      listPending: async () => [],
+      findExpected: async () => ['queued', 'running', 'cancel-requested'].includes(saved.status) ? saved : null,
+      markActive: async () => undefined,
+      complete: async (_id, status, result) => { saved = { ...saved, status, result }; },
+      fail: async () => { throw new Error('Valid completed output must not be lost'); },
+    });
+    await reconciler.completed(runId, {
+      runId, language: 'python', runtimeVersion: '3.12', status: 'succeeded',
+      stdout: 'preserved\n', stderr: '', exitCode: 0, signal: null,
+      durationMs: 10, outputTruncated: false, oomKilled: false,
+    });
+    expect(saved).toMatchObject({ status: 'succeeded', result: { stdout: 'preserved\n', exitCode: 0 } });
   });
 });
 

@@ -1,6 +1,6 @@
 import { Queue } from 'bullmq';
 import { getCodeRunsQueue } from '@/config/queues';
-import { getRedisClient } from '@/config/redis';
+import { getQueueRedisClient } from '@/config/redis';
 import { CodeLanguage, CodeRunModel, CodeRunStatus } from '@/models/CodeRun';
 import { ProjectRecord, projectService } from './projectService';
 
@@ -130,7 +130,7 @@ export interface CodeRunnerAvailability {
 export class BullMqCodeRunDispatcher implements CodeRunDispatcher {
   constructor(
     private readonly resolveQueue: () => Queue = getCodeRunsQueue,
-    private readonly resolveRedis: () => CodeRunnerRedis = () => getRedisClient() as unknown as CodeRunnerRedis,
+    private readonly resolveRedis: () => CodeRunnerRedis = () => getQueueRedisClient() as unknown as CodeRunnerRedis,
     private readonly now: () => number = Date.now,
     private readonly heartbeatMaxAgeMs = CODE_RUNNER_HEARTBEAT_MAX_AGE_MS
   ) {}
@@ -399,19 +399,13 @@ export class CodeRunService {
     const timestamp = this.now();
     const status: CodeRunStatus = dispatchResult === 'removed' || dispatchResult === 'missing'
       ? 'cancelled'
-      : dispatchResult === 'terminal'
-        ? 'internal_error'
-        : 'cancel-requested';
+      : 'cancel-requested';
+    // A terminal Redis job may still be awaiting Mongo reconciliation. Keep
+    // it eligible for the completion event/sweep instead of destroying its result.
     const run = await this.repository.transition(ownerId, runId, ['queued', 'running'], {
       status,
       cancelRequestedAt: timestamp,
-      ...(status === 'cancelled' || status === 'internal_error' ? { completedAt: timestamp } : {}),
-      ...(status === 'internal_error' ? {
-        result: {
-          errorCode: 'RECONCILIATION_MISSED',
-          errorMessage: 'The runner job finished before its result could be reconciled.',
-        },
-      } : {}),
+      ...(status === 'cancelled' ? { completedAt: timestamp } : {}),
     });
     if (run) return { run, idempotent: false };
     const latest = await this.get(ownerId, runId);

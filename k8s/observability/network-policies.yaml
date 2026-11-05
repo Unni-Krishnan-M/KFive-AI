@@ -1,0 +1,190 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: kfive-observability
+  labels: {app.kubernetes.io/part-of: kfive}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: kfive-observability
+  labels: {app.kubernetes.io/part-of: kfive}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kube-system}
+          podSelector:
+            matchLabels: {k8s-app: kube-dns}
+        # kindnet can enforce Service traffic before or after DNAT; permit the
+        # exact CoreDNS ClusterIP as well as the selected CoreDNS pods.
+        - ipBlock: {cidr: 10.96.0.10/32}
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus
+  namespace: kfive-observability
+  labels: {app.kubernetes.io/part-of: kfive}
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: prometheus}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: grafana}
+      ports: [{protocol: TCP, port: 9090}]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kfive}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: backend}
+      ports: [{protocol: TCP, port: 5000}]
+    - to:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: subsystem-prober}
+      ports: [{protocol: TCP, port: 9116}]
+    - to:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: alertmanager}
+      ports: [{protocol: TCP, port: 9093}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-alertmanager
+  namespace: kfive-observability
+  labels: {app.kubernetes.io/part-of: kfive}
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: alertmanager}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: prometheus}
+      ports: [{protocol: TCP, port: 9093}]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: kfive-alert-receiver}
+      ports: [{protocol: TCP, port: 8080}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-subsystem-prober
+  namespace: kfive-observability
+  labels: {app.kubernetes.io/part-of: kfive}
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: subsystem-prober}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: prometheus}
+      ports: [{protocol: TCP, port: 9116}]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kfive}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: mongodb}
+      ports: [{protocol: TCP, port: 27017}]
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kfive}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: redis}
+      ports: [{protocol: TCP, port: 6379}]
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kfive}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: chromadb}
+      ports: [{protocol: TCP, port: 8000}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-grafana
+  namespace: kfive-observability
+  labels: {app.kubernetes.io/part-of: kfive}
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: grafana}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kfive}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: traefik}
+      ports: [{protocol: TCP, port: 3000}]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: prometheus}
+      ports: [{protocol: TCP, port: 9090}]
+    - to:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: loki}
+      ports: [{protocol: TCP, port: 3100}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-loki
+  namespace: kfive-observability
+  labels: {app.kubernetes.io/part-of: kfive}
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: loki}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: grafana}
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: fluent-bit}
+      ports: [{protocol: TCP, port: 3100}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-fluent-bit
+  namespace: kfive-observability
+  labels: {app.kubernetes.io/part-of: kfive}
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: fluent-bit}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: loki}
+      ports: [{protocol: TCP, port: 3100}]
+    # Repeat the exact DNS edge on this selected workload for kindnet's
+    # local multi-policy enforcement path.
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kube-system}
+          podSelector:
+            matchLabels: {k8s-app: kube-dns}
+        - ipBlock: {cidr: 10.96.0.10/32}
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}

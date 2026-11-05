@@ -37,6 +37,7 @@ function fakeService(overrides: Partial<Record<keyof RagService, jest.Mock>> = {
     status: jest.fn().mockResolvedValue(status),
     list: jest.fn().mockResolvedValue([source]),
     ingest: jest.fn().mockResolvedValue(source),
+    ingestDocument: jest.fn().mockResolvedValue({ source, created: true }),
     delete: jest.fn().mockResolvedValue(undefined),
     query: jest.fn().mockResolvedValue({
       answer: 'Answer [S1]',
@@ -129,6 +130,32 @@ describe('knowledge routes', () => {
     expect(service.ingest).toHaveBeenCalledWith(ownerId, input);
     expect(service.query).toHaveBeenCalledWith(ownerId, { question: 'What?', projectId, topK: 3 });
     expect(service.delete).toHaveBeenCalledWith(ownerId, sourceId);
+  });
+
+  it('indexes a stored document using only its owner-scoped id', async () => {
+    const documentId = '64b000000000000000000301';
+    const service = fakeService();
+    const result = await invoke(createKnowledgeRouter(service), 'post', '/sources/from-document', {
+      body: { documentId },
+    });
+    expect(service.ingestDocument).toHaveBeenCalledWith(ownerId, documentId);
+    expect(result).toEqual({ status: 201, body: { success: true, data: { source, created: true } } });
+
+    const existing = fakeService({ ingestDocument: jest.fn().mockResolvedValue({ source, created: false }) });
+    const repeated = await invoke(createKnowledgeRouter(existing), 'post', '/sources/from-document', {
+      body: { documentId },
+    });
+    expect(repeated.status).toBe(200);
+
+    const forgedScope = fakeService();
+    const rejected = await invoke(createKnowledgeRouter(forgedScope), 'post', '/sources/from-document', {
+      body: { documentId, projectId },
+    });
+    expect(rejected).toMatchObject({
+      status: 400,
+      body: { error: { code: 'INVALID_RAG_INPUT' } },
+    });
+    expect(forgedScope.ingestDocument).not.toHaveBeenCalled();
   });
 
   it('returns a structured conflict when deletion races an indexing source', async () => {

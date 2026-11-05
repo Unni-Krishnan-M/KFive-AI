@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '@/utils/logger';
+import { metricRequestPath } from '@/observability/metrics';
 
 export interface ApiError extends Error {
   statusCode?: number;
@@ -32,7 +33,7 @@ export function errorHandler(
   logger.error('API Error:', {
     error: message,
     stack: error.stack,
-    url: req.url,
+    path: metricRequestPath(req, statusCode),
     method: req.method,
     ip: req.ip,
     userAgent: req.get('User-Agent'),
@@ -72,7 +73,7 @@ export function errorHandler(
 }
 
 export function notFound(req: Request, res: Response, next: NextFunction): void {
-  const error = new AppError(`Route ${req.originalUrl} not found`, 404);
+  const error = new AppError('Route not found', 404);
   next(error);
 }
 

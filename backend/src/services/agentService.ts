@@ -102,7 +102,7 @@ const OBJECT_ID = /^[a-f\d]{24}$/i;
 
 function requireObjectId(value: unknown, label: string): string {
   if (typeof value !== 'string' || !OBJECT_ID.test(value)) throw new AgentError(`${label} is invalid.`, 'INVALID_AGENT_ID', 400);
-  return value;
+  return value.toLowerCase();
 }
 
 function hasUnsafeControls(value: string, allowNewlines: boolean): boolean {

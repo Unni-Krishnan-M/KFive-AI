@@ -23,7 +23,9 @@ const status = {
 
 function fakeService(): RepositoryAnalysisService {
   return {
-    status: jest.fn().mockResolvedValue(status), list: jest.fn().mockResolvedValue([analysisSummary]),
+    status: jest.fn().mockResolvedValue(status), list: jest.fn().mockResolvedValue({
+      analyses: [analysisSummary], pagination: { page: 1, pageSize: 50, total: 1, totalPages: 1, maxPages: 10 },
+    }),
     get: jest.fn().mockResolvedValue(analysis), create: jest.fn().mockResolvedValue(analysis), delete: jest.fn().mockResolvedValue(undefined),
   } as unknown as RepositoryAnalysisService;
 }
@@ -84,15 +86,17 @@ describe('repository analysis routes', () => {
     const service = fakeService();
     const router = createRepositoriesRouter(service);
     await expect(invoke(router, 'get', '/status', { query: { projectId } })).resolves.toEqual({ status: 200, body: { success: true, data: status } });
-    await expect(invoke(router, 'get', '/analyses', { query: { projectId } })).resolves.toEqual({ status: 200, body: { success: true, data: { analyses: [analysisSummary], count: 1 } } });
+    await expect(invoke(router, 'get', '/analyses', { query: { projectId, page: '1' } })).resolves.toEqual({ status: 200, body: { success: true, data: {
+      analyses: [analysisSummary], count: 1, pagination: { page: 1, pageSize: 50, total: 1, totalPages: 1, maxPages: 10 },
+    } } });
     await expect(invoke(router, 'get', '/analyses/:id', { params: { id: analysis.id } })).resolves.toEqual({ status: 200, body: { success: true, data: { analysis } } });
     await expect(invoke(router, 'delete', '/analyses/:id', { params: { id: analysis.id } })).resolves.toEqual({
       status: 200, body: { success: true, data: { analysisId: analysis.id, deleted: true } },
     });
     expect(service.status).toHaveBeenCalledWith(ownerId, projectId);
-    expect(service.list).toHaveBeenCalledWith(ownerId, projectId, undefined);
+    expect(service.list).toHaveBeenCalledWith(ownerId, projectId, undefined, '1');
     await invoke(router, 'get', '/analyses', { query: { scope: 'orphaned' } });
-    expect(service.list).toHaveBeenLastCalledWith(ownerId, undefined, 'orphaned');
+    expect(service.list).toHaveBeenLastCalledWith(ownerId, undefined, 'orphaned', undefined);
     expect(service.get).toHaveBeenCalledWith(ownerId, analysis.id);
     expect(service.delete).toHaveBeenCalledWith(ownerId, analysis.id);
   });

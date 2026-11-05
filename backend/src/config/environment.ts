@@ -34,14 +34,30 @@ export interface EnvironmentConfig {
   customLlmSupportsStructuredOutput: boolean;
   publicBaseUrl?: string;
   corsOrigins: string[];
+  trustedProxyHops: number;
   jwtSecret: string;
   jwtRefreshSecret: string;
+  jwtExpiresIn: string;
+  jwtRefreshExpiresIn: string;
   codeRunnerMode: 'disabled' | 'container';
   notebookExecutionEnabled: boolean;
   notebookRuntimeImage?: string;
   notebookVerifierImage?: string;
   documentProcessorUrl?: string;
   ocrServiceUrl?: string;
+}
+
+function boundedDuration(name: string, minSeconds: number, maxSeconds: number) {
+  return (value: string, helpers: Joi.CustomHelpers) => {
+    const match = /^([1-9]\d*)(s|m|h|d)$/.exec(value);
+    if (!match) return helpers.error('any.custom', { message: `${name} must use canonical integer s/m/h/d syntax` });
+    const factors: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400 };
+    const seconds = Number(match[1]) * factors[match[2]];
+    if (!Number.isSafeInteger(seconds) || seconds < minSeconds || seconds > maxSeconds) {
+      return helpers.error('any.custom', { message: `${name} is outside the allowed lifetime range` });
+    }
+    return value;
+  };
 }
 
 const schema = Joi.object({
@@ -82,6 +98,7 @@ const schema = Joi.object({
   CUSTOM_LLM_SUPPORTS_STRUCTURED_OUTPUT: Joi.boolean().truthy('true').falsy('false').default(false),
   PUBLIC_BASE_URL: Joi.string().uri({ scheme: ['http', 'https'] }).allow(''),
   CORS_ORIGIN: Joi.string().default('http://localhost:3000'),
+  TRUST_PROXY_HOPS: Joi.number().integer().min(0).max(2).default(1),
   JWT_SECRET: Joi.when('KFIVE_PROCESS', {
     is: 'api', then: Joi.string().min(32).required(),
     otherwise: Joi.string().min(32).default('kfive-worker-no-http-authentication-00000001'),
@@ -90,6 +107,8 @@ const schema = Joi.object({
     is: 'api', then: Joi.string().min(32).required(),
     otherwise: Joi.string().min(32).default('kfive-worker-no-refresh-authentication-0001'),
   }),
+  JWT_EXPIRES_IN: Joi.string().custom(boundedDuration('JWT_EXPIRES_IN', 1, 24 * 60 * 60)).default('15m'),
+  JWT_REFRESH_EXPIRES_IN: Joi.string().custom(boundedDuration('JWT_REFRESH_EXPIRES_IN', 60, 30 * 24 * 60 * 60)).default('7d'),
   CODE_RUNNER_MODE: Joi.string().valid('disabled', 'container').default('disabled'),
   NOTEBOOK_EXECUTION_ENABLED: Joi.boolean().truthy('true').falsy('false').default(false),
   NOTEBOOK_RUNTIME_IMAGE: Joi.string().trim().max(500).allow(''),
@@ -99,6 +118,9 @@ const schema = Joi.object({
 }).unknown(true).custom((value, helpers) => {
   if (!value.MONGODB_URL && !value.MONGODB_URI) {
     return helpers.error('any.custom', { message: 'MONGODB_URL is required' });
+  }
+  if (value.KFIVE_PROCESS === 'api' && value.JWT_SECRET === value.JWT_REFRESH_SECRET) {
+    return helpers.error('any.custom', { message: 'JWT_SECRET and JWT_REFRESH_SECRET must be distinct' });
   }
 
   const corsOrigins: string[] = [];
@@ -221,8 +243,11 @@ export function parseEnvironment(source: NodeJS.ProcessEnv): EnvironmentConfig {
     customLlmSupportsStructuredOutput: value.CUSTOM_LLM_SUPPORTS_STRUCTURED_OUTPUT,
     publicBaseUrl: cleanOptional(value.PUBLIC_BASE_URL),
     corsOrigins: value.CORS_ORIGIN.split(',').map((origin: string) => origin.trim()).filter(Boolean),
+    trustedProxyHops: value.TRUST_PROXY_HOPS,
     jwtSecret: value.JWT_SECRET,
     jwtRefreshSecret: value.JWT_REFRESH_SECRET,
+    jwtExpiresIn: value.JWT_EXPIRES_IN,
+    jwtRefreshExpiresIn: value.JWT_REFRESH_EXPIRES_IN,
     codeRunnerMode: value.CODE_RUNNER_MODE,
     notebookExecutionEnabled: value.NOTEBOOK_EXECUTION_ENABLED,
     notebookRuntimeImage: cleanOptional(value.NOTEBOOK_RUNTIME_IMAGE),

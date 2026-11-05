@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { AppError } from './errorHandler';
+import { isAcceptedAccessToken } from '@/security/authPolicy';
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -10,13 +11,14 @@ export interface AuthenticatedRequest extends Request {
   };
 }
 
-export function authenticateToken(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+export interface AuthenticatedIdentity {
+  userId: string;
+  email: string;
+  role: string;
+}
 
-  if (!token) {
-    throw new AppError('Access token required', 401);
-  }
+export function verifyAccessToken(token: unknown): AuthenticatedIdentity {
+  if (!isAcceptedAccessToken(token)) throw new AppError('Access token required', 401);
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET!, {
@@ -24,22 +26,29 @@ export function authenticateToken(req: AuthenticatedRequest, res: Response, next
       issuer: 'kfive-ai',
       audience: 'kfive-web',
     });
-
-    if (typeof decoded === 'string' || typeof decoded.userId !== 'string' || typeof decoded.email !== 'string' || typeof decoded.role !== 'string') {
+    if (typeof decoded === 'string'
+      || decoded.type !== 'access'
+      || typeof decoded.userId !== 'string'
+      || typeof decoded.email !== 'string'
+      || typeof decoded.role !== 'string') {
       throw new jwt.JsonWebTokenError('Invalid token payload');
     }
-
-    req.user = { userId: decoded.userId, email: decoded.email, role: decoded.role };
-    next();
+    return { userId: decoded.userId, email: decoded.email, role: decoded.role };
   } catch (error) {
-    if (error instanceof jwt.TokenExpiredError) {
-      throw new AppError('Token expired', 401);
-    } else if (error instanceof jwt.JsonWebTokenError) {
-      throw new AppError('Invalid token', 401);
-    } else {
-      throw new AppError('Authentication failed', 401);
-    }
+    if (error instanceof jwt.TokenExpiredError) throw new AppError('Token expired', 401);
+    if (error instanceof jwt.JsonWebTokenError) throw new AppError('Invalid token', 401);
+    if (error instanceof AppError) throw error;
+    throw new AppError('Authentication failed', 401);
   }
+}
+
+export function authenticateToken(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
+  const authHeader = req.headers['authorization'];
+  const match = typeof authHeader === 'string' ? /^Bearer ([^\s]+)$/.exec(authHeader) : null;
+  const token = match?.[1];
+
+  req.user = verifyAccessToken(token);
+  next();
 }
 
 export function getAuthenticatedUserId(req: Request): string {

@@ -1,5 +1,5 @@
 import { AiProviderClient, AiStreamEvent } from '@/services/ai/types';
-import { AiProviderUnavailableError } from '@/services/ai/errors';
+import { AiProviderTimeoutError, AiProviderUnavailableError } from '@/services/ai/errors';
 import { AgentError, AgentRecord } from './agentService';
 import { ProjectError } from './projectService';
 import {
@@ -93,6 +93,17 @@ describe('agent run validation', () => {
 });
 
 describe('AgentRunService', () => {
+  it('canonicalizes equivalent ObjectIds before ownership and lease checks', async () => {
+    const access = agents();
+    const service = new AgentRunService(
+      statefulRepository(), access as any, () => provider(async () => undefined), 30_000, () => now
+    );
+
+    await expect(service.prepare(ownerId.toUpperCase(), agentId.toUpperCase(), { prompt: 'Review' }))
+      .resolves.toMatchObject({ ownerId, agent: { _id: agentId } });
+    expect(access.getExecutableRecord).toHaveBeenCalledWith(ownerId, agentId);
+  });
+
   it('paginates every retained run so older audit records remain discoverable', async () => {
     const list = jest.fn().mockResolvedValue([]);
     const countByOwnerAgent = jest.fn().mockResolvedValue(120);
@@ -252,6 +263,37 @@ describe('AgentRunService', () => {
     });
   });
 
+  it('preserves cancellation when provider completion races the Mongo cancel transition', async () => {
+    const repository = statefulRepository();
+    const transition = repository.transition.bind(repository);
+    repository.transition = jest.fn(async (requestedOwner, requestedRun, allowed, changes, events) => {
+      if (changes.status === 'succeeded') {
+        await transition(requestedOwner, requestedRun, ['running'], {
+          status: 'cancel-requested', cancelRequestedAt: now,
+        }, [{ sequence: 49, type: 'cancel_requested', timestamp: now }]);
+        return null;
+      }
+      return transition(requestedOwner, requestedRun, allowed, changes, events);
+    });
+    const service = new AgentRunService(
+      repository, agents() as any, () => provider(async () => undefined), 30_000, () => now
+    );
+    await expect(service.execute(await service.prepare(ownerId, agentId, { prompt: 'Review' }), () => undefined))
+      .rejects.toMatchObject({ code: 'AGENT_RUN_CONFLICT', message: 'Agent run was cancelled.' });
+    await expect(service.get(ownerId, agentId, runId)).resolves.toMatchObject({ status: 'cancelled' });
+  });
+
+  it('classifies the configured provider deadline as a timed-out run', async () => {
+    const repository = statefulRepository();
+    const service = new AgentRunService(repository, agents() as any, () => provider(async () => {
+      throw new AiProviderTimeoutError('ollama');
+    }), 45_000, () => now);
+
+    await expect(service.execute(await service.prepare(ownerId, agentId, { prompt: 'Review' }), () => undefined))
+      .rejects.toMatchObject({ code: 'AGENT_TIMEOUT', statusCode: 408 });
+    await expect(service.get(ownerId, agentId, runId)).resolves.toMatchObject({ status: 'timed_out' });
+  });
+
   it('enforces one active run per owner', async () => {
     const repository = statefulRepository();
     const ai = provider((_emit, signal) => new Promise<void>((_resolve, reject) => {
@@ -325,5 +367,7 @@ describe('AgentRunService', () => {
     await expect(service.get(otherOwnerId, agentId, runId)).rejects.toMatchObject({ code: 'AGENT_NOT_FOUND' });
     await expect(service.recoverInterrupted()).resolves.toBe(2);
     expect(interruptActive).toHaveBeenCalledWith(new Date(now.getTime() - 60_000), now);
+    await expect(service.recoverInterrupted(0)).resolves.toBe(2);
+    expect(interruptActive).toHaveBeenLastCalledWith(now, now);
   });
 });

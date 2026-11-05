@@ -2,7 +2,7 @@ import { RedisRunnerCoordinator } from './coordinator';
 import { ExecFileDockerAdapter } from './dockerCli';
 import { DockerCodeExecutor } from './executor';
 import { BullMqWorkerFactory } from './queueWorker';
-import { parseRedisUrl } from './redisConfig';
+import { resolveRedisConfig } from './redisConfig';
 import { StaleCodeRunReaper } from './reaper';
 import { ReaperLoop } from './reaperLoop';
 import { CodeRunnerWorkerHost } from './workerHost';
@@ -22,7 +22,7 @@ function parseConcurrency(raw: string | undefined): number {
 }
 
 async function main(): Promise<void> {
-  const redis = parseRedisUrl(process.env.REDIS_URL);
+  const redis = resolveRedisConfig();
   const concurrency = parseConcurrency(process.env.CODE_RUNNER_CONCURRENCY);
   const onError = (event: string): void => log('error', event);
   const coordinator = new RedisRunnerCoordinator(redis, onError);

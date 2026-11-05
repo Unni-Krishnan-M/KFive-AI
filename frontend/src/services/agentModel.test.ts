@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   AGENT_RUN_OUTPUT_BYTES,
   buildAgentPayload,
@@ -9,6 +9,7 @@ import {
   normalizeAgentRunPage,
   normalizeAgentRunTimeline,
   normalizeAgentRunUsage,
+  waitForTerminalAgentRun,
 } from './agentModel';
 
 const summary = {
@@ -77,5 +78,16 @@ describe('agent API normalization', () => {
     expect(normalizeAgentRunDetail({ ...summary, prompt: 'Prompt', output: 'x'.repeat(AGENT_RUN_OUTPUT_BYTES + 1), timeline: [] })).toBeUndefined();
     expect(normalizeAgentRunUsage({ totalTokens: 200_000_001 })).toBeUndefined();
     expect(normalizeAgentRunTimeline([{ sequence: 0, type: 'created', timestamp: summary.queuedAt }])).toBeUndefined();
+  });
+
+  it('reconciles a cancellation response to a terminal persisted run with bounded polling', async () => {
+    const sleep = vi.fn().mockResolvedValue(undefined);
+    const read = vi.fn()
+      .mockResolvedValueOnce({ data: { run: { ...summary, status: 'cancel-requested', prompt: 'Stop', output: '', timeline: [] } } })
+      .mockResolvedValueOnce({ data: { run: { ...summary, status: 'cancelled', prompt: 'Stop', output: '', timeline: [] } } });
+    await expect(waitForTerminalAgentRun(read, { attempts: 3, delayMs: 0, sleep }))
+      .resolves.toMatchObject({ status: 'cancelled' });
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(sleep).toHaveBeenCalledTimes(1);
   });
 });

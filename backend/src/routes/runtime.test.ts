@@ -43,7 +43,7 @@ describe('runtime configuration route', () => {
     expect(body.data.services).toContainEqual(expect.objectContaining({ id: 'chromadb', location: 'remote' }));
     expect(body.data.missingDependencies).toEqual(expect.arrayContaining([
       'Code Runner is not configured.',
-      'Document Processor is unavailable because this build has no isolated processor adapter.',
+      'Document Processor is not configured.',
       'OCR service is not configured.',
     ]));
     expect(body.data.restartRequiredFields).toContain('AI_PROVIDER');
@@ -53,7 +53,7 @@ describe('runtime configuration route', () => {
     expect(serialized).not.toContain(process.env.JWT_SECRET);
   });
 
-  it('does not claim document processing is available from an unused endpoint setting', async () => {
+  it('reports configured PDF extraction without claiming live dependency health', async () => {
     const configuredEndpoint = parseEnvironment({
       ...process.env,
       NODE_ENV: 'test',
@@ -72,12 +72,12 @@ describe('runtime configuration route', () => {
     const processor = body.data.services.find((service: { id: string }) => service.id === 'document-processor');
 
     expect(processor).toMatchObject({
-      configured: false,
+      configured: true,
       location: 'remote',
-      message: 'An endpoint is configured, but this build has no isolated Document Processor adapter.',
+      message: 'PDF text extraction is configured; live health has not been checked.',
     });
-    expect(body.data.missingDependencies).toContain(
-      'Document Processor is unavailable because this build has no isolated processor adapter.',
+    expect(body.data.missingDependencies).not.toContain(
+      'Document Processor is not configured.',
     );
   });
 });

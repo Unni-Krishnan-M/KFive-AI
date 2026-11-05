@@ -25,6 +25,10 @@ export interface RepositoryAnalysis {
   warnings: RepositoryWarning[]; createdAt?: string; updatedAt?: string;
 }
 export type RepositoryAnalysisSummary = Omit<RepositoryAnalysis, 'languages' | 'frameworks' | 'manifests' | 'dependencies' | 'signals' | 'tree' | 'warnings'>;
+export interface RepositoryAnalysisPage {
+  analyses: RepositoryAnalysisSummary[];
+  pagination: { page: number; pageSize: number; total: number; totalPages: number; maxPages: number };
+}
 
 export function repositoryHistoryScope(search: string, projectRequested: boolean): 'workspace' | 'orphaned' | 'invalid' {
   const query = new URLSearchParams(search);
@@ -143,6 +147,18 @@ export function normalizeRepositoryAnalysis(payload: unknown): RepositoryAnalysi
 export function normalizeRepositoryAnalyses(payload: unknown): RepositoryAnalysisSummary[] {
   const root = object(unwrapApiData(payload));
   return root && Array.isArray(root.analyses) ? root.analyses.flatMap((analysis) => { const normalized = normalizeRepositoryAnalysisSummaryRecord(analysis); return normalized ? [normalized] : []; }) : [];
+}
+export function normalizeRepositoryAnalysisPage(payload: unknown): RepositoryAnalysisPage | undefined {
+  const root = object(unwrapApiData(payload));
+  const pagination = object(root?.pagination);
+  if (!root || !Array.isArray(root.analyses) || !pagination) return undefined;
+  const analyses = normalizeRepositoryAnalyses(payload);
+  const page = count(pagination.page); const pageSize = count(pagination.pageSize); const total = count(pagination.total);
+  const totalPages = count(pagination.totalPages); const maxPages = count(pagination.maxPages);
+  if (analyses.length !== root.analyses.length || page === undefined || page < 1 || pageSize !== 50
+    || total === undefined || totalPages === undefined || totalPages !== Math.max(1, Math.ceil(total / pageSize))
+    || maxPages === undefined || maxPages < 1 || page > maxPages || totalPages > maxPages || analyses.length > pageSize) return undefined;
+  return { analyses, pagination: { page, pageSize, total, totalPages, maxPages } };
 }
 export function validateRepositoryArchive(file: Pick<File, 'name' | 'type' | 'size'>, maximumBytes = REPOSITORY_ARCHIVE_LIMIT_BYTES): string | undefined {
   if (!file.name.toLowerCase().endsWith('.zip')) return 'Choose a ZIP archive.';

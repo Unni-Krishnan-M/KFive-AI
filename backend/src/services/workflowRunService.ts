@@ -1,4 +1,5 @@
 import { WorkflowDefinition, WORKFLOW_TEMPLATE_TOKEN } from '@/models/Workflow';
+import { getEnvironment } from '@/config/environment';
 import { WorkflowRunModel, WorkflowRunStatus, WorkflowRunTimelineType } from '@/models/WorkflowRun';
 import { AiProviderClient, AiStreamEvent, AiUsage } from '@/services/ai/types';
 import { AiProviderError } from '@/services/ai/errors';
@@ -190,7 +191,7 @@ function serializeRun(record: WorkflowRunRecord, detail: boolean): PublicWorkflo
     ...(record.cancelRequestedAt ? { cancelRequestedAt: record.cancelRequestedAt } : {}),
     ...(record.completedAt ? { completedAt: record.completedAt } : {}),
     ...(record.createdAt ? { createdAt: record.createdAt } : {}), ...(record.updatedAt ? { updatedAt: record.updatedAt } : {}),
-    ...(detail ? { input: record.input, output: record.output, timeline: record.timeline } : {}),
+    ...(detail ? { input: record.input, output: record.output, timeline: [...record.timeline].sort((left, right) => left.sequence - right.sequence) } : {}),
   };
 }
 
@@ -198,7 +199,7 @@ function requireObjectId(value: unknown, label: string): string {
   if (typeof value !== 'string' || !/^[a-f\d]{24}$/i.test(value)) {
     throw new WorkflowRunError(`${label} is invalid.`, 'INVALID_WORKFLOW_RUN_INPUT', 400);
   }
-  return value;
+  return value.toLowerCase();
 }
 
 function requirePage(value: unknown): number {
@@ -442,15 +443,31 @@ export class WorkflowRunService {
     } catch (error) {
       acceptingProviderEvents = false;
       const completedAt = this.now();
+      let persistedCancellation = false;
+      if (error instanceof WorkflowRunError && error.code === 'WORKFLOW_RUN_CONFLICT'
+        && !active.cancelRequested && !active.timedOut && !active.outputLimit) {
+        let latest: WorkflowRunRecord | null;
+        try { latest = await this.repository.findByOwnerWorkflowAndId(prepared.ownerId, workflowId, runId); }
+        catch { throw new WorkflowRunError('Workflow run storage is unavailable.', 'WORKFLOW_RUN_STORAGE_UNAVAILABLE', 503); }
+        if (latest && TERMINAL.has(latest.status)) {
+          const result = serializeRun(latest, true);
+          onEvent({ type: 'completed', run: result });
+          return result;
+        }
+        if (latest?.status === 'cancel-requested') persistedCancellation = true;
+        else throw error;
+      }
       const classification = active.outputLimit
         ? { status: 'output_limit' as const, code: 'WORKFLOW_OUTPUT_LIMIT', message: 'Workflow output exceeded the 256 KiB limit.' }
         : active.timedOut
           ? { status: 'timed_out' as const, code: 'WORKFLOW_TIMEOUT', message: 'The workflow run timed out.' }
-          : active.cancelRequested
+          : active.cancelRequested || persistedCancellation
             ? { status: 'cancelled' as const, code: undefined, message: undefined }
-            : error instanceof AiProviderError && error.code === 'PROVIDER_UNAVAILABLE'
-              ? { status: 'failed' as const, code: 'WORKFLOW_PROVIDER_UNAVAILABLE', message: 'The configured AI provider is unavailable.' }
-              : { status: 'failed' as const, code: 'WORKFLOW_EXECUTION_FAILED', message: 'The workflow run failed.' };
+            : error instanceof AiProviderError && error.code === 'REQUEST_TIMEOUT'
+              ? { status: 'timed_out' as const, code: 'WORKFLOW_TIMEOUT', message: 'The workflow run timed out.' }
+              : error instanceof AiProviderError && error.code === 'PROVIDER_UNAVAILABLE'
+                ? { status: 'failed' as const, code: 'WORKFLOW_PROVIDER_UNAVAILABLE', message: 'The configured AI provider is unavailable.' }
+                : { status: 'failed' as const, code: 'WORKFLOW_EXECUTION_FAILED', message: 'The workflow run failed.' };
       const terminalEvents: WorkflowRunTimeline[] = [
         ...(selectedAt ? [{ sequence: 3, type: 'provider_selected' as const, timestamp: selectedAt, provider: providerId, model: actualModel }] : []),
         {
@@ -579,4 +596,9 @@ export class WorkflowRunService {
   }
 }
 
-export const workflowRunService = new WorkflowRunService();
+export const workflowRunService = new WorkflowRunService(
+  mongooseWorkflowRunRepository,
+  workflowService,
+  getAiProvider,
+  getEnvironment().aiTimeoutMs
+);

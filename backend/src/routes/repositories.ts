@@ -76,8 +76,8 @@ export function createRepositoriesRouter(service: RepositoryAnalysisService = re
 
   router.get('/analyses', asyncHandler(async (req, res) => {
     try {
-      const analyses = await service.list(getAuthenticatedUserId(req), req.query.projectId, req.query.scope);
-      res.json({ success: true, data: { analyses, count: analyses.length } });
+      const page = await service.list(getAuthenticatedUserId(req), req.query.projectId, req.query.scope, req.query.page);
+      res.json({ success: true, data: { ...page, count: page.analyses.length } });
     } catch (error) { if (!handleRepositoryError(res, error)) throw error; }
   }));
 

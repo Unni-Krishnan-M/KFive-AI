@@ -13,11 +13,15 @@ import { readableApiError } from '@/services/runtimeSettings';
 
 interface Document {
   _id: string;
+  projectId?: string;
   originalName: string;
   size: number;
   mimeType: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   errorMessage?: string;
+  content?: string;
+  pageCount?: number;
+  ocrApplied?: boolean;
   createdAt: string;
 }
 
@@ -26,6 +30,7 @@ export default function DocumentsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [addingToKnowledgeId, setAddingToKnowledgeId] = useState<string>();
   
   const [previewDoc, setPreviewDoc] = useState<Document | null>(null);
   const [isSlideOverOpen, setIsSlideOverOpen] = useState(false);
@@ -53,6 +58,20 @@ export default function DocumentsPage() {
       }
     } catch (error) {
       toast.error(readableApiError(error, 'Failed to fetch documents.'));
+    }
+  };
+
+  const addToKnowledge = async (document: Document) => {
+    if (document.status !== 'completed' || !document.content?.trim() || addingToKnowledgeId) return;
+    setAddingToKnowledgeId(document._id);
+    try {
+      const response = await documentApi.addToKnowledge(document._id);
+      const created = response.data?.data?.created === true;
+      toast.success(created ? 'Document snapshot indexed in Knowledge.' : 'This document is already indexed in Knowledge.');
+    } catch (error) {
+      toast.error(readableApiError(error, 'The document could not be added to Knowledge.'));
+    } finally {
+      setAddingToKnowledgeId(undefined);
     }
   };
 
@@ -168,7 +187,7 @@ export default function DocumentsPage() {
           onChange={handleFileInput} 
           disabled={!uploadAllowed || isUploading}
           className="hidden" 
-          accept=".pdf,.doc,.docx,.txt,.csv"
+          accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.txt,.csv"
         />
         
         {isUploading ? (
@@ -184,7 +203,7 @@ export default function DocumentsPage() {
             </div>
             <h3 className="text-lg font-medium text-white mb-2">Drag & Drop files here</h3>
             <p className="text-sm text-gray-400 mb-6 max-w-md">
-              Store supported PDFs, Word documents, CSVs, or text files. Maximum 50 MB per file.
+              Store supported PDFs, PNG/JPEG scans, Word documents, CSVs, or text files. Maximum 50 MB per file.
             </p>
             <button 
               onClick={() => fileInputRef.current?.click()}
@@ -225,9 +244,12 @@ export default function DocumentsPage() {
               <motion.div
                 key={doc._id}
                 layout
-                onClick={() => {
-                  setPreviewDoc(doc);
-                  setIsSlideOverOpen(true);
+                onClick={async () => {
+                  try {
+                    const response = await documentApi.getDocument(doc._id);
+                    setPreviewDoc(response.data.data);
+                    setIsSlideOverOpen(true);
+                  } catch { toast.error('Document details are unavailable'); }
                 }}
                 className="bg-black/20 border border-white/10 p-5 rounded-2xl cursor-pointer hover:bg-black/40 hover:border-white/20 transition-all group relative"
               >
@@ -300,6 +322,21 @@ export default function DocumentsPage() {
                 </div>
                 {previewDoc.status === 'failed' && previewDoc.errorMessage ? <p role="alert" className="mt-2 text-sm text-red-300">{previewDoc.errorMessage}</p> : null}
               </div>
+              {previewDoc.status === 'completed' ? <section aria-label="Extracted document text">
+                <h3 className="font-medium text-white">{previewDoc.ocrApplied ? 'OCR text' : 'Extracted text'} ({previewDoc.pageCount ?? 0} {(previewDoc.pageCount ?? 0) === 1 ? 'page' : 'pages'})</h3>
+                <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap text-sm text-gray-300">{previewDoc.content?.trim() || 'No text was detected in this document.'}</pre>
+                <div className="mt-4 space-y-2">
+                  <button
+                    onClick={() => void addToKnowledge(previewDoc)}
+                    disabled={!previewDoc.content?.trim() || addingToKnowledgeId === previewDoc._id}
+                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Database className="h-4 w-4" />
+                    {addingToKnowledgeId === previewDoc._id ? 'Indexing…' : 'Add to Knowledge'}
+                  </button>
+                  <p className="text-xs text-gray-500">Knowledge stores an independent text snapshot. Delete its Knowledge source separately if you later delete this document.</p>
+                </div>
+              </section> : null}
             </div>
             
           </div>

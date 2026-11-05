@@ -1,0 +1,93 @@
+- generic [ref=f2e304]:
+  - complementary [ref=f2e305]:
+    - generic [ref=f2e306]:
+      - generic [ref=f2e307]: KFive AI
+      - button "Collapse sidebar" [ref=f2e313] [cursor=pointer]
+    - generic [ref=f2e317]:
+      - generic [ref=f2e318] [cursor=pointer]:
+        - generic [ref=f2e319]: Search
+        - generic [ref=f2e324]:
+          - generic [ref=f2e325]: ⌘
+          - generic [ref=f2e326]: K
+      - navigation [ref=f2e327]:
+        - link "Dashboard" [ref=f2e328] [cursor=pointer]:
+          - /url: /app/dashboard
+        - link "AI Chat" [ref=f2e336] [cursor=pointer]:
+          - /url: /app/chat
+        - link "Code Lab" [ref=f2e341] [cursor=pointer]:
+          - /url: /app/code
+        - link "Agents" [ref=f2e349] [cursor=pointer]:
+          - /url: /app/agents
+        - link "Documents" [ref=f2e355] [cursor=pointer]:
+          - /url: /app/documents
+        - link "Knowledge / RAG" [ref=f2e361] [cursor=pointer]:
+          - /url: /app/knowledge
+        - link "Repository Analyzer" [ref=f2e367] [cursor=pointer]:
+          - /url: /app/repositories
+        - link "Workflows" [ref=f2e374] [cursor=pointer]:
+          - /url: /app/workflows
+        - link "Dataset Lab" [ref=f2e382] [cursor=pointer]:
+          - /url: /app/datasets
+        - link "Model Benchmarks" [ref=f2e389] [cursor=pointer]:
+          - /url: /app/benchmarks
+        - link "Notebooks" [ref=f2e395] [cursor=pointer]:
+          - /url: /app/notebooks
+        - link "Voice Assistant" [ref=f2e401] [cursor=pointer]:
+          - /url: /app/voice
+        - link "Models" [ref=f2e407] [cursor=pointer]:
+          - /url: /app/models
+        - link "Projects" [ref=f2e420] [cursor=pointer]:
+          - /url: /app/projects
+        - link "Workspace" [ref=f2e425] [cursor=pointer]:
+          - /url: /app/workspace
+        - link "PDF Utilities" [ref=f2e431] [cursor=pointer]:
+          - /url: /app/files
+    - generic [ref=f2e436]:
+      - generic [ref=f2e437]:
+        - generic [ref=f2e438]: c
+        - generic [ref=f2e440]:
+          - paragraph [ref=f2e441]: code_accept_20260920
+          - paragraph [ref=f2e442]: code_accept_20260920@example.test
+      - generic [ref=f2e443]:
+        - link "Profile" [ref=f2e444] [cursor=pointer]:
+          - /url: /app/profile
+        - link "Settings" [ref=f2e448] [cursor=pointer]:
+          - /url: /app/settings
+        - button "Toggle theme" [ref=f2e452] [cursor=pointer]
+        - button "Sign out" [ref=f2e459] [cursor=pointer]
+  - main [ref=f2e463]:
+    - generic [ref=f2e466]:
+      - generic [ref=f2e467]:
+        - generic [ref=f2e468]:
+          - heading "Code Lab" [level=1] [ref=f2e469]
+          - paragraph [ref=f2e474]: Run small programs in an isolated online compiler playground.
+        - generic [ref=f2e475]:
+          - button "Reset" [ref=f2e476] [cursor=pointer]
+          - button "Run" [ref=f2e480] [cursor=pointer]
+      - generic [ref=f2e483]:
+        - generic [ref=f2e484]:
+          - generic [ref=f2e485]:
+            - generic [ref=f2e486]:
+              - generic [ref=f2e487]:
+                - button "Python" [ref=f2e488] [cursor=pointer]
+                - button "JavaScript" [ref=f2e489] [cursor=pointer]
+              - generic [ref=f2e490]: "Runtime: 3.12"
+            - generic [ref=f2e491]:
+              - generic [ref=f2e492]: Source code
+              - textbox "Source code" [ref=f2e493]: "import sys name = sys.stdin.read().strip() or \"world\" print(f\"Hello, {name}!\")"
+          - generic [ref=f2e495]:
+            - text: Standard input
+            - textbox "Standard input" [ref=f2e496]:
+              - /placeholder: Optional stdin
+              - text: KFive
+          - generic [ref=f2e497]:
+            - generic [ref=f2e498]:
+              - heading "Run result" [level=2] [ref=f2e499]
+              - generic [ref=f2e502]: No run selected
+            - paragraph [ref=f2e504]: Submit code or select a historical run to see actual runner output.
+        - complementary [ref=f2e505]:
+          - generic [ref=f2e506]:
+            - heading "Run history" [level=2] [ref=f2e507]
+            - button "Refresh run history" [ref=f2e508] [cursor=pointer]
+          - paragraph [ref=f2e514]: Your recent runs
+          - paragraph [ref=f2e516]: No code runs found.

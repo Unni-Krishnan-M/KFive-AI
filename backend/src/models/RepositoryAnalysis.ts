@@ -76,7 +76,7 @@ const repositoryAnalysisSchema = new Schema({
   warnings: { type: [warningSchema], validate: [(v: unknown[]) => v.length <= 100, 'Warning list is too large.'] },
 }, { timestamps: true });
 
-repositoryAnalysisSchema.index({ ownerId: 1, projectId: 1, createdAt: -1 });
-repositoryAnalysisSchema.index({ ownerId: 1, createdAt: -1 });
+repositoryAnalysisSchema.index({ ownerId: 1, projectId: 1, createdAt: -1, _id: -1 });
+repositoryAnalysisSchema.index({ ownerId: 1, createdAt: -1, _id: -1 });
 
 export const RepositoryAnalysisModel = model('RepositoryAnalysis', repositoryAnalysisSchema);

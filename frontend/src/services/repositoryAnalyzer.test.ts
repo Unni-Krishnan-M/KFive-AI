@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { repositoryHistoryScope } from './repositoryAnalyzer';
-import { canCreateRepositoryAnalysis, canDeleteRepositoryAnalysis, effectiveRepositoryProjectStatus, isRepositoryScopeRequestCurrent, normalizeRepositoryAnalyses, normalizeRepositoryAnalysis, normalizeRepositoryStatus, repositoryAnalysisScopeKey, validateRepositoryArchive, validateRepositoryZipSignature } from './repositoryAnalyzer';
+import { canCreateRepositoryAnalysis, canDeleteRepositoryAnalysis, effectiveRepositoryProjectStatus, isRepositoryScopeRequestCurrent, normalizeRepositoryAnalyses, normalizeRepositoryAnalysis, normalizeRepositoryAnalysisPage, normalizeRepositoryStatus, repositoryAnalysisScopeKey, validateRepositoryArchive, validateRepositoryZipSignature } from './repositoryAnalyzer';
 
 const complete = {
   id: 'analysis-1', projectId: 'project-1', name: 'KFive', status: 'completed', analyzerVersion: 1,
@@ -38,6 +38,21 @@ describe('repository analyzer contract', () => {
     const summary = { id: complete.id, projectId: complete.projectId, name: complete.name, status: complete.status, analyzerVersion: complete.analyzerVersion, source: complete.source, summary: complete.summary, createdAt: complete.createdAt };
     expect(normalizeRepositoryAnalyses({ data: { analyses: [summary, { id: 'bad' }] } })).toEqual([expect.objectContaining({ id: 'analysis-1', summary: expect.objectContaining({ fileCount: 4 }) })]);
     expect(normalizeRepositoryAnalysis(summary)).toBeUndefined();
+  });
+
+  it('normalizes strict bounded repository history pagination without inventing metadata', () => {
+    const summary = { id: complete.id, projectId: complete.projectId, name: complete.name, status: complete.status, analyzerVersion: complete.analyzerVersion, source: complete.source, summary: complete.summary, createdAt: complete.createdAt };
+    expect(normalizeRepositoryAnalysisPage({ data: {
+      analyses: [summary],
+      pagination: { page: 2, pageSize: 50, total: 100, totalPages: 2, maxPages: 10 },
+    } })).toEqual({
+      analyses: [expect.objectContaining({ id: 'analysis-1' })],
+      pagination: { page: 2, pageSize: 50, total: 100, totalPages: 2, maxPages: 10 },
+    });
+    expect(normalizeRepositoryAnalysisPage({ data: { analyses: [summary] } })).toBeUndefined();
+    expect(normalizeRepositoryAnalysisPage({ data: {
+      analyses: [summary], pagination: { page: 0, pageSize: 50, total: 100, totalPages: 2, maxPages: 10 },
+    } })).toBeUndefined();
   });
 
   it('rejects incomplete, invalid-digest, and overlong hostile records', () => {

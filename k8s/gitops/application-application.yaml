@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kfive-application
+  namespace: argocd
+spec:
+  project: kfive-application
+  source:
+    repoURL: https://github.com/Unni-Krishnan-M/KFive-AI.git
+    targetRevision: main
+    path: k8s/base
+    directory:
+      recurse: false
+      include: '{application-storage.yaml,backend.yaml,frontend.yaml}'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kfive
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=false
+      - ApplyOutOfSyncOnly=true
+      - PruneLast=true
+      - PrunePropagationPolicy=foreground
+  revisionHistoryLimit: 5

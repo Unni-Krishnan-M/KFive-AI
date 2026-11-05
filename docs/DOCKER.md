@@ -13,6 +13,21 @@ docker compose config --quiet
 ./scripts/kfive-up.sh
 ```
 
+## Experimental production Compose foundation
+
+Phase 14 has a standalone, deliberately smaller production topology. It does not inherit the development Compose file and does not enable Code Lab, Notebook, Document processing, host Ollama, or observability automatically.
+
+```bash
+cp .env.production.example .env.production
+chmod 600 .env.production
+# Replace every placeholder and image digest.
+npm run production:up -- .env.production
+```
+
+Preflight treats the file as data rather than sourcing it. It requires HTTPS public/provider URLs, exact HTTPS CORS origins, an authenticated remote provider, distinct strong JWT keys, URL-safe datastore passwords, five immutable image digests, and the exact two-hop production proxy contract. Only `127.0.0.1:8080` is published by default. Put a separately secured TLS reverse proxy in front of that loopback listener; it must replace client forwarding headers and pass the HTTPS scheme. Do not change the bind address to a public interface as a substitute for TLS.
+
+Named volumes use `KFIVE_VOLUME_PREFIX` and survive normal Compose down/recreation. The Experimental maintenance workflow backs up MongoDB, Redis, ChromaDB, and uploads together and restores only into a distinct empty same-datastore-image project; logs remain a separate retention choice. It does not prove cross-host migration or remote DR, so do not infer those from local recovery. Full instructions and limits are in [Remote deployment](REMOTE_DEPLOYMENT.md).
+
 ## Opt-in Code Lab profile
 
 Host-loopback Ollama has a separate opt-in [Unix-socket bridge](OLLAMA_HOST_BRIDGE.md):
@@ -51,6 +66,19 @@ Before accepting queue jobs, the broker lists containers with the exact `com.kfi
 Mounting a Docker socket gives the trusted broker control of that daemon and is effectively host-level authority. Prefer a dedicated runner host or a dedicated/rootless Docker daemon with only Code Lab runtime images. A rootless socket commonly lives below `/run/user/<uid>/docker.sock`; set both the socket path and its actual owning group ID rather than copying the system-daemon defaults.
 
 The upstream runtime tags are mutable. Pin and verify image digests before non-development use.
+
+## Opt-in Document Processor and OCR
+
+PDF text extraction and OCR are excluded from default startup so native processing consumes no baseline resources. Enable the isolated processor and matching backend configuration with:
+
+```bash
+./scripts/kfive-up.sh --with-documents
+./scripts/kfive-status.sh --with-documents
+./scripts/kfive-logs.sh --with-documents document-processor
+./scripts/kfive-down.sh --with-documents
+```
+
+The processor exposes fixed internal `/extract` and `/ocr` contracts and has no host port or persistent mount. It runs as non-root with a read-only root filesystem, a 128 MiB tmpfs, dropped capabilities, `no-new-privileges`, 1 CPU, 512 MiB RAM, 64 PIDs, and an internal-only network shared only with the backend. `DOCUMENT_PROCESSOR_URL` and `OCR_SERVICE_URL` are independently configurable; local Compose points both at this service. Combine `--with-documents` with `--with-host-ollama`, `--with-code-lab`, or `--with-notebook` when those opt-in services are also needed.
 
 ## Opt-in Notebook profile
 

@@ -28,32 +28,48 @@ export interface RepositoryAnalysisRecord extends RepositoryArchiveReport {
 
 export interface RepositoryAnalysisRepository {
   create(value: Omit<RepositoryAnalysisRecord, '_id' | 'createdAt' | 'updatedAt'>): Promise<RepositoryAnalysisRecord>;
-  list(ownerId: string, projectId?: string, orphaned?: boolean): Promise<RepositoryAnalysisRecord[]>;
+  list(ownerId: string, projectId: string | undefined, orphaned: boolean, page: number): Promise<{ records: RepositoryAnalysisRecord[]; total: number }>;
   findByOwnerAndId(ownerId: string, analysisId: string): Promise<RepositoryAnalysisRecord | null>;
   countByOwner(ownerId: string): Promise<number>;
   deleteByOwnerAndId(ownerId: string, analysisId: string): Promise<RepositoryAnalysisRecord | null>;
 }
 
+export const REPOSITORY_ANALYSIS_PAGE_SIZE = 50;
+export const REPOSITORY_ANALYSIS_MAX_PAGES = 10;
+
 export const mongooseRepositoryAnalysisRepository: RepositoryAnalysisRepository = {
   async create(value) {
     return RepositoryAnalysisModel.create(value) as unknown as Promise<RepositoryAnalysisRecord>;
   },
-  async list(ownerId, projectId, orphaned = false) {
+  async list(ownerId, projectId, orphaned, page) {
+    const skip = (page - 1) * REPOSITORY_ANALYSIS_PAGE_SIZE;
     if (orphaned) {
-      return RepositoryAnalysisModel.aggregate([
+      const result = await RepositoryAnalysisModel.aggregate([
         { $match: { ownerId: new mongoose.Types.ObjectId(ownerId), projectId: { $exists: true, $ne: null } } },
         { $lookup: { from: ProjectModel.collection.name, localField: 'projectId', foreignField: '_id', as: 'linkedProject' } },
         { $match: { 'linkedProject.0': { $exists: false } } },
         { $sort: { createdAt: -1, _id: -1 } },
-        { $limit: 50 },
-        { $project: { _id: 1, projectId: 1, name: 1, status: 1, analyzerVersion: 1, source: 1, summary: 1, createdAt: 1, updatedAt: 1 } },
-      ]) as Promise<RepositoryAnalysisRecord[]>;
+        { $facet: {
+          metadata: [{ $count: 'total' }],
+          records: [
+            { $skip: skip },
+            { $limit: REPOSITORY_ANALYSIS_PAGE_SIZE },
+            { $project: { _id: 1, projectId: 1, name: 1, status: 1, analyzerVersion: 1, source: 1, summary: 1, createdAt: 1, updatedAt: 1 } },
+          ],
+        } },
+      ]) as Array<{ records?: RepositoryAnalysisRecord[]; metadata?: Array<{ total?: number }> }>;
+      return { records: result[0]?.records ?? [], total: result[0]?.metadata?.[0]?.total ?? 0 };
     }
-    return RepositoryAnalysisModel.find(projectId
+    const filter = projectId
       ? { ownerId, projectId }
-      : { ownerId, projectId: { $exists: false } })
+      : { ownerId, projectId: { $exists: false } };
+    const [records, total] = await Promise.all([
+      RepositoryAnalysisModel.find(filter)
       .select('_id projectId name status analyzerVersion source summary createdAt updatedAt')
-      .sort({ createdAt: -1, _id: -1 }).limit(50).lean() as unknown as Promise<RepositoryAnalysisRecord[]>;
+      .sort({ createdAt: -1, _id: -1 }).skip(skip).limit(REPOSITORY_ANALYSIS_PAGE_SIZE).lean() as unknown as Promise<RepositoryAnalysisRecord[]>,
+      RepositoryAnalysisModel.countDocuments(filter),
+    ]);
+    return { records, total };
   },
   async findByOwnerAndId(ownerId, analysisId) {
     return RepositoryAnalysisModel.findOne({ _id: analysisId, ownerId }).lean() as unknown as Promise<RepositoryAnalysisRecord | null>;
@@ -78,6 +94,18 @@ function requireOwnerId(value: unknown): string {
 function requireAnalysisId(value: unknown): string {
   if (typeof value !== 'string' || !OBJECT_ID.test(value)) throw new RepositoryAnalysisError('Analysis id is invalid.', 'INVALID_REPOSITORY_INPUT', 400);
   return value;
+}
+
+function requirePage(value: unknown): number {
+  if (value === undefined) return 1;
+  if (typeof value !== 'string' || !/^[1-9]\d*$/.test(value)) {
+    throw new RepositoryAnalysisError('Repository history page is invalid.', 'INVALID_REPOSITORY_INPUT', 400);
+  }
+  const page = Number(value);
+  if (!Number.isSafeInteger(page) || page > REPOSITORY_ANALYSIS_MAX_PAGES) {
+    throw new RepositoryAnalysisError('Repository history page is invalid.', 'INVALID_REPOSITORY_INPUT', 400);
+  }
+  return page;
 }
 
 function safeName(value: unknown, fallback: string): string {
@@ -105,6 +133,11 @@ export interface PublicRepositoryAnalysis {
   tree?: RepositoryArchiveReport['tree']; languages?: RepositoryArchiveReport['languages']; manifests?: RepositoryArchiveReport['manifests'];
   dependencies?: RepositoryArchiveReport['dependencies']; frameworks?: RepositoryArchiveReport['frameworks'];
   signals?: RepositoryArchiveReport['signals']; warnings?: RepositoryArchiveReport['warnings']; createdAt?: Date; updatedAt?: Date;
+}
+
+export interface PublicRepositoryAnalysisPage {
+  analyses: PublicRepositoryAnalysis[];
+  pagination: { page: number; pageSize: number; total: number; totalPages: number; maxPages: number };
 }
 
 function publicAnalysis(record: RepositoryAnalysisRecord): PublicRepositoryAnalysis {
@@ -209,13 +242,21 @@ export class RepositoryAnalysisService {
     }
   }
 
-  async list(ownerIdValue: unknown, projectIdValue?: unknown, scopeValue?: unknown): Promise<PublicRepositoryAnalysis[]> {
+  async list(ownerIdValue: unknown, projectIdValue?: unknown, scopeValue?: unknown, pageValue?: unknown): Promise<PublicRepositoryAnalysisPage> {
     const ownerId = requireOwnerId(ownerIdValue);
+    const page = requirePage(pageValue);
     if ((scopeValue !== undefined && scopeValue !== 'orphaned') || (scopeValue === 'orphaned' && projectIdValue !== undefined)) {
       throw new RepositoryAnalysisError('Choose either a project or deleted-project history.', 'INVALID_REPOSITORY_INPUT', 400);
     }
     if (scopeValue === 'orphaned') {
-      try { return (await this.repository.list(ownerId, undefined, true)).map(publicAnalysisSummary); }
+      try {
+        const result = await this.repository.list(ownerId, undefined, true, page);
+        return {
+          analyses: result.records.map(publicAnalysisSummary),
+          pagination: { page, pageSize: REPOSITORY_ANALYSIS_PAGE_SIZE, total: result.total,
+            totalPages: Math.max(1, Math.ceil(result.total / REPOSITORY_ANALYSIS_PAGE_SIZE)), maxPages: REPOSITORY_ANALYSIS_MAX_PAGES },
+        };
+      }
       catch { throw new RepositoryAnalysisError('Repository analysis storage is unavailable.', 'REPOSITORY_ANALYSIS_FAILED', 503); }
     }
     let projectId: string | undefined;
@@ -227,10 +268,14 @@ export class RepositoryAnalysisService {
         || typeof projectIdValue !== 'string' || !OBJECT_ID.test(projectIdValue)) throw error;
       projectId = projectIdValue;
     }
-    let records: RepositoryAnalysisRecord[];
-    try { records = await this.repository.list(ownerId, projectId); }
+    let result: { records: RepositoryAnalysisRecord[]; total: number };
+    try { result = await this.repository.list(ownerId, projectId, false, page); }
     catch { throw new RepositoryAnalysisError('Repository analysis storage is unavailable.', 'REPOSITORY_ANALYSIS_FAILED', 503); }
-    return records.map(publicAnalysisSummary);
+    return {
+      analyses: result.records.map(publicAnalysisSummary),
+      pagination: { page, pageSize: REPOSITORY_ANALYSIS_PAGE_SIZE, total: result.total,
+        totalPages: Math.max(1, Math.ceil(result.total / REPOSITORY_ANALYSIS_PAGE_SIZE)), maxPages: REPOSITORY_ANALYSIS_MAX_PAGES },
+    };
   }
 
   async get(ownerIdValue: unknown, analysisIdValue: unknown): Promise<PublicRepositoryAnalysis> {

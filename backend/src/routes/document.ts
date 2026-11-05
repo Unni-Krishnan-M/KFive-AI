@@ -11,11 +11,14 @@ import { isAllowedDocumentMime, matchesFileSignature, sanitizeOriginalFilename }
 import { ProjectError, ProjectRecord, projectService } from '@/services/projectService';
 import { projectMutationLease } from '@/services/projectMutationLease';
 import { logger } from '@/utils/logger';
+import { getEnvironment } from '@/config/environment';
+import { processStoredDocument } from '@/services/documentProcessor';
 
 const router = Router();
 
 export const uploadDir = path.resolve(process.cwd(), 'uploads');
 export const DOCUMENT_PROCESSOR_UNAVAILABLE_MESSAGE = 'Document processor is unavailable';
+export const OCR_SERVICE_UNAVAILABLE_MESSAGE = 'OCR service is unavailable';
 
 export class DocumentRouteError extends AppError {
   constructor(message: string, readonly code: string, statusCode: number) {
@@ -125,6 +128,8 @@ export function publicDocumentRecord(document: Record<string, unknown>): Record<
     ...(document.status === 'failed' ? {
       errorMessage: document.errorMessage === DOCUMENT_PROCESSOR_UNAVAILABLE_MESSAGE
         ? DOCUMENT_PROCESSOR_UNAVAILABLE_MESSAGE
+        : document.errorMessage === OCR_SERVICE_UNAVAILABLE_MESSAGE
+          ? OCR_SERVICE_UNAVAILABLE_MESSAGE
         : 'Document processing failed',
     } : {}),
     ...(document.createdAt ? { createdAt: document.createdAt } : {}),
@@ -148,11 +153,44 @@ export async function persistUploadedDocument(
   }
 }
 
+export async function persistUploadedDocumentWithProjectLease(
+  userId: string,
+  projectId: unknown,
+  file: Express.Multer.File,
+  resolveProject: (ownerId: string, value: unknown) => Promise<ProjectRecord | undefined> =
+    (ownerId, value) => projectService.resolveActiveProject(ownerId, value),
+  createDocument: (data: Record<string, unknown>) => Promise<ProcessableDocument> =
+    (data) => DocumentModel.create(data) as unknown as Promise<ProcessableDocument>,
+  removeFile: (filePath: string) => Promise<void> = fs.promises.unlink,
+  lease: Pick<typeof projectMutationLease, 'run'> = projectMutationLease
+): Promise<ProcessableDocument> {
+  const initialProject = await resolveUploadedProjectContext(
+    userId, projectId, file.path, resolveProject, removeFile
+  );
+  if (!initialProject) return persistUploadedDocument(userId, file, undefined, createDocument, removeFile);
+
+  return lease.run(String(initialProject._id), async () => {
+    // Project archive/delete uses the same lease. Re-read after acquiring it so
+    // a queued upload cannot publish into a project that changed meanwhile.
+    const activeProject = await resolveUploadedProjectContext(
+      userId, projectId, file.path, resolveProject, removeFile
+    );
+    return persistUploadedDocument(userId, file, activeProject, createDocument, removeFile);
+  });
+}
+
 export async function markDocumentProcessorUnavailable(document: ProcessableDocument): Promise<void> {
   document.status = 'failed';
   document.errorMessage = DOCUMENT_PROCESSOR_UNAVAILABLE_MESSAGE;
   await document.save();
   logger.warn('Document processor unavailable', { documentId: String(document._id) });
+}
+
+export async function markOcrServiceUnavailable(document: ProcessableDocument): Promise<void> {
+  document.status = 'failed';
+  document.errorMessage = OCR_SERVICE_UNAVAILABLE_MESSAGE;
+  await document.save();
+  logger.warn('OCR service unavailable', { documentId: String(document._id) });
 }
 
 export function resolveDocumentStoragePath(storedPath: unknown, rootDirectory = uploadDir): string {
@@ -196,12 +234,43 @@ router.post('/', upload.single('document'), asyncHandler(async (req, res) => {
     await fs.promises.unlink(req.file.path).catch(() => undefined);
     throw error;
   }
-  const project = await resolveUploadedProjectContext(userId, req.body.projectId, req.file.path);
-
-  const doc = await persistUploadedDocument(userId, req.file, project);
-  // The API process is intentionally producer/storage-only for untrusted documents.
-  // Do not claim processing until the separate constrained processor contract exists.
-  await markDocumentProcessorUnavailable(doc);
+  const doc = await persistUploadedDocumentWithProjectLease(userId, req.body.projectId, req.file);
+  const environment = getEnvironment();
+  const processorUrl = environment.documentProcessorUrl;
+  const ocrUrl = environment.ocrServiceUrl;
+  const isPdf = req.file.mimetype === 'application/pdf';
+  const isImage = req.file.mimetype === 'image/png' || req.file.mimetype === 'image/jpeg';
+  if (isPdf && !processorUrl && !ocrUrl) {
+    await markDocumentProcessorUnavailable(doc);
+  } else if (isImage && !ocrUrl) {
+    await markOcrServiceUnavailable(doc);
+  } else if (!isPdf && !isImage) {
+    await markDocumentProcessorUnavailable(doc);
+  } else {
+    doc.status = 'processing';
+    await doc.save();
+    try {
+      const safePath = resolveDocumentStoragePath(req.file.path);
+      const result = await processStoredDocument(
+        safePath,
+        req.file.mimetype as 'application/pdf' | 'image/png' | 'image/jpeg',
+        processorUrl,
+        ocrUrl
+      );
+      doc.content = result.text;
+      doc.pageCount = result.pageCount;
+      doc.ocrApplied = result.ocrApplied;
+      doc.status = 'completed';
+      doc.errorMessage = undefined;
+    } catch (error) {
+      doc.status = 'failed';
+      doc.errorMessage = error instanceof Error && [
+        DOCUMENT_PROCESSOR_UNAVAILABLE_MESSAGE,
+        OCR_SERVICE_UNAVAILABLE_MESSAGE,
+      ].includes(error.message) ? error.message : 'Document processing failed';
+    }
+    await doc.save();
+  }
 
   res.status(201).json({ success: true, data: publicDocumentRecord(doc) });
 }));
@@ -226,6 +295,17 @@ router.get('/', asyncHandler(async (req, res) => {
 }));
 
 // Delete a document
+router.get('/:id', asyncHandler(async (req, res) => {
+  if (!/^[a-f\d]{24}$/i.test(req.params.id)) throw new DocumentRouteError('Document not found', 'DOCUMENT_NOT_FOUND', 404);
+  const doc = await DocumentModel.findOne({ _id: req.params.id, userId: getAuthenticatedUserId(req) });
+  if (!doc) throw new DocumentRouteError('Document not found', 'DOCUMENT_NOT_FOUND', 404);
+  res.json({ success: true, data: {
+    ...publicDocumentRecord(doc as unknown as Record<string, unknown>),
+    ...(doc.status === 'completed' ? { content: doc.content, pageCount: doc.pageCount } : {}),
+    ...(doc.status === 'completed' ? { ocrApplied: doc.ocrApplied === true } : {}),
+  } });
+}));
+
 router.delete('/:id', asyncHandler(async (req, res) => {
   const userId = getAuthenticatedUserId(req);
   const doc = await DocumentModel.findOne({ _id: req.params.id, userId }) as unknown as DeletableDocument | null;

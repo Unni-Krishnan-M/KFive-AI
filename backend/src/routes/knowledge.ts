@@ -47,6 +47,24 @@ export function createKnowledgeRouter(service: RagService = ragService): Router 
     }
   }));
 
+  router.post('/sources/from-document', aiLimiter, asyncHandler(async (req, res) => {
+    try {
+      const body = req.body;
+      if (!body || typeof body !== 'object' || Array.isArray(body)
+        || Object.keys(body).length !== 1 || !Object.prototype.hasOwnProperty.call(body, 'documentId')) {
+        throw new RagServiceError(
+          'Document knowledge input must contain only documentId.',
+          'INVALID_RAG_INPUT',
+          400
+        );
+      }
+      const result = await service.ingestDocument(getAuthenticatedUserId(req), body.documentId);
+      res.status(result.created ? 201 : 200).json({ success: true, data: result });
+    } catch (error) {
+      if (!handleKnowledgeError(res, error)) throw error;
+    }
+  }));
+
   router.delete('/sources/:id', asyncHandler(async (req, res) => {
     try {
       const ownerId = getAuthenticatedUserId(req);

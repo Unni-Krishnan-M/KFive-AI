@@ -8,11 +8,14 @@ describe('RagSource model', () => {
       { ownerId: 1, projectId: 1, createdAt: -1 },
       { ownerId: 1, status: 1, updatedAt: -1 },
       { ownerId: 1, contentHash: 1, embeddingProvider: 1, embeddingModel: 1 },
+      { ownerId: 1, documentId: 1 },
     ]));
     expect(RagSourceModel.schema.path('ownerId').options.immutable).toBe(true);
     expect(RagSourceModel.schema.path('chunkCount').options.max).toBe(64);
     expect(RagSourceModel.schema.path('byteCount').options.max).toBe(65_536);
     expect(RagSourceModel.schema.path('chunkingVersion').options.enum).toEqual([1]);
+    expect(RagSourceModel.schema.path('documentId').options.immutable).toBe(true);
+    expect(RagSourceModel.schema.path('sourceKind').options.enum).toEqual(['text', 'document']);
     expect(RagSourceModel.schema.path('content')).toBeUndefined();
   });
 

@@ -50,12 +50,12 @@ function providerLocation(config: EnvironmentConfig): ServiceLocation {
 export function buildRuntimeStatus(config: EnvironmentConfig) {
   const documentProcessorStatus: RuntimeServiceStatus = {
     id: 'document-processor',
-    configured: false,
+    configured: Boolean(config.documentProcessorUrl),
     location: config.documentProcessorUrl ? classifyUrl(config.documentProcessorUrl) : 'disabled',
     restartRequired: true,
     message: config.documentProcessorUrl
-      ? 'An endpoint is configured, but this build has no isolated Document Processor adapter.'
-      : 'This build has no isolated Document Processor adapter.',
+      ? 'PDF text extraction is configured; live health has not been checked.'
+      : 'Document Processor is not configured.',
   };
   const services: RuntimeServiceStatus[] = [
     { id: 'mongodb', configured: Boolean(config.mongodbUrl), location: classifyUrl(config.mongodbUrl), restartRequired: true },
@@ -75,7 +75,7 @@ export function buildRuntimeStatus(config: EnvironmentConfig) {
   const missingDependencies = services
     .filter((service) => !service.configured)
     .map((service) => service.id === 'document-processor'
-      ? 'Document Processor is unavailable because this build has no isolated processor adapter.'
+      ? 'Document Processor is not configured.'
       : `${serviceLabels[service.id] ?? service.id} is not configured.`);
 
   return {

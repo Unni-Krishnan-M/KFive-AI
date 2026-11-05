@@ -89,6 +89,15 @@ describe('knowledge contract normalization', () => {
     ]);
   });
 
+  it('preserves bounded document provenance for stored-document sources', () => {
+    expect(normalizeKnowledgeSources({ data: { sources: [{
+      id: 'source-1', name: 'scan.pdf', mediaType: 'application/pdf', status: 'ready',
+      sourceKind: 'document', documentId: 'document-1', pageCount: 2, ocrApplied: true,
+    }] } })[0]).toMatchObject({
+      sourceKind: 'document', documentId: 'document-1', pageCount: 2, ocrApplied: true,
+    });
+  });
+
   it('bounds references and requires their source fields', () => {
     const result = normalizeKnowledgeQuery({ data: {
       answer: 'Backend answer', provider: 'ollama', model: 'phi3', references: [
@@ -111,6 +120,15 @@ describe('knowledge contract normalization', () => {
       referenceId: undefined, marker: '[S1]', sourceId: 's1', sourceName: 'a.txt', chunkId: undefined,
       mediaType: 'text/plain', projectId: undefined, chunkIndex: 0, excerpt: 'source text', distance: 0.1,
     });
+  });
+
+  it('normalizes validated document page references', () => {
+    expect(normalizeKnowledgeQuery({ data: {
+      answer: 'See [S1].', provider: 'ollama', model: 'phi3', references: [{
+        marker: '[S1]', sourceId: 's1', sourceName: 'scan.pdf', mediaType: 'application/pdf',
+        documentId: 'd1', pageStart: 2, pageEnd: 2, chunkIndex: 1, snippet: 'page fact', distance: 0.1,
+      }],
+    } })?.references[0]).toMatchObject({ documentId: 'd1', pageStart: 2, pageEnd: 2 });
   });
 
   it('gates archived/invalid project mutations and scopes payloads', () => {

@@ -1,0 +1,34 @@
+services:
+  remote-provider-fixture:
+    image: ${KFIVE_FIXTURE_IMAGE:-kfive-ai-remote-provider-fixture:acceptance}
+    build:
+      context: .
+      dockerfile: services/remote-provider-fixture/Dockerfile
+    environment:
+      FIXTURE_BEARER_TOKEN: ${KFIVE_FIXTURE_BEARER_TOKEN:?Set the isolated fixture token}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4010/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=8m
+    networks: [provider-egress]
+    restart: unless-stopped
+    pids_limit: 32
+    cap_drop: [ALL]
+    deploy:
+      resources:
+        limits: {cpus: "0.25", memory: 64M, pids: 32}
+    security_opt: [no-new-privileges:true]
+
+  backend:
+    environment:
+      OPENAI_API_KEY: ${KFIVE_FIXTURE_BEARER_TOKEN:?Set the isolated fixture token}
+    depends_on:
+      remote-provider-fixture: {condition: service_healthy}
+
+  benchmark-worker:
+    environment:
+      OPENAI_API_KEY: ${KFIVE_FIXTURE_BEARER_TOKEN:?Set the isolated fixture token}

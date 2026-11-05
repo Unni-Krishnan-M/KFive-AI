@@ -1,0 +1,128 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: kfive-observability
+  labels: {app.kubernetes.io/name: prometheus, app.kubernetes.io/part-of: kfive}
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 5s
+      scrape_timeout: 4s
+      evaluation_interval: 15s
+    rule_files:
+      - /etc/prometheus/rules/*.yml
+    alerting:
+      alertmanagers:
+        - scheme: http
+          static_configs:
+            - targets: [alertmanager:9093]
+    scrape_configs:
+      - job_name: kfive-backend
+        metrics_path: /metrics
+        static_configs:
+          - targets: [backend.kfive.svc.cluster.local:5000]
+            labels:
+              service: backend
+              deployment_mode: local-kind
+      - job_name: kfive-subsystem-probes
+        metrics_path: /metrics
+        static_configs:
+          - targets: [subsystem-prober:9116]
+            labels:
+              service: subsystem-prober
+              deployment_mode: local-kind
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: kfive-observability
+  labels: {app.kubernetes.io/name: prometheus, app.kubernetes.io/part-of: kfive}
+data:
+  kfive.rules.yml: |
+    groups:
+      - name: kfive.rules
+        rules:
+          - alert: KFiveBackendUnavailable
+            expr: up{job="kfive-backend"} == 0 or absent(up{job="kfive-backend"})
+            for: 30s
+            labels:
+              severity: critical
+              component: backend
+            annotations:
+              summary: KFive backend metrics target is unavailable
+              description: Prometheus has been unable to scrape the KFive backend for at least 30 seconds.
+              runbook_url: https://github.com/Unni-Krishnan-M/KFive-AI/blob/main/docs/OBSERVABILITY.md#kfivebackendunavailable
+          - alert: KFiveSubsystemUnavailable
+            expr: kfive_subsystem_probe_success == 0
+            for: 30s
+            labels:
+              severity: warning
+              component: subsystem
+            annotations:
+              summary: A fixed KFive subsystem probe is unavailable
+              description: The independent fixed-target probe has failed for at least 30 seconds.
+              runbook_url: https://github.com/Unni-Krishnan-M/KFive-AI/blob/main/docs/OBSERVABILITY.md#kfivesubsystemunavailable
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: kfive-observability
+  labels: {app.kubernetes.io/name: prometheus, app.kubernetes.io/component: metrics, app.kubernetes.io/part-of: kfive}
+spec:
+  type: ClusterIP
+  selector: {app.kubernetes.io/name: prometheus}
+  ports: [{name: http, port: 9090, targetPort: http}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: kfive-observability
+  labels: &labels {app.kubernetes.io/name: prometheus, app.kubernetes.io/component: metrics, app.kubernetes.io/part-of: kfive}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app.kubernetes.io/name: prometheus}}
+  template:
+    metadata: {labels: *labels}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v3.14.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
+            - --storage.tsdb.retention.time=24h
+            - --storage.tsdb.retention.size=512MB
+          ports: [{name: http, containerPort: 9090}]
+          startupProbe: {httpGet: {path: /-/ready, port: http}, failureThreshold: 30, periodSeconds: 2}
+          readinessProbe: {httpGet: {path: /-/ready, port: http}, periodSeconds: 5, timeoutSeconds: 3}
+          livenessProbe: {httpGet: {path: /-/healthy, port: http}, periodSeconds: 10, timeoutSeconds: 3}
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: config, mountPath: /etc/prometheus/prometheus.yml, subPath: prometheus.yml, readOnly: true}
+            - {name: rules, mountPath: /etc/prometheus/rules, readOnly: true}
+            - {name: data, mountPath: /prometheus}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - {name: config, configMap: {name: prometheus-config}}
+        - {name: rules, configMap: {name: prometheus-rules}}
+        - {name: data, persistentVolumeClaim: {claimName: prometheus-data}}
+        - {name: tmp, emptyDir: {sizeLimit: 32Mi}}

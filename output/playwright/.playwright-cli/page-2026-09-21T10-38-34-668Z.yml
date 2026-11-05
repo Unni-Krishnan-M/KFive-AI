@@ -1,0 +1,97 @@
+- generic [ref=f2e380]:
+  - complementary [ref=f2e381]:
+    - generic [ref=f2e382]:
+      - generic [ref=f2e383]: KFive AI
+      - button "Collapse sidebar" [ref=f2e389] [cursor=pointer]
+    - generic [ref=f2e393]:
+      - generic [ref=f2e394] [cursor=pointer]:
+        - generic [ref=f2e395]: Search
+        - generic [ref=f2e400]:
+          - generic [ref=f2e401]: ⌘
+          - generic [ref=f2e402]: K
+      - navigation [ref=f2e403]:
+        - link "Dashboard" [ref=f2e404] [cursor=pointer]:
+          - /url: /app/dashboard
+        - link "AI Chat" [ref=f2e412] [cursor=pointer]:
+          - /url: /app/chat
+        - link "Code Lab" [ref=f2e417] [cursor=pointer]:
+          - /url: /app/code
+        - link "Agents" [ref=f2e424] [cursor=pointer]:
+          - /url: /app/agents
+        - link "Documents" [ref=f2e430] [cursor=pointer]:
+          - /url: /app/documents
+        - link "Knowledge / RAG" [ref=f2e437] [cursor=pointer]:
+          - /url: /app/knowledge
+        - link "Repository Analyzer" [ref=f2e443] [cursor=pointer]:
+          - /url: /app/repositories
+        - link "Workflows" [ref=f2e450] [cursor=pointer]:
+          - /url: /app/workflows
+        - link "Dataset Lab" [ref=f2e458] [cursor=pointer]:
+          - /url: /app/datasets
+        - link "Model Benchmarks" [ref=f2e465] [cursor=pointer]:
+          - /url: /app/benchmarks
+        - link "Notebooks" [ref=f2e471] [cursor=pointer]:
+          - /url: /app/notebooks
+        - link "Voice Assistant" [ref=f2e477] [cursor=pointer]:
+          - /url: /app/voice
+        - link "Models" [ref=f2e483] [cursor=pointer]:
+          - /url: /app/models
+        - link "Projects" [ref=f2e496] [cursor=pointer]:
+          - /url: /app/projects
+        - link "Workspace" [ref=f2e501] [cursor=pointer]:
+          - /url: /app/workspace
+        - link "PDF Utilities" [ref=f2e507] [cursor=pointer]:
+          - /url: /app/files
+    - generic [ref=f2e512]:
+      - generic [ref=f2e513]:
+        - generic [ref=f2e514]: D
+        - generic [ref=f2e516]:
+          - paragraph [ref=f2e517]: Document RAG
+          - paragraph [ref=f2e518]: doc_rag_73933932@example.test
+      - generic [ref=f2e519]:
+        - link "Profile" [ref=f2e520] [cursor=pointer]:
+          - /url: /app/profile
+        - link "Settings" [ref=f2e524] [cursor=pointer]:
+          - /url: /app/settings
+        - button "Toggle theme" [ref=f2e528] [cursor=pointer]
+        - button "Sign out" [ref=f2e535] [cursor=pointer]
+  - main [ref=f2e539]:
+    - generic [ref=f2e541]:
+      - generic [ref=f2e542]:
+        - generic [ref=f2e543]:
+          - heading "Documents" [level=1] [ref=f2e544]
+          - paragraph [ref=f2e549]: Upload documents and track their actual processing status.
+        - button "Open PDF Utilities" [ref=f2e550] [cursor=pointer]
+      - paragraph [ref=f2e553]: PDF Utilities run locally in your browser. Select the source files again there; stored Documents are not passed to the utility or overwritten.
+      - generic [ref=f2e556]:
+        - generic [ref=f2e557] [cursor=pointer]
+        - heading "Drag & Drop files here" [level=3] [ref=f2e561]
+        - paragraph [ref=f2e562]: Store supported PDFs, PNG/JPEG scans, Word documents, CSVs, or text files. Maximum 50 MB per file.
+        - button "Browse Files" [ref=f2e563] [cursor=pointer]
+      - textbox "Search documents by name..." [ref=f2e569]
+      - generic [ref=f2e571] [cursor=pointer]:
+        - heading "kfive-document-rag-browser.pdf" [level=3] [ref=f2e576]
+        - generic [ref=f2e577]:
+          - generic [ref=f2e578]: 45.4 KB
+          - generic [ref=f2e579]: Ready
+      - generic [ref=f2e584]:
+        - generic [ref=f2e585]:
+          - heading "Document Details" [level=2] [ref=f2e586]
+          - button "Close slide over" [ref=f2e587] [cursor=pointer]
+        - generic [ref=f2e592]:
+          - generic [ref=f2e593]:
+            - heading "kfive-document-rag-browser.pdf" [level=3] [ref=f2e598]
+            - paragraph [ref=f2e599]: 45.4 KB • application/pdf
+          - generic [ref=f2e600]:
+            - generic [ref=f2e601]:
+              - paragraph [ref=f2e602]: Upload Date
+              - paragraph [ref=f2e603]: 9/21/2026 at 12:31:36 PM
+            - generic [ref=f2e604]:
+              - paragraph [ref=f2e605]: Processing status
+              - paragraph [ref=f2e608]: completed
+            - region "Extracted document text" [ref=f2e609]:
+              - heading "OCR text (2 pages)" [level=3] [ref=f2e610]
+              - generic [ref=f2e611]: CEDAR PAGE ONE 92126 ORCHID PAGE TWO 92126
+              - generic [ref=f2e612]:
+                - button "Add to Knowledge" [ref=f2e613] [cursor=pointer]
+                - paragraph [ref=f2e618]: Knowledge stores an independent text snapshot. Delete its Knowledge source separately if you later delete this document.

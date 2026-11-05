@@ -1,6 +1,6 @@
 # Agents
 
-The Phase 9 Agent Runtime slice is **Experimental**. It provides owner-scoped agent definitions and a bounded prompt-to-model execution path with Server-Sent Events (SSE), cancellation, and a persistent MongoDB `AgentRun` audit record. It is not a tool-using autonomous-agent system.
+The Phase 9 local single-replica Agent Runtime slice is **Implemented**. It provides owner-scoped agent definitions and a bounded prompt-to-model execution path with Server-Sent Events (SSE), cancellation, and a persistent MongoDB `AgentRun` audit record. Overall Agents remain **Experimental** because this is not a distributed or tool-using autonomous-agent system.
 
 ## Current behavior
 
@@ -37,7 +37,7 @@ The Agents page streams the active response, requests server-side cancellation b
 
 - Prompt input is normalized, rejects unsafe control/format characters, and is limited to 16 KiB of UTF-8.
 - Persisted output is limited to 256 KiB. Crossing the limit aborts the run and records `output_limit` without appending the overflowing chunk.
-- The service timeout is currently 30 seconds.
+- The service timeout follows the validated `AI_TIMEOUT_MS` runtime setting.
 - Each owner may retain at most 500 runs across all agents. History is exposed as at most ten pages of 50 summaries, and timeline storage is bounded to 50 events per run.
 - Run states are `queued`, `running`, `cancel-requested`, `succeeded`, `failed`, `cancelled`, `timed_out`, `output_limit`, or `interrupted`.
 
@@ -56,10 +56,10 @@ Execution coordination is process-local. One active run per owner and the per-ag
 - a restart cannot resume an active run; periodic recovery eventually marks a recently updated orphan terminal after its stale threshold, but does not resume provider work; and
 - a provider that ignores cancellation may continue work remotely even after KFive stops accepting its events.
 
-Use a single backend process for this Experimental slice. Distributed leases, a durable execution queue/worker, cross-process cancellation delivery, and takeover/recovery are required before horizontal scaling.
+Use a single backend process for this implemented local slice. Distributed leases, a durable execution queue/worker, cross-process cancellation delivery, and takeover/recovery are required before horizontal scaling.
 
-## Privacy and pending verification
+## Privacy and verification
 
 The normalized user prompt and generated output are stored in MongoDB in application-readable form so the detail API and audit record can reproduce the run. The run snapshot stores only a hash of the system prompt, but the editable Agent record separately stores the system prompt. The system prompt and user prompt are transmitted to the configured provider; when that endpoint is remote, they leave the KFive host. Terminal runs have explicit deletion and the owner cap bounds retained records, but there is no age-based retention window, bulk purge, redaction mode, or application-level field encryption. Do not submit secrets or regulated data; the configured provider, database operators, and anyone with access to backups may access submitted content.
 
-The complete target-host path is still pending: browser to authenticated API, healthy MongoDB persistence and restart recovery, and a real configured provider including streaming, timeout, and cancellation behavior. External provider smoke tests must remain opt-in so normal verification cannot create billable requests.
+On 2026-09-21 a production browser passed authenticated local-Ollama streaming success and real UI cancellation through the deployed proxy/API, with MongoDB history/detail and terminal deletion. After restarting the backend, browser reload recovered both exact terminal records and the successful output. Focused timeout behavior remains regression-tested rather than live-accepted. External provider smoke tests remain opt-in so normal verification cannot create billable requests. See [live evidence](../output/verification/agent-live.md).

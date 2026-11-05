@@ -1,0 +1,145 @@
+- generic [ref=f1e2]:
+  - generic [ref=f1e16]:
+    - complementary [ref=f1e17]:
+      - generic [ref=f1e18]:
+        - generic [ref=f1e19]: KFive AI
+        - button "Collapse sidebar" [ref=f1e25] [cursor=pointer]
+      - generic [ref=f1e29]:
+        - generic [ref=f1e30] [cursor=pointer]:
+          - generic [ref=f1e31]: Search
+          - generic [ref=f1e36]:
+            - generic [ref=f1e37]: ⌘
+            - generic [ref=f1e38]: K
+        - navigation [ref=f1e39]:
+          - link "Dashboard" [ref=f1e40] [cursor=pointer]:
+            - /url: /app/dashboard
+          - link "AI Chat" [ref=f1e48] [cursor=pointer]:
+            - /url: /app/chat
+          - link "Code Lab" [ref=f1e53] [cursor=pointer]:
+            - /url: /app/code
+          - link "Agents" [ref=f1e60] [cursor=pointer]:
+            - /url: /app/agents
+          - link "Documents" [ref=f1e66] [cursor=pointer]:
+            - /url: /app/documents
+          - link "Knowledge / RAG" [ref=f1e72] [cursor=pointer]:
+            - /url: /app/knowledge
+          - link "Repository Analyzer" [ref=f1e78] [cursor=pointer]:
+            - /url: /app/repositories
+          - link "Workflows" [ref=f1e85] [cursor=pointer]:
+            - /url: /app/workflows
+          - link "Dataset Lab" [ref=f1e94] [cursor=pointer]:
+            - /url: /app/datasets
+          - link "Model Benchmarks" [ref=f1e101] [cursor=pointer]:
+            - /url: /app/benchmarks
+          - link "Notebooks" [ref=f1e107] [cursor=pointer]:
+            - /url: /app/notebooks
+          - link "Voice Assistant" [ref=f1e113] [cursor=pointer]:
+            - /url: /app/voice
+          - link "Models" [ref=f1e119] [cursor=pointer]:
+            - /url: /app/models
+          - link "Projects" [ref=f1e132] [cursor=pointer]:
+            - /url: /app/projects
+          - link "Workspace" [ref=f1e137] [cursor=pointer]:
+            - /url: /app/workspace
+          - link "PDF Utilities" [ref=f1e143] [cursor=pointer]:
+            - /url: /app/files
+      - generic [ref=f1e148]:
+        - generic [ref=f1e149]:
+          - generic [ref=f1e150]: W
+          - generic [ref=f1e152]:
+            - paragraph [ref=f1e153]: Workflow Final
+            - paragraph [ref=f1e154]: workflowfinal9212309@example.test
+        - generic [ref=f1e155]:
+          - link "Profile" [ref=f1e156] [cursor=pointer]:
+            - /url: /app/profile
+          - link "Settings" [ref=f1e160] [cursor=pointer]:
+            - /url: /app/settings
+          - button "Toggle theme" [ref=f1e164] [cursor=pointer]
+          - button "Sign out" [ref=f1e171] [cursor=pointer]
+    - main [ref=f1e175]:
+      - generic [ref=f1e177]:
+        - generic [ref=f1e178]:
+          - generic [ref=f1e179]:
+            - generic [ref=f1e180]:
+              - heading "Workflows" [level=1] [ref=f1e181]
+              - generic [ref=f1e186]: Experimental
+            - paragraph [ref=f1e187]: Build and execute the supported fixed linear workflow with durable history.
+          - generic [ref=f1e188]:
+            - button "Refresh workflows" [ref=f1e189] [cursor=pointer]
+            - button "New workflow" [ref=f1e195] [cursor=pointer]
+        - alert [ref=f1e197]: Workflow prompt templates, system prompts, immutable definition snapshots, run inputs, generated output, provider metadata, and timelines are persisted. Do not include passwords, tokens, or other secrets.
+        - paragraph [ref=f1e202]: Models reported by ollama · installed
+        - generic [ref=f1e203]:
+          - complementary [ref=f1e204]:
+            - generic [ref=f1e205]:
+              - heading "Saved workflows" [level=2] [ref=f1e206]
+              - generic [ref=f1e207]: "1"
+            - generic [ref=f1e267]:
+              - button [ref=f1e268] [cursor=pointer]:
+                - paragraph [ref=f1e269]: Workflow Final 9212309
+                - paragraph [ref=f1e270]: Disposable browser cancellation acceptance
+                - paragraph [ref=f1e271]: Revision 1 · 9/21/2026, 11:24:06 PM
+              - button "Delete Workflow Final 9212309" [ref=f1e272] [cursor=pointer]
+          - main [ref=f1e210]:
+            - generic [ref=f1e276]:
+              - generic [ref=f1e277]:
+                - generic [ref=f1e278]:
+                  - heading "Workflow Final 9212309" [level=2] [ref=f1e279]
+                  - paragraph [ref=f1e280]: Schema 1 · revision 1 · updated 9/21/2026, 11:24:06 PM
+                - button "Edit definition" [ref=f1e281] [cursor=pointer]
+              - paragraph [ref=f1e284]: Disposable browser cancellation acceptance
+              - generic [ref=f1e286]:
+                - article [ref=f1e287]:
+                  - heading "Input" [level=3] [ref=f1e292]
+                  - paragraph [ref=f1e293]: Bounded text supplied for each run.
+                - article [ref=f1e297]:
+                  - heading "Prompt" [level=3] [ref=f1e303]
+                  - paragraph [ref=f1e304]: "{{input}}"
+                  - paragraph [ref=f1e305]: Repeat the user input exactly and do not add any other text.
+                - article [ref=f1e309]:
+                  - heading "LLM" [level=3] [ref=f1e314]
+                  - paragraph [ref=f1e315]: phi3:latest
+                  - paragraph [ref=f1e316]: Temperature 0.7
+                - article [ref=f1e320]:
+                  - heading "Output" [level=3] [ref=f1e332]
+                  - paragraph [ref=f1e333]: Persisted bounded model response.
+            - generic [ref=f1e334]:
+              - generic [ref=f1e335]:
+                - heading "Run workflow" [level=2] [ref=f1e336]
+                - paragraph [ref=f1e337]:
+                  - text: The prompt template receives this value at its single
+                  - code [ref=f1e338]: "{{input}}"
+                  - text: marker.
+              - textbox "Enter workflow input…" [ref=f1e339]
+              - button "Run workflow" [disabled] [ref=f1e341]
+            - generic [ref=f1e344]:
+              - generic [ref=f1e345]:
+                - heading "Run detail" [level=2] [ref=f1e346]
+                - paragraph [ref=f1e347]: Run the workflow or select a historical run.
+              - complementary [ref=f1e348]:
+                - generic [ref=f1e349]:
+                  - generic [ref=f1e350]:
+                    - heading "Run history" [level=2] [ref=f1e351]
+                    - generic [ref=f1e352]: "0"
+                  - paragraph [ref=f1e353]: "Owner retention cap: 500. Delete terminal runs to reclaim capacity."
+                - paragraph [ref=f1e355]: No runs on this page.
+                - generic [ref=f1e356]:
+                  - button "Previous" [disabled] [ref=f1e357]
+                  - generic [ref=f1e358]: 1 / 1
+                  - button "Next" [disabled] [ref=f1e359]
+            - generic [ref=f1e219]:
+              - heading "Planned nodes" [level=2] [ref=f1e220]
+              - paragraph [ref=f1e221]: These Phase 10 node types are unavailable in this bounded slice. They cannot be added or executed.
+              - generic [ref=f1e222]:
+                - button "Smart Model RouterPlanned" [disabled] [ref=f1e223]
+                - button "RAGPlanned" [disabled] [ref=f1e224]
+                - button "DocumentPlanned" [disabled] [ref=f1e225]
+                - button "PDF ExtractPlanned" [disabled] [ref=f1e226]
+                - button "OCRPlanned" [disabled] [ref=f1e227]
+                - button "Structured ExtractPlanned" [disabled] [ref=f1e228]
+                - button "Code RunnerPlanned" [disabled] [ref=f1e229]
+                - button "AgentPlanned" [disabled] [ref=f1e230]
+                - button "ConditionPlanned" [disabled] [ref=f1e231]
+                - button "TransformPlanned" [disabled] [ref=f1e232]
+                - button "DatasetPlanned" [disabled] [ref=f1e233]
+  - status [ref=f1e365]: Workflow created.

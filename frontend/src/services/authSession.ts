@@ -1,6 +1,6 @@
 export interface RefreshedAuthTokens {
   accessToken: string;
-  refreshToken: string;
+  csrfToken: string;
 }
 
 interface AuthSessionObserver {

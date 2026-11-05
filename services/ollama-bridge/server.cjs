@@ -116,15 +116,43 @@ async function listenSocket(server, socketPath) {
   await fs.chmod(socketPath, 0o660);
 }
 
+function tcpListenAddress(value) {
+  if (net.isIP(value) !== 4) throw new Error('TCP listener requires a literal IPv4 address.');
+  const [a, b] = value.split('.').map(Number);
+  const allowed = value === '127.0.0.1'
+    || a === 10
+    || (a === 172 && b >= 16 && b <= 31)
+    || (a === 192 && b === 168);
+  if (!allowed) throw new Error('TCP listener must bind loopback or an RFC1918 address.');
+  return value;
+}
+
+async function listenTcp(server, host, port) {
+  const address = tcpListenAddress(host);
+  const numericPort = Number(port);
+  if (!Number.isInteger(numericPort) || numericPort < 0 || numericPort > 65535 || (numericPort > 0 && numericPort < 1024)) {
+    throw new Error('TCP listener port must be zero or between 1024 and 65535.');
+  }
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(numericPort, address, resolve);
+  });
+  return server.address();
+}
+
 if (require.main === module) {
   process.umask(0o007);
   const bridge = createBridge({ upstreamUrl: process.env.KFIVE_OLLAMA_HOST_URL || 'http://127.0.0.1:11434' });
-  listenSocket(bridge, '/run/ollama-bridge/ollama.sock').then(() => {
-    console.log(JSON.stringify({ service: 'ollama-host-bridge', transport: 'unix-socket', listening: true, gpuVerified: false }));
+  const tcpHost = process.env.OLLAMA_TCP_LISTEN_HOST;
+  const listening = tcpHost
+    ? listenTcp(bridge, tcpHost, process.env.OLLAMA_TCP_LISTEN_PORT || 11435)
+    : listenSocket(bridge, process.env.OLLAMA_SOCKET_PATH || '/run/ollama-bridge/ollama.sock');
+  listening.then(() => {
+    console.log(JSON.stringify({ service: 'ollama-host-bridge', transport: tcpHost ? 'restricted-tcp' : 'unix-socket', listening: true, gpuVerified: false }));
   }).catch(() => { console.error('Ollama bridge failed to start; no TCP listener was opened.'); process.exitCode = 1; bridge.close(); });
   for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => {
     bridge.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 5000).unref();
   });
 }
-module.exports = { createBridge, listenSocket, upstreamAddress };
+module.exports = { createBridge, listenSocket, listenTcp, tcpListenAddress, upstreamAddress };

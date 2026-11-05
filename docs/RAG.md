@@ -1,6 +1,6 @@
 # Knowledge / RAG
 
-KFive currently provides an Experimental, bounded retrieval-augmented generation slice for UTF-8 TXT and Markdown sources. It is available in workspace scope or inside an owned Project Room.
+KFive currently provides an Experimental, bounded retrieval-augmented generation slice for UTF-8 TXT/Markdown uploads and completed stored PDF/PNG/JPEG documents. It is available in workspace scope or inside an owned Project Room.
 
 ## Configuration
 
@@ -31,7 +31,10 @@ Status skips the provider network probe when the embedding model is missing or e
 
 ## Current behavior
 
-- Inputs are limited to valid UTF-8 TXT or Markdown, 64 KiB per source, and 64 chunks.
+- Inputs are limited to valid UTF-8 TXT/Markdown uploads or the persisted extracted text of an owned, completed PDF/PNG/JPEG document, 64 KiB per source, and 64 chunks.
+- **Add to Knowledge** sends only the stored document id. The backend derives its owner, project scope, name, media type, text, page count, and OCR marker from MongoDB; client-supplied scope or content is rejected. Repeating the action returns the existing source instead of embedding a duplicate.
+- Stored-document sources are independent text/vector snapshots. Deleting the original Document does not delete its Knowledge source, and deleting the source does not delete the original Document.
+- PDF/OCR form-feed boundaries produce page references only when their count matches the persisted page count. Otherwise ingestion remains available without fabricated page numbers.
 - Ingestion normalizes and chunks text, requests embeddings in bounded batches, and stores only metadata in MongoDB. Source chunks and vectors are stored in ChromaDB.
 - Collections are separated by owner, provider, embedding model, vector dimension, and chunking version.
 - Every vector operation includes owner and workspace/project scope filters. Query results are also checked against ready, owner-scoped MongoDB records before they are used.
@@ -53,6 +56,7 @@ All routes require JWT authentication and use the `/api/v1/knowledge` prefix.
 | `GET` | `/sources?projectId=...` | List sources in the workspace or selected owned project scope |
 | `GET` | `/sources?scope=orphaned` | List owner metadata for deleted-project sources; mutually exclusive with `projectId` |
 | `POST` | `/sources` | Synchronously validate, chunk, embed, and index one source |
+| `POST` | `/sources/from-document` | Idempotently index one owned completed stored document; body must contain only `documentId` |
 | `DELETE` | `/sources/:id` | Delete owned vectors first, then their MongoDB metadata |
 | `POST` | `/query` | Retrieve bounded chunks and generate an answer with source references |
 
@@ -74,6 +78,8 @@ passed. [Browser evidence](../output/verification/rag-browser-2026-09-17.md) rec
 the results and fixture cleanup. GPU verification, process-crash recovery and
 remote deployment remain unproven; RAG remains Experimental.
 
+On 2026-09-21, a production-Compose API verifier and real browser executed the stored-document path with a two-page raster-only PDF: upload, isolated Poppler/Tesseract OCR, MongoDB persistence, server-authoritative indexing, real Ollama embeddings, Chroma storage/retrieval, Ollama generation, and a page-2 source reference. Repeat ingestion returned the same source, a second owner was denied, and cleanup passed. MongoDB, ChromaDB, the document processor, and backend were then restarted; a fresh browser query returned HTTP 200 and displayed the persisted page-2 excerpt. See [stored-document evidence](../output/verification/document-rag-live.md).
+
 ### Reproduce the standalone live API check
 
 Build the backend and start the local Compose dependencies. Install `phi3:latest` and `all-minilm:22m` on host Ollama, listening at loopback port 11434. Then run:
@@ -87,10 +93,10 @@ The opt-in verifier uses Docker inspection to obtain local database endpoints wi
 
 Deleted-project recovery passed a separate live browser/API/MongoDB/ChromaDB proof on 2026-09-16 using explicitly synthetic two-dimensional vectors, not model-generated embeddings. Recovery excluded an existing project; archived-source deletion returned 409. After confirmed project deletion, recovery listed the source; a second user saw no recovery record and received 404 attempting deletion. A full stop/start preserved both metadata and vectors. Browser-confirmed source deletion removed its Mongo record and vector while preserving another owner's control record/vector in the same fixture collection. All disposable accounts, project, sources, and the empty test collection were cleaned up. This proves recovery/cleanup, not ingestion, retrieval quality, or answer generation.
 
-Latest automated gates passed 468 backend tests and 107 frontend tests, all lint targets, and frontend/backend production builds. The standalone verifier writes checkpoint/cleanup evidence to `output/verification/rag-live-<run-id>.json`; only a `passed` status proves both its checks and cleanup completed. A `running` artifact after interruption is not a successful test.
+The 2026-09-21 stored-document focused gate passed 49 backend tests, 17 frontend tests, frontend/backend production builds, image builds, the live API verifier, and the browser/restart check. The standalone TXT verifier writes checkpoint/cleanup evidence to `output/verification/rag-live-<run-id>.json`; only a `passed` status proves both its checks and cleanup completed. A `running` artifact after interruption is not a successful test.
 
 Known lifecycle gaps remain: 200-record lists have no pagination or source quota, indexing interrupted by a crash lacks reconciliation, and process-local project leases do not coordinate replicas. Recovery cannot delete sources still marked indexing; do not manually delete their metadata while a writer could still be active.
 
 ## Not yet implemented
 
-PDF/DOCX/OCR ingestion, reranking, document page references, repository ingestion, background indexing jobs, batch ingestion, reindex controls, hybrid search, and persistent conversational RAG memory remain planned.
+DOCX ingestion, repository ingestion, reranking, background indexing/recovery jobs, batch ingestion, reindex controls, hybrid search, persistent conversational RAG memory, and remote/Kubernetes verification remain planned. Stored PDF/OCR ingestion and conservative page references are implemented only within the bounded synchronous slice described above.

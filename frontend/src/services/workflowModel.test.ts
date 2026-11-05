@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   WORKFLOW_OUTPUT_BYTES,
   buildWorkflowDefinition,
@@ -14,6 +14,7 @@ import {
   workflowDraftError,
   workflowDraftFromView,
   workflowScopeKey,
+  waitForTerminalWorkflowRun,
 } from './workflowModel';
 
 const draft = {
@@ -125,5 +126,16 @@ describe('workflow frontend contract', () => {
     expect(isWorkflowScopeRequestCurrent(`project:${projectId}`, `project:${projectId}`, 3, 3)).toBe(true);
     expect(isWorkflowScopeRequestCurrent('project:507f1f77bcf86cd799439014', `project:${projectId}`, 3, 3)).toBe(false);
     expect(isWorkflowScopeRequestCurrent(`project:${projectId}`, `project:${projectId}`, 4, 3)).toBe(false);
+  });
+
+  it('reconciles a cancellation response to a terminal persisted run with bounded polling', async () => {
+    const sleep = vi.fn().mockResolvedValue(undefined);
+    const read = vi.fn()
+      .mockResolvedValueOnce({ data: { run: { ...run, status: 'cancel-requested', input: 'Stop', output: '', timeline: [] } } })
+      .mockResolvedValueOnce({ data: { run: { ...run, status: 'cancelled', input: 'Stop', output: '', timeline: [] } } });
+    await expect(waitForTerminalWorkflowRun(read, { attempts: 3, delayMs: 0, sleep }))
+      .resolves.toMatchObject({ status: 'cancelled' });
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(sleep).toHaveBeenCalledTimes(1);
   });
 });

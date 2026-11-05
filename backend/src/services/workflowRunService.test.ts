@@ -1,6 +1,6 @@
 import { WorkflowDefinition } from '@/models/Workflow';
 import { AiProviderClient, AiStreamEvent } from '@/services/ai/types';
-import { AiProviderUnavailableError } from '@/services/ai/errors';
+import { AiProviderTimeoutError, AiProviderUnavailableError } from '@/services/ai/errors';
 import { WorkflowError, WorkflowRecord } from './workflowService';
 import { ProjectError } from './projectService';
 import { resetWorkflowExecutionLeasesForTests } from './workflowExecutionLease';
@@ -228,6 +228,51 @@ describe('WorkflowRunService', () => {
     await expect(service.cancel(ownerId, workflowId, runId)).resolves.toMatchObject({ run: { status: 'cancelled' }, idempotent: true });
   });
 
+  it('normalizes uppercase identifiers before lease lookup and cancellation delivery', async () => {
+    const ai = provider((_emit, signal) => new Promise<void>((_resolve, reject) => {
+      signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+    }));
+    const service = new WorkflowRunService(statefulRepository(), workflows() as any, () => ai, 30_000, () => now);
+    const execution = service.execute(await service.prepare(ownerId.toUpperCase(), workflowId.toUpperCase(), { input: 'notes' }), () => undefined);
+    await Promise.resolve(); await Promise.resolve();
+    await expect(service.cancel(ownerId.toUpperCase(), workflowId.toUpperCase(), runId.toUpperCase()))
+      .resolves.toMatchObject({ run: { status: 'cancel-requested' }, idempotent: false });
+    await expect(execution).rejects.toMatchObject({ code: 'WORKFLOW_RUN_CONFLICT' });
+    await expect(service.get(ownerId, workflowId, runId)).resolves.toMatchObject({ status: 'cancelled' });
+  });
+
+  it('preserves cancellation when provider completion races the Mongo cancel transition', async () => {
+    const repository = statefulRepository();
+    const transition = repository.transition.bind(repository);
+    repository.transition = jest.fn(async (requestedOwner, requestedRun, allowed, changes, events) => {
+      if (changes.status === 'succeeded') {
+        await transition(requestedOwner, requestedRun, ['running'], {
+          status: 'cancel-requested', cancelRequestedAt: now,
+        }, [{ sequence: 49, type: 'cancel_requested', timestamp: now }]);
+        return null;
+      }
+      return transition(requestedOwner, requestedRun, allowed, changes, events);
+    });
+    const service = new WorkflowRunService(
+      repository, workflows() as any, () => provider(async () => undefined), 30_000, () => now
+    );
+    await expect(service.execute(await service.prepare(ownerId, workflowId, { input: 'notes' }), () => undefined))
+      .rejects.toMatchObject({ code: 'WORKFLOW_RUN_CONFLICT', message: 'Workflow run was cancelled.' });
+    const stored = await service.get(ownerId, workflowId, runId);
+    expect(stored).toMatchObject({ status: 'cancelled' });
+    expect(stored.timeline?.map((event) => event.sequence)).toEqual([1, 2, 49, 50]);
+  });
+
+  it('classifies the configured provider deadline as a timed-out run', async () => {
+    const repository = statefulRepository();
+    const service = new WorkflowRunService(repository, workflows() as any, () => provider(async () => {
+      throw new AiProviderTimeoutError('ollama');
+    }), 45_000, () => now);
+    await expect(service.execute(await service.prepare(ownerId, workflowId, { input: 'notes' }), () => undefined))
+      .rejects.toMatchObject({ code: 'WORKFLOW_TIMEOUT', statusCode: 408 });
+    await expect(service.get(ownerId, workflowId, runId)).resolves.toMatchObject({ status: 'timed_out' });
+  });
+
   it('times out even when a provider ignores AbortSignal and releases owner concurrency', async () => {
     const ai = provider(async () => new Promise<void>(() => undefined));
     const service = new WorkflowRunService(statefulRepository(), workflows() as any, () => ai, 5, () => now);
@@ -275,6 +320,8 @@ describe('WorkflowRunService', () => {
     const recovery = new WorkflowRunService(statefulRepository({ interruptActive }), workflows() as any, () => provider(async () => undefined), 30_000, () => now);
     await expect(recovery.recoverInterrupted()).resolves.toBe(2);
     expect(interruptActive).toHaveBeenCalledWith(new Date(now.getTime() - 60_000), now);
+    await expect(recovery.recoverInterrupted(0)).resolves.toBe(2);
+    expect(interruptActive).toHaveBeenLastCalledWith(now, now);
   });
 
   it('blocks active and archived-project run deletion while preserving cancellation as safe shutdown', async () => {

@@ -1,0 +1,92 @@
+- generic [ref=f1e4]:
+  - complementary [ref=f1e5]:
+    - generic [ref=f1e6]:
+      - generic [ref=f1e7]: KFive AI
+      - button "Collapse sidebar" [ref=f1e12] [cursor=pointer]
+    - generic [ref=f1e16]:
+      - generic [ref=f1e17] [cursor=pointer]:
+        - generic [ref=f1e18]: Search
+        - generic [ref=f1e23]:
+          - generic [ref=f1e24]: ⌘
+          - generic [ref=f1e25]: K
+      - navigation [ref=f1e26]:
+        - link "Dashboard" [ref=f1e27] [cursor=pointer]:
+          - /url: /app/dashboard
+        - link "AI Chat" [ref=f1e35] [cursor=pointer]:
+          - /url: /app/chat
+        - link "Code Lab" [ref=f1e40] [cursor=pointer]:
+          - /url: /app/code
+        - link "Agents" [ref=f1e48] [cursor=pointer]:
+          - /url: /app/agents
+        - link "Documents" [ref=f1e54] [cursor=pointer]:
+          - /url: /app/documents
+        - link "Knowledge / RAG" [ref=f1e60] [cursor=pointer]:
+          - /url: /app/knowledge
+        - link "Repository Analyzer" [ref=f1e66] [cursor=pointer]:
+          - /url: /app/repositories
+        - link "Workflows" [ref=f1e73] [cursor=pointer]:
+          - /url: /app/workflows
+        - link "Dataset Lab" [ref=f1e81] [cursor=pointer]:
+          - /url: /app/datasets
+        - link "Model Benchmarks" [ref=f1e88] [cursor=pointer]:
+          - /url: /app/benchmarks
+        - link "Notebooks" [ref=f1e94] [cursor=pointer]:
+          - /url: /app/notebooks
+        - link "Voice Assistant" [ref=f1e100] [cursor=pointer]:
+          - /url: /app/voice
+        - link "Models" [ref=f1e106] [cursor=pointer]:
+          - /url: /app/models
+        - link "Projects" [ref=f1e119] [cursor=pointer]:
+          - /url: /app/projects
+        - link "Workspace" [ref=f1e124] [cursor=pointer]:
+          - /url: /app/workspace
+        - link "PDF Utilities" [ref=f1e130] [cursor=pointer]:
+          - /url: /app/files
+    - generic [ref=f1e135]:
+      - generic [ref=f1e136]:
+        - generic [ref=f1e137]: C
+        - generic [ref=f1e139]:
+          - paragraph [ref=f1e140]: Code Acceptance
+          - paragraph [ref=f1e141]: codelab-20260923-2058@example.test
+      - generic [ref=f1e142]:
+        - link "Profile" [ref=f1e143] [cursor=pointer]:
+          - /url: /app/profile
+        - link "Settings" [ref=f1e147] [cursor=pointer]:
+          - /url: /app/settings
+        - button "Toggle theme" [ref=f1e151] [cursor=pointer]
+        - button "Sign out" [ref=f1e158] [cursor=pointer]
+  - main [ref=f1e162]:
+    - generic [ref=f1e165]:
+      - generic [ref=f1e166]:
+        - generic [ref=f1e167]:
+          - heading "Code Lab" [level=1] [ref=f1e168]
+          - paragraph [ref=f1e173]: Run small programs in an isolated online compiler playground.
+        - generic [ref=f1e174]:
+          - button "Reset" [ref=f1e175] [cursor=pointer]
+          - button "Run" [disabled] [ref=f1e179]
+      - generic [ref=f1e182]:
+        - generic [ref=f1e183]:
+          - generic [ref=f1e184]:
+            - generic [ref=f1e185]:
+              - generic [ref=f1e186]:
+                - button "Python" [disabled] [ref=f1e187]
+                - button "JavaScript" [disabled] [ref=f1e188]
+              - generic [ref=f1e189]: "Runtime: Loading…"
+            - generic [ref=f1e190]:
+              - generic [ref=f1e191]: Source code
+              - textbox "Source code" [ref=f1e192]: "import sys name = sys.stdin.read().strip() or \"world\" print(f\"Hello, {name}!\")"
+          - generic [ref=f1e194]:
+            - text: Standard input
+            - textbox "Standard input" [ref=f1e195]:
+              - /placeholder: Optional stdin
+              - text: KFive
+          - generic [ref=f1e196]:
+            - generic [ref=f1e197]:
+              - heading "Run result" [level=2] [ref=f1e198]
+              - generic [ref=f1e201]: No run selected
+            - paragraph [ref=f1e203]: Submit code or select a historical run to see actual runner output.
+        - complementary [ref=f1e204]:
+          - generic [ref=f1e205]:
+            - heading "Run history" [level=2] [ref=f1e206]
+            - button "Refresh run history" [disabled] [ref=f1e207]
+          - paragraph [ref=f1e213]: Your recent runs

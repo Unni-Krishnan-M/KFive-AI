@@ -1,7 +1,9 @@
-import axios, { AxiosInstance, AxiosError } from 'axios';
-import { getToken } from '@/utils/getToken';
+import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios';
 import { apiBaseUrl } from '@/config/runtime';
-import { publishClearedAuthSession, publishRefreshedAuthTokens } from './authSession';
+import {
+  AuthCoordinationSupersededError,
+  getBrowserAuthCoordinator,
+} from './authCoordination';
 import type { AgentPayload, AgentRunDeletion, AgentRunDetail, AgentRunPage, AgentView } from './agentModel';
 import type { WorkflowPayload, WorkflowRunDeletion, WorkflowRunDetail, WorkflowRunPage, WorkflowView } from './workflowModel';
 import type { BenchmarkRunDeletion, BenchmarkRunDetail, BenchmarkRunPage, BenchmarkStatus, BenchmarkSuite } from './benchmarkModel';
@@ -13,24 +15,82 @@ interface ApiEnvelope<T> {
   data: T;
 }
 
+interface BrowserRefreshTokens {
+  accessToken: string;
+  csrfToken: string;
+}
+
 // Create axios instance
 export const apiClient: AxiosInstance = axios.create({
   baseURL: apiBaseUrl,
   timeout: 30000,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-const refreshClient = axios.create({ baseURL: apiBaseUrl, timeout: 30000 });
-let refreshPromise: Promise<{ accessToken: string; refreshToken: string }> | null = null;
+const refreshClient = axios.create({ baseURL: apiBaseUrl, timeout: 30000, withCredentials: true });
+const COOKIE_TRANSPORT_HEADERS = { 'X-KFive-Auth-Transport': 'cookie' } as const;
+
+export function isAuthSessionSuperseded(error: unknown): boolean {
+  return error instanceof AuthCoordinationSupersededError;
+}
+
+function coordinatedResponse(tokens: BrowserRefreshTokens): AxiosResponse<ApiEnvelope<BrowserRefreshTokens>> {
+  return {
+    data: { success: true, data: tokens },
+    status: 200,
+    statusText: 'OK',
+    headers: {},
+    config: {} as AxiosResponse<ApiEnvelope<BrowserRefreshTokens>>['config'],
+  };
+}
+
+async function refreshBrowserSession(_csrfToken?: string) {
+  const coordinator = getBrowserAuthCoordinator();
+  const expected = coordinator.readSnapshot();
+  const tokens = await coordinator.refresh(
+    { epoch: expected.epoch, sessionId: expected.sessionId, accessToken: expected.accessToken },
+    async (csrfToken) => {
+      const response = await refreshClient.post<ApiEnvelope<BrowserRefreshTokens>>('/auth/refresh', {}, {
+        headers: { ...COOKIE_TRANSPORT_HEADERS, 'X-KFive-CSRF': csrfToken },
+      });
+      return response.data.data;
+    },
+  );
+  return coordinatedResponse(tokens);
+}
+
+async function logoutBrowserSession(_csrfToken?: string) {
+  return getBrowserAuthCoordinator().logout(async (csrfToken) => {
+    await refreshClient.post('/auth/logout', {}, {
+      headers: { ...COOKIE_TRANSPORT_HEADERS, 'X-KFive-CSRF': csrfToken },
+    });
+  });
+}
+
+function finishBrowserLogout(): void {}
+
+function redirectIfBrowserSessionIsSignedOut(): void {
+  if (getBrowserAuthCoordinator().readSnapshot().phase === 'signed-out' && typeof window !== 'undefined') {
+    window.location.href = '/login';
+  }
+}
 
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
   (config) => {
-    const token = getToken();
-    if (token) {
+    const snapshot = getBrowserAuthCoordinator().readSnapshot();
+    (config as any)._authEpoch = snapshot.epoch;
+    (config as any)._authSessionId = snapshot.sessionId;
+    (config as any)._authAccessToken = snapshot.accessToken;
+    const token = snapshot.phase === 'active' ? snapshot.accessToken : null;
+    const isAuthenticationMutation = /^\/auth\/(?:login|register|refresh|logout)$/.test(config.url || '');
+    if (token && !isAuthenticationMutation) {
       config.headers.Authorization = `Bearer ${token}`;
+    } else if (isAuthenticationMutation) {
+      config.headers.delete('Authorization');
     }
     return config;
   },
@@ -44,45 +104,45 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as any;
+    if (!originalRequest) return Promise.reject(error);
 
-    if (error.response?.status === 401 && !originalRequest._retry && originalRequest.url !== '/auth/refresh') {
+    const isAuthenticationMutation = /^\/auth\/(?:login|register|refresh|logout)$/.test(originalRequest.url || '');
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthenticationMutation) {
       originalRequest._retry = true;
 
       try {
-        // Get refresh token from localStorage
-        const authData = localStorage.getItem('kfive-auth');
-        if (authData) {
-          const { state } = JSON.parse(authData);
-          if (state?.refreshToken) {
-            refreshPromise ??= refreshClient.post('/auth/refresh', {
-              refreshToken: state.refreshToken,
-            }).then((response) => response.data.data).finally(() => {
-              refreshPromise = null;
+        // The long-lived refresh credential is HttpOnly; JavaScript retains only
+        // the non-secret, session-bound CSRF proof returned after each rotation.
+        const coordinator = getBrowserAuthCoordinator();
+        const tokens = await coordinator.refresh(
+          {
+            epoch: originalRequest._authEpoch,
+            sessionId: originalRequest._authSessionId,
+            accessToken: originalRequest._authAccessToken,
+          },
+          async (csrfToken) => {
+            const response = await refreshClient.post<ApiEnvelope<BrowserRefreshTokens>>('/auth/refresh', {}, {
+              headers: { ...COOKIE_TRANSPORT_HEADERS, 'X-KFive-CSRF': csrfToken },
             });
-            const tokens = await refreshPromise;
-            
-            // Update tokens in localStorage
-            const newAuthData = {
-              ...JSON.parse(authData),
-              state: {
-                ...state,
-                accessToken: tokens.accessToken,
-                refreshToken: tokens.refreshToken,
-              }
-            };
-            localStorage.setItem('kfive-auth', JSON.stringify(newAuthData));
-            
-            // Retry original request with new token
-            publishRefreshedAuthTokens(tokens);
-            originalRequest.headers.Authorization = `Bearer ${tokens.accessToken}`;
-            return apiClient(originalRequest);
-          }
-        }
+            return response.data.data;
+          },
+        );
+        originalRequest.headers.Authorization = `Bearer ${tokens.accessToken}`;
+        return apiClient(originalRequest);
       } catch (refreshError) {
-        // Refresh failed, clear auth data and redirect to login
-        publishClearedAuthSession();
-        localStorage.removeItem('kfive-auth');
-        window.location.href = '/login';
+        const coordinator = getBrowserAuthCoordinator();
+        await coordinator.signOutIfCurrent({
+          epoch: originalRequest._authEpoch,
+          sessionId: originalRequest._authSessionId,
+          accessToken: originalRequest._authAccessToken,
+        });
+        if (isAuthSessionSuperseded(refreshError)) {
+          redirectIfBrowserSessionIsSignedOut();
+          return Promise.reject(error);
+        }
+        // Coordinator refresh failures already fail closed under the auth lock.
+        // Redirect only if no newer session replaced the failed one.
+        redirectIfBrowserSessionIsSignedOut();
         return Promise.reject(refreshError);
       }
     }
@@ -95,17 +155,29 @@ apiClient.interceptors.response.use(
 
 // API service functions
 export const authApi = {
-  login: (email: string, password: string) =>
-    apiClient.post('/auth/login', { email, password }),
+  login: (email: string, password: string) => getBrowserAuthCoordinator().replaceSession(
+    () => apiClient.post('/auth/login', { email, password }, { headers: COOKIE_TRANSPORT_HEADERS }),
+    (response: AxiosResponse<any>) => ({
+      user: response.data.data.user,
+      tokens: { accessToken: response.data.data.accessToken, csrfToken: response.data.data.csrfToken },
+    }),
+  ),
   
-  register: (userData: any) =>
-    apiClient.post('/auth/register', userData),
+  register: (userData: any) => getBrowserAuthCoordinator().replaceSession(
+    () => apiClient.post('/auth/register', userData, { headers: COOKIE_TRANSPORT_HEADERS }),
+    (response: AxiosResponse<any>) => ({
+      user: response.data.data.user,
+      tokens: { accessToken: response.data.data.accessToken, csrfToken: response.data.data.csrfToken },
+    }),
+  ),
   
-  refresh: (refreshToken: string) =>
-    apiClient.post('/auth/refresh', { refreshToken }),
+  refresh: (csrfToken: string) =>
+    refreshBrowserSession(csrfToken),
   
-  logout: (refreshToken?: string | null) =>
-    apiClient.post('/auth/logout', { refreshToken }),
+  logout: (csrfToken: string) =>
+    logoutBrowserSession(csrfToken),
+
+  finishLogout: finishBrowserLogout,
 };
 
 export const chatApi = {
@@ -193,14 +265,18 @@ export const projectApi = {
 };
 
 export const documentApi = {
+  getDocument: (id: string) => apiClient.get(`/documents/${encodeURIComponent(id)}`),
   getDocuments: (projectId?: string) => apiClient.get('/documents', { params: projectId ? { projectId } : undefined }),
   uploadDocument: (formData: FormData, projectId?: string) => {
     if (projectId) formData.set('projectId', projectId);
     return (
     apiClient.post('/documents', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 90000,
     }));
   },
+  addToKnowledge: (documentId: string) =>
+    apiClient.post('/knowledge/sources/from-document', { documentId }),
   deleteDocument: (id: string) => apiClient.delete(`/documents/${id}`)
 };
 
@@ -223,8 +299,8 @@ export const knowledgeApi = {
 export const repositoryApi = {
   getStatus: (projectId?: string) =>
     apiClient.get('/repositories/status', { params: projectId ? { projectId } : undefined }),
-  getAnalyses: (projectId?: string, scope?: 'orphaned') =>
-    apiClient.get('/repositories/analyses', { params: { ...(projectId ? { projectId } : {}), ...(scope ? { scope } : {}) } }),
+  getAnalyses: (projectId?: string, scope?: 'orphaned', page = 1) =>
+    apiClient.get('/repositories/analyses', { params: { ...(projectId ? { projectId } : {}), ...(scope ? { scope } : {}), page } }),
   getAnalysis: (id: string) => apiClient.get(`/repositories/analyses/${id}`),
   deleteAnalysis: (id: string) => apiClient.delete(`/repositories/analyses/${id}`),
   createAnalysis: (archive: File, options: { name?: string; projectId?: string } = {}) => {

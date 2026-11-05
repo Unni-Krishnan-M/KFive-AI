@@ -1,6 +1,6 @@
 const leases = new Set<string>();
 
-function key(ownerId: string, agentId: string): string { return `${ownerId}:${agentId}`; }
+function key(ownerId: string, agentId: string): string { return `${ownerId.toLowerCase()}:${agentId.toLowerCase()}`; }
 
 export function tryAcquireAgentExecutionLease(ownerId: string, agentId: string): boolean {
   const lease = key(ownerId, agentId);

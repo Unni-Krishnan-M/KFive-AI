@@ -39,6 +39,23 @@ describe('parseEnvironment', () => {
     expect(config.aiEmbeddingModel).toBeUndefined();
     expect(config.aiMaxOutputTokens).toBe(2048);
     expect(config.aiTimeoutMs).toBe(30000);
+    expect(config.trustedProxyHops).toBe(1);
+  });
+
+  it('bounds the trusted proxy chain used by production TLS termination', () => {
+    expect(parseEnvironment({ ...baseEnvironment, TRUST_PROXY_HOPS: '2' }).trustedProxyHops).toBe(2);
+    expect(() => parseEnvironment({ ...baseEnvironment, TRUST_PROXY_HOPS: '3' })).toThrow(/TRUST_PROXY_HOPS/);
+  });
+
+  it('accepts bounded canonical JWT lifetimes and rejects ambiguous durations', () => {
+    expect(parseEnvironment({ ...baseEnvironment, JWT_EXPIRES_IN: '4s', JWT_REFRESH_EXPIRES_IN: '7d' }))
+      .toMatchObject({ jwtExpiresIn: '4s', jwtRefreshExpiresIn: '7d' });
+    for (const value of ['120', '0s', '-1s', '1.5m', '1ms', '25h', '999999d']) {
+      expect(() => parseEnvironment({ ...baseEnvironment, JWT_EXPIRES_IN: value })).toThrow(/JWT_EXPIRES_IN/);
+    }
+    for (const value of ['30s', '0d', '31d', 'forever']) {
+      expect(() => parseEnvironment({ ...baseEnvironment, JWT_REFRESH_EXPIRES_IN: value })).toThrow(/JWT_REFRESH_EXPIRES_IN/);
+    }
   });
 
   it('keeps the embedding model separate from the chat model', () => {
@@ -121,6 +138,13 @@ describe('parseEnvironment', () => {
       NODE_ENV: 'production',
       JWT_SECRET: 'replace-this-example-secret-123456789',
     })).toThrow(/Production JWT secrets/);
+  });
+
+  it('requires distinct access and refresh signing secrets for the API process', () => {
+    expect(() => parseEnvironment({
+      ...baseEnvironment,
+      JWT_REFRESH_SECRET: baseEnvironment.JWT_SECRET,
+    })).toThrow(/JWT_SECRET and JWT_REFRESH_SECRET must be distinct/);
   });
 
   it('does not require API signing secrets in the portless benchmark worker', () => {

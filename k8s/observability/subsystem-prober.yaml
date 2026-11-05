@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: subsystem-prober
+  namespace: kfive-observability
+  labels: {app.kubernetes.io/name: subsystem-prober, app.kubernetes.io/component: probing, app.kubernetes.io/part-of: kfive}
+spec:
+  type: ClusterIP
+  selector: {app.kubernetes.io/name: subsystem-prober}
+  ports: [{name: http, port: 9116, targetPort: http}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: subsystem-prober
+  namespace: kfive-observability
+  labels: &labels {app.kubernetes.io/name: subsystem-prober, app.kubernetes.io/component: probing, app.kubernetes.io/part-of: kfive}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app.kubernetes.io/name: subsystem-prober}}
+  template:
+    metadata: {labels: *labels}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: subsystem-prober
+          image: kfive-ai-subsystem-prober:latest
+          imagePullPolicy: IfNotPresent
+          ports: [{name: http, containerPort: 9116}]
+          startupProbe: {httpGet: {path: /health, port: http}, failureThreshold: 30, periodSeconds: 2}
+          readinessProbe: {httpGet: {path: /health, port: http}, periodSeconds: 5, timeoutSeconds: 3}
+          livenessProbe: {httpGet: {path: /health, port: http}, periodSeconds: 10, timeoutSeconds: 3}
+          resources:
+            requests: {cpu: 10m, memory: 24Mi}
+            limits: {cpu: 100m, memory: 64Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - {name: tmp, emptyDir: {sizeLimit: 8Mi}}

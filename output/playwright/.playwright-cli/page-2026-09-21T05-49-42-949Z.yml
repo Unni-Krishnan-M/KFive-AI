@@ -1,0 +1,94 @@
+- generic [ref=f2e4]:
+  - complementary [ref=f2e5]:
+    - generic [ref=f2e6]:
+      - generic [ref=f2e7]: KFive AI
+      - button "Collapse sidebar" [ref=f2e13] [cursor=pointer]
+    - generic [ref=f2e17]:
+      - generic [ref=f2e18] [cursor=pointer]:
+        - generic [ref=f2e19]: Search
+        - generic [ref=f2e24]:
+          - generic [ref=f2e25]: ⌘
+          - generic [ref=f2e26]: K
+      - navigation [ref=f2e27]:
+        - link "Dashboard" [ref=f2e28] [cursor=pointer]:
+          - /url: /app/dashboard
+        - link "AI Chat" [ref=f2e36] [cursor=pointer]:
+          - /url: /app/chat
+        - link "Code Lab" [ref=f2e41] [cursor=pointer]:
+          - /url: /app/code
+        - link "Agents" [ref=f2e48] [cursor=pointer]:
+          - /url: /app/agents
+        - link "Documents" [ref=f2e54] [cursor=pointer]:
+          - /url: /app/documents
+        - link "Knowledge / RAG" [ref=f2e61] [cursor=pointer]:
+          - /url: /app/knowledge
+        - link "Repository Analyzer" [ref=f2e67] [cursor=pointer]:
+          - /url: /app/repositories
+        - link "Workflows" [ref=f2e74] [cursor=pointer]:
+          - /url: /app/workflows
+        - link "Dataset Lab" [ref=f2e82] [cursor=pointer]:
+          - /url: /app/datasets
+        - link "Model Benchmarks" [ref=f2e89] [cursor=pointer]:
+          - /url: /app/benchmarks
+        - link "Notebooks" [ref=f2e95] [cursor=pointer]:
+          - /url: /app/notebooks
+        - link "Voice Assistant" [ref=f2e101] [cursor=pointer]:
+          - /url: /app/voice
+        - link "Models" [ref=f2e107] [cursor=pointer]:
+          - /url: /app/models
+        - link "Projects" [ref=f2e120] [cursor=pointer]:
+          - /url: /app/projects
+        - link "Workspace" [ref=f2e125] [cursor=pointer]:
+          - /url: /app/workspace
+        - link "PDF Utilities" [ref=f2e131] [cursor=pointer]:
+          - /url: /app/files
+    - generic [ref=f2e136]:
+      - generic [ref=f2e137]:
+        - generic [ref=f2e138]: o
+        - generic [ref=f2e140]:
+          - paragraph [ref=f2e141]: ocr_browser_20260921
+          - paragraph [ref=f2e142]: ocr_browser_20260921@example.test
+      - generic [ref=f2e143]:
+        - link "Profile" [ref=f2e144] [cursor=pointer]:
+          - /url: /app/profile
+        - link "Settings" [ref=f2e148] [cursor=pointer]:
+          - /url: /app/settings
+        - button "Toggle theme" [ref=f2e152] [cursor=pointer]
+        - button "Sign out" [ref=f2e159] [cursor=pointer]
+  - main [ref=f2e163]:
+    - generic [ref=f2e165]:
+      - generic [ref=f2e166]:
+        - generic [ref=f2e167]:
+          - heading "Documents" [level=1] [ref=f2e168]
+          - paragraph [ref=f2e173]: Upload documents and track their actual processing status.
+        - button "Open PDF Utilities" [ref=f2e174] [cursor=pointer]
+      - paragraph [ref=f2e177]: PDF Utilities run locally in your browser. Select the source files again there; stored Documents are not passed to the utility or overwritten.
+      - generic [ref=f2e180]:
+        - generic [ref=f2e181] [cursor=pointer]
+        - heading "Drag & Drop files here" [level=3] [ref=f2e185]
+        - paragraph [ref=f2e186]: Store supported PDFs, PNG/JPEG scans, Word documents, CSVs, or text files. Maximum 50 MB per file.
+        - button "Browse Files" [ref=f2e187] [cursor=pointer]
+      - textbox "Search documents by name..." [ref=f2e193]
+      - generic [ref=f2e196] [cursor=pointer]:
+        - heading "kfive-ocr-browser.png" [level=3] [ref=f2e201]
+        - generic [ref=f2e202]:
+          - generic [ref=f2e203]: 10.9 KB
+          - generic [ref=f2e204]: Ready
+      - generic [ref=f2e209]:
+        - generic [ref=f2e210]:
+          - heading "Document Details" [level=2] [ref=f2e211]
+          - button "Close slide over" [ref=f2e212] [cursor=pointer]
+        - generic [ref=f2e217]:
+          - generic [ref=f2e218]:
+            - heading "kfive-ocr-browser.png" [level=3] [ref=f2e223]
+            - paragraph [ref=f2e224]: 10.9 KB • image/png
+          - generic [ref=f2e225]:
+            - generic [ref=f2e226]:
+              - paragraph [ref=f2e227]: Upload Date
+              - paragraph [ref=f2e228]: 9/21/2026 at 11:16:05 AM
+            - generic [ref=f2e229]:
+              - paragraph [ref=f2e230]: Processing status
+              - paragraph [ref=f2e233]: completed
+            - region "Extracted document text" [ref=f2e234]:
+              - heading "OCR text (1 page)" [level=3] [ref=f2e235]
+              - generic [ref=f2e236]: KFIVE BROWSER OCR 92126

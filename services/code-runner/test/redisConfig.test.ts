@@ -9,7 +9,14 @@ import {
   RUNNER_CANCEL_TTL_SECONDS,
   RUNNER_HEARTBEAT_KEY,
 } from '../src/coordinator';
-import { parseRedisUrl } from '../src/redisConfig';
+import { parseRedisUrl, resolveRedisConfig } from '../src/redisConfig';
+
+test('worker and healthcheck resolve queue override before cache Redis', () => {
+  assert.equal(resolveRedisConfig({ REDIS_URL: 'redis://cache:6379/0', QUEUE_REDIS_URL: 'redis://queue:6379/3' }).db, 3);
+  assert.equal(resolveRedisConfig({ REDIS_URL: 'redis://cache:6379/2' }).db, 2);
+  assert.equal(resolveRedisConfig({ REDIS_URL: 'redis://cache:6379/2', QUEUE_REDIS_URL: '' }).db, 2);
+  assert.throws(() => resolveRedisConfig({}), /REDIS_URL is required/);
+});
 
 class FakeCommandClient implements CoordinatorRedisClient {
   isOpen = false;

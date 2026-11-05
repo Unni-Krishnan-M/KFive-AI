@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: traefik-observability-dynamic
+  namespace: kfive
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/part-of: kfive
+data:
+  observability.yaml: |
+    http:
+      routers:
+        grafana:
+          entryPoints: [web]
+          rule: Host(`kfive.local`) && PathPrefix(`/grafana`)
+          service: grafana
+      services:
+        grafana:
+          loadBalancer:
+            servers:
+              - url: http://grafana.kfive-observability.svc.cluster.local:3000

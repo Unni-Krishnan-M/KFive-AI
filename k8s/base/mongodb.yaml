@@ -1,0 +1,70 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  namespace: kfive
+  labels:
+    app.kubernetes.io/name: mongodb
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: kfive
+spec:
+  selector: {app.kubernetes.io/name: mongodb}
+  ports: [{name: mongodb, port: 27017, targetPort: mongodb}]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb
+  namespace: kfive
+  labels: &labels
+    app.kubernetes.io/name: mongodb
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: kfive
+spec:
+  serviceName: mongodb
+  replicas: 1
+  selector: {matchLabels: {app.kubernetes.io/name: mongodb}}
+  template:
+    metadata: {labels: *labels}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: mongodb
+          image: mongo:7.0
+          imagePullPolicy: IfNotPresent
+          ports: [{name: mongodb, containerPort: 27017}]
+          env:
+            - {name: MONGO_INITDB_ROOT_USERNAME, valueFrom: {secretKeyRef: {name: kfive-secrets, key: MONGO_ROOT_USERNAME}}}
+            - {name: MONGO_INITDB_ROOT_PASSWORD, valueFrom: {secretKeyRef: {name: kfive-secrets, key: MONGO_ROOT_PASSWORD}}}
+            - {name: MONGO_INITDB_DATABASE, value: kfive_ai}
+          readinessProbe: &mongoProbe
+            exec: {command: [sh, -c, 'mongosh --quiet --username "$MONGO_INITDB_ROOT_USERNAME" --password "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval "db.adminCommand({ping:1})" >/dev/null']}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 4
+            failureThreshold: 12
+          livenessProbe:
+            <<: *mongoProbe
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 100m, memory: 192Mi}
+            limits: {cpu: "1", memory: 768Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - {name: data, mountPath: /data/db}
+            - {name: configdb, mountPath: /data/configdb}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - {name: data, persistentVolumeClaim: {claimName: mongodb-data}}
+        - {name: configdb, emptyDir: {sizeLimit: 64Mi}}
+        - {name: tmp, emptyDir: {sizeLimit: 64Mi}}

@@ -1,0 +1,118 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kfive-config
+  namespace: kfive
+  labels:
+    app.kubernetes.io/part-of: kfive
+data:
+  NODE_ENV: production
+  KFIVE_PROCESS: api
+  PORT: "5000"
+  API_VERSION: v1
+  KFIVE_MODE: local
+  AI_PROVIDER: ollama
+  AI_DEFAULT_MODEL: phi3:latest
+  AI_MAX_OUTPUT_TOKENS: "2048"
+  AI_TIMEOUT_MS: "30000"
+  MONGODB_HOST: mongodb
+  REDIS_HOST: redis
+  CHROMA_URL: http://chromadb:8000
+  OLLAMA_BASE_URL: http://localhost
+  OLLAMA_SOCKET_PATH: /run/ollama-bridge/ollama.sock
+  PUBLIC_BASE_URL: http://kfive.local:8088
+  CORS_ORIGIN: http://kfive.local:8088
+  CODE_RUNNER_MODE: disabled
+  NOTEBOOK_EXECUTION_ENABLED: "false"
+  QUEUE_CONCURRENCY: "2"
+  LOG_FILE: /app/logs/app.log
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-nginx
+  namespace: kfive
+  labels:
+    app.kubernetes.io/part-of: kfive
+data:
+  default.conf: |
+    server {
+      listen 8080;
+      server_name _;
+      root /usr/share/nginx/html;
+      index index.html;
+      client_max_body_size 52m;
+      location /api/ {
+        proxy_pass http://backend:5000;
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 95s;
+        proxy_send_timeout 95s;
+      }
+      location /socket.io/ {
+        proxy_pass http://backend:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+      }
+      location / { try_files $uri $uri/ /index.html; }
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chroma-log-config
+  namespace: kfive
+  labels:
+    app.kubernetes.io/name: chromadb
+    app.kubernetes.io/part-of: kfive
+data:
+  log_config.yml: |
+    version: 1
+    disable_existing_loggers: false
+    formatters:
+      default:
+        format: '%(asctime)s %(levelname)s %(name)s %(message)s'
+    handlers:
+      stdout:
+        class: logging.StreamHandler
+        formatter: default
+        stream: ext://sys.stdout
+    root:
+      level: INFO
+      handlers: [stdout]
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: traefik-dynamic
+  namespace: kfive
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/part-of: kfive
+data:
+  core.yaml: |
+    http:
+      routers:
+        kfive-api:
+          entryPoints: [web]
+          rule: Host(`kfive.local`) && (PathPrefix(`/api`) || PathPrefix(`/socket.io`))
+          service: backend
+        kfive-frontend:
+          entryPoints: [web]
+          rule: Host(`kfive.local`)
+          service: frontend
+      services:
+        backend:
+          loadBalancer:
+            servers:
+              - url: http://backend.kfive.svc.cluster.local:5000
+        frontend:
+          loadBalancer:
+            servers:
+              - url: http://frontend.kfive.svc.cluster.local:8080

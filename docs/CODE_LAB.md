@@ -4,7 +4,7 @@ Code Lab is a focused online compiler and AI coding playground. It is intentiona
 
 ## Current state
 
-The source implementation is **Experimental** and disabled by default. It includes a validated, owner-scoped Code Run API, a dedicated Redis queue, a separate runner worker/core, and a browser playground for Python and JavaScript. Unit tests exercise request validation, state transitions, output limits, cancellation orchestration, hardened Docker arguments, and cleanup with injected adapters.
+The Python/JavaScript critical execution path is **Complete** against the 2026-09-20 acceptance checks: real production browser/API → Redis → worker → Docker → MongoDB, UI execution/cancellation, and saved result/history after API/worker restart. The terminal-cancellation reconciliation race and Redis selection mismatch are fixed. Deployment remains opt-in and disabled by default; additional languages and public multi-tenant hardening are outside this completion claim. See the current acceptance entry in `STATUS.md`; earlier Experimental findings below are historical.
 
 Real untrusted-code execution is not considered implemented until the host-Docker isolation suite below has passed. Do not enable Code Lab on a public deployment based only on unit tests.
 
@@ -19,12 +19,27 @@ arguments and execute the source in memory; no host temporary source file or
 
 Live verification passed Python stdin/EOF, main-module behavior, Unicode and
 multi-chunk source; JavaScript stdin and main-module behavior; stderr/nonzero
-exit; timeout; and output-cap termination. The verifier inspected the actual
-container configuration and confirmed removal after each case. These checks
-do not establish the full isolation suite: memory/PID pressure, behavioral
-network/filesystem denial, explicit cancellation, broker crash/restart,
-queue/history persistence, and the authenticated browser execution path
-remain unverified. Code Lab remains Experimental and disabled by default.
+exit; timeout; output-cap termination; kernel OOM; PID pressure; behavioral
+network/root-filesystem denial; non-root UID, absent host-home/socket/GPU
+paths and application secret environment variables; and active cancellation.
+The verifier inspected the actual container configuration and confirmed
+executor removal after each case, before its own fallback cleanup. At that
+time, broker restart, queue/history persistence, and the authenticated browser
+path remained unverified; the 2026-09-20 acceptance subsequently verified
+those critical paths. Code Lab remains disabled by default even though the
+scoped Python/JavaScript critical path is Complete.
+
+The separate `scripts/verify-code-queue-live.cjs --allow-live-test` check also
+passed against disposable loopback-only Redis: actual BullMQ dispatch, runner
+execution, retained queue result across a graceful worker restart, Redis
+cancellation and cleanup. It uses no application Redis or MongoDB records.
+This is queue integration evidence, not authenticated API/browser or MongoDB
+history verification. Run the runner build before invoking this check.
+
+Those review findings were resolved on 2026-09-20: terminal cancellation no
+longer overwrites a reconciled Mongo result, and dispatch/heartbeat/cancellation
+share the same `QUEUE_REDIS_URL` then `REDIS_URL` selection. Focused regressions
+and the production acceptance path passed.
 
 Container creation now enables stdin explicitly (unit regression verified).
 A serial reaper scheduler now repeats sweeps every 30 seconds after the prior
@@ -107,9 +122,9 @@ Create payloads accept only `language`, `source`, optional `stdin`, and optional
 
 Run source and stdin are stored in MongoDB for history. The first queue implementation also carries source/stdin in Redis until the job is removed according to queue retention. Encoded source also appears in the host Docker CLI arguments and container command metadata; it is not a secret transport. Do not submit secrets. A later privacy/retention control should allow disabling stdin/source history and move queue payload retrieval behind an internal authenticated API.
 
-## Mandatory host-Docker verification
+## Public-deployment hardening checklist
 
-Before changing Code Lab from disabled/Experimental, execute and record all of these against the actual target daemon:
+The scoped critical path has been verified, but before exposing Code Lab to untrusted public users, execute and record all of these against the actual target daemon and deployment profile:
 
 - normal stdout and stdin;
 - stderr and non-zero exit code;

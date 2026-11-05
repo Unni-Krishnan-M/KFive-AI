@@ -1,0 +1,51 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: kfive-infrastructure
+  namespace: argocd
+spec:
+  description: KFive local-kind namespaces, state, data services, configuration, and ingress controller
+  sourceRepos:
+    - https://github.com/Unni-Krishnan-M/KFive-AI.git
+  destinations:
+    - namespace: kfive
+      server: https://kubernetes.default.svc
+    - namespace: kfive-observability
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - {group: "", kind: Namespace}
+  namespaceResourceWhitelist:
+    - {group: "", kind: ConfigMap}
+    - {group: "", kind: PersistentVolumeClaim}
+    - {group: "", kind: Service}
+    - {group: "", kind: ServiceAccount}
+    - {group: apps, kind: Deployment}
+    - {group: apps, kind: StatefulSet}
+    - {group: networking.k8s.io, kind: NetworkPolicy}
+  namespaceResourceBlacklist:
+    - {group: "", kind: Secret}
+  orphanedResources:
+    warn: true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: kfive-application
+  namespace: argocd
+spec:
+  description: KFive local-kind frontend, backend, services, and ingress
+  sourceRepos:
+    - https://github.com/Unni-Krishnan-M/KFive-AI.git
+  destinations:
+    - namespace: kfive
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist: []
+  namespaceResourceWhitelist:
+    - {group: "", kind: ConfigMap}
+    - {group: "", kind: PersistentVolumeClaim}
+    - {group: "", kind: Service}
+    - {group: apps, kind: Deployment}
+  namespaceResourceBlacklist:
+    - {group: "", kind: Secret}
+  orphanedResources:
+    warn: true

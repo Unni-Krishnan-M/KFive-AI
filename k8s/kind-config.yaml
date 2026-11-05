@@ -1,0 +1,17 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: kfive
+networking:
+  # Keeps the exact CoreDNS ClusterIP fallback in NetworkPolicy deterministic.
+  serviceSubnet: 10.96.0.0/16
+nodes:
+  - role: control-plane
+    extraMounts:
+      - hostPath: /tmp/kfive-kind-ollama
+        containerPath: /run/kfive-host-ollama
+        readOnly: true
+    extraPortMappings:
+      - containerPort: 30080
+        hostPort: 8088
+        listenAddress: 127.0.0.1
+        protocol: TCP

@@ -1,7 +1,7 @@
 import { Schema, model } from 'mongoose';
 
 export type RagSourceStatus = 'indexing' | 'ready' | 'failed';
-export type RagSourceMediaType = 'text/plain' | 'text/markdown';
+export type RagSourceMediaType = 'text/plain' | 'text/markdown' | 'application/pdf' | 'image/png' | 'image/jpeg';
 export type RagSourceErrorCode =
   | 'RAG_PROVIDER_UNAVAILABLE'
   | 'RAG_VECTOR_STORE_UNAVAILABLE'
@@ -10,8 +10,12 @@ export type RagSourceErrorCode =
 const ragSourceSchema = new Schema({
   ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, immutable: true, index: true },
   projectId: { type: Schema.Types.ObjectId, ref: 'Project', index: true },
+  sourceKind: { type: String, enum: ['text', 'document'], required: true, immutable: true, default: 'text' },
+  documentId: { type: Schema.Types.ObjectId, ref: 'Document', immutable: true },
+  documentPageCount: { type: Number, min: 1, max: 500, immutable: true },
+  documentOcrApplied: { type: Boolean, immutable: true },
   name: { type: String, required: true, trim: true, minlength: 1, maxlength: 200 },
-  mediaType: { type: String, enum: ['text/plain', 'text/markdown'], required: true },
+  mediaType: { type: String, enum: ['text/plain', 'text/markdown', 'application/pdf', 'image/png', 'image/jpeg'], required: true },
   status: { type: String, enum: ['indexing', 'ready', 'failed'], required: true, default: 'indexing' },
   characterCount: { type: Number, required: true, min: 1, max: 65_536 },
   byteCount: { type: Number, required: true, min: 1, max: 65_536 },
@@ -33,5 +37,9 @@ const ragSourceSchema = new Schema({
 ragSourceSchema.index({ ownerId: 1, projectId: 1, createdAt: -1 });
 ragSourceSchema.index({ ownerId: 1, status: 1, updatedAt: -1 });
 ragSourceSchema.index({ ownerId: 1, contentHash: 1, embeddingProvider: 1, embeddingModel: 1 });
+ragSourceSchema.index(
+  { ownerId: 1, documentId: 1 },
+  { unique: true, partialFilterExpression: { documentId: { $type: 'objectId' } } }
+);
 
 export const RagSourceModel = model('RagSource', ragSourceSchema);

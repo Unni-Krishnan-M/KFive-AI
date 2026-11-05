@@ -8,9 +8,13 @@ import { EnvironmentConfig } from './config/environment';
 import { AppError, errorHandler, notFound } from './middleware/errorHandler';
 import { setupRoutes } from './routes';
 import { logger } from './utils/logger';
-import { getLiveness } from './config/health';
+import { getLiveness, getReadiness } from './config/health';
+import { createMetrics, metricRequestPath } from './observability/metrics';
 
 export const ALLOWED_CORS_METHODS = Object.freeze(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']);
+export const ALLOWED_CORS_HEADERS = Object.freeze([
+  'Content-Type', 'Authorization', 'x-refresh-token', 'x-request-id', 'X-KFive-Auth-Transport', 'X-KFive-CSRF',
+]);
 
 export function corsOriginError(origin: string | undefined, allowedOrigins: readonly string[]): AppError | undefined {
   if (!origin || allowedOrigins.includes(origin)) return undefined;
@@ -19,12 +23,21 @@ export function corsOriginError(origin: string | undefined, allowedOrigins: read
 
 export function createApp(config: EnvironmentConfig): Express {
   const app = express();
+  const metrics = createMetrics({
+    collectDependencies: () => {
+      const dependencies = getReadiness(config).body.dependencies;
+      return {
+        mongodb: dependencies.mongodb === 'available',
+        redis: dependencies.redis === 'available',
+      };
+    },
+  });
 
   app.disable('x-powered-by');
-  // KFive's supported routing places exactly one frontend/ingress proxy in
-  // front of the API. This lets rate limiting use that proxy's appended client
-  // address without accepting an arbitrary-length forwarded chain.
-  app.set('trust proxy', 1);
+  // Trust only the explicitly bounded deployment chain. Local Compose uses
+  // one frontend proxy; production uses outer TLS termination plus frontend.
+  app.set('trust proxy', config.trustedProxyHops);
+  app.use(metrics.middleware);
   app.use((req, res, next) => {
     const requestId = req.header('x-request-id') || randomUUID();
     res.setHeader('x-request-id', requestId);
@@ -33,7 +46,7 @@ export function createApp(config: EnvironmentConfig): Express {
       logger.info('HTTP request', {
         requestId,
         method: req.method,
-        path: req.originalUrl,
+        path: metricRequestPath(req, res.statusCode),
         statusCode: res.statusCode,
         durationMs: Date.now() - startedAt,
       });
@@ -59,7 +72,7 @@ export function createApp(config: EnvironmentConfig): Express {
     },
     credentials: true,
     methods: [...ALLOWED_CORS_METHODS],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-refresh-token', 'x-request-id'],
+    allowedHeaders: [...ALLOWED_CORS_HEADERS],
     exposedHeaders: ['x-request-id'],
   }));
 
@@ -69,6 +82,9 @@ export function createApp(config: EnvironmentConfig): Express {
     message: { success: false, error: { message: 'Too many requests from this IP' } },
     standardHeaders: true,
     legacyHeaders: false,
+    // Cluster probes must report dependency readiness, not consume the shared
+    // client request budget and eventually become false 429 failures.
+    skip: (req) => /^\/api\/v\d+\/(?:health|readiness)\/?$/.test(req.originalUrl.split('?')[0]),
   }));
 
   app.use(compression());
@@ -78,6 +94,8 @@ export function createApp(config: EnvironmentConfig): Express {
   app.get('/health', (_req, res) => {
     res.status(200).json(getLiveness(config));
   });
+
+  app.get('/metrics', metrics.handler);
 
   setupRoutes(app, config);
   app.use(notFound);

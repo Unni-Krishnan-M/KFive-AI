@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-optional-output
+  namespace: kfive-observability
+data:
+  optional-output.conf: |
+    [OUTPUT]
+        Name                     datadog
+        Match                    kube.*
+        Host                     ${DD_HOST}
+        Port                     ${DD_PORT}
+        TLS                      ${DD_TLS}
+        Compress                 gzip
+        Apikey                   ${DD_API_KEY}
+        Dd_Service               kfive
+        Dd_Source                kubernetes
+        Dd_Tags                  deployment_mode:local-kind,managed_by:kfive
+        net.dns.resolver         LEGACY
+        net.dns.prefer_ipv4      On
+        Retry_Limit              5
+        storage.total_limit_size 16M
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluent-bit
+  namespace: kfive-observability
+spec:
+  template:
+    spec:
+      containers:
+        - name: fluent-bit
+          env:
+            - {name: DD_HOST, value: http-intake.logs.datadoghq.com}
+            - {name: DD_PORT, value: "443"}
+            - {name: DD_TLS, value: "On"}
+            - name: DD_API_KEY
+              valueFrom:
+                secretKeyRef: {name: kfive-datadog, key: DD_API_KEY}

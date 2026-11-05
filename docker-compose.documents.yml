@@ -1,0 +1,25 @@
+services:
+  backend:
+    environment:
+      DOCUMENT_PROCESSOR_URL: ${DOCUMENT_PROCESSOR_URL:-http://document-processor:8080}
+      OCR_SERVICE_URL: ${OCR_SERVICE_URL:-http://document-processor:8080}
+    depends_on:
+      document-processor: { condition: service_healthy }
+    networks: [kfive-network, document-processor-network]
+  document-processor:
+    build:
+      context: services/document-processor
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=128m
+    cpus: 1.0
+    mem_limit: 512m
+    pids_limit: 64
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    init: true
+    networks: [document-processor-network]
+
+networks:
+  document-processor-network:
+    internal: true

@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import { getEnvironment } from '@/config/environment';
 import { AgentRunModel, AgentRunStatus, AgentRunTimelineType } from '@/models/AgentRun';
 import { AiProviderClient, AiStreamEvent, AiUsage } from '@/services/ai/types';
 import { AiProviderError } from '@/services/ai/errors';
@@ -170,13 +171,13 @@ function serializeRun(record: AgentRunRecord, detail: boolean): PublicAgentRun {
     ...(record.cancelRequestedAt ? { cancelRequestedAt: record.cancelRequestedAt } : {}),
     ...(record.completedAt ? { completedAt: record.completedAt } : {}),
     ...(record.createdAt ? { createdAt: record.createdAt } : {}), ...(record.updatedAt ? { updatedAt: record.updatedAt } : {}),
-    ...(detail ? { prompt: record.prompt, output: record.output, timeline: record.timeline } : {}),
+    ...(detail ? { prompt: record.prompt, output: record.output, timeline: [...record.timeline].sort((left, right) => left.sequence - right.sequence) } : {}),
   };
 }
 
 function requireObjectId(value: unknown, label: string): string {
   if (typeof value !== 'string' || !/^[a-f\d]{24}$/i.test(value)) throw new AgentRunError(`${label} is invalid.`, 'INVALID_AGENT_RUN_INPUT', 400);
-  return value;
+  return value.toLowerCase();
 }
 
 function requirePage(value: unknown): number {
@@ -405,12 +406,28 @@ export class AgentRunService {
     } catch (error) {
       acceptingProviderEvents = false;
       const completedAt = this.now();
+      let persistedCancellation = false;
+      if (error instanceof AgentRunError && error.code === 'AGENT_RUN_CONFLICT'
+        && !active.cancelRequested && !active.timedOut && !active.outputLimit) {
+        let latest: AgentRunRecord | null;
+        try { latest = await this.repository.findByOwnerAgentAndId(prepared.ownerId, agentId, runId); }
+        catch { throw new AgentRunError('Agent run storage is unavailable.', 'AGENT_RUN_STORAGE_UNAVAILABLE', 503); }
+        if (latest && TERMINAL.has(latest.status)) {
+          const result = serializeRun(latest, true);
+          onEvent({ type: 'completed', run: result });
+          return result;
+        }
+        if (latest?.status === 'cancel-requested') persistedCancellation = true;
+        else throw error;
+      }
       const classification = active.outputLimit
         ? { status: 'output_limit' as const, code: 'AGENT_OUTPUT_LIMIT', message: 'Agent output exceeded the 256 KiB limit.' }
         : active.timedOut
           ? { status: 'timed_out' as const, code: 'AGENT_TIMEOUT', message: 'The agent run timed out.' }
-          : active.cancelRequested
+          : active.cancelRequested || persistedCancellation
             ? { status: 'cancelled' as const, code: undefined, message: undefined }
+            : error instanceof AiProviderError && error.code === 'REQUEST_TIMEOUT'
+              ? { status: 'timed_out' as const, code: 'AGENT_TIMEOUT', message: 'The agent run timed out.' }
             : error instanceof AiProviderError && error.code === 'PROVIDER_UNAVAILABLE'
               ? { status: 'failed' as const, code: 'AGENT_PROVIDER_UNAVAILABLE', message: 'The configured AI provider is unavailable.' }
               : { status: 'failed' as const, code: 'AGENT_EXECUTION_FAILED', message: 'The agent run failed.' };
@@ -549,4 +566,9 @@ export class AgentRunService {
   }
 }
 
-export const agentRunService = new AgentRunService();
+export const agentRunService = new AgentRunService(
+  mongooseAgentRunRepository,
+  agentService,
+  getAiProvider,
+  getEnvironment().aiTimeoutMs
+);

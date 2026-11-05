@@ -97,6 +97,8 @@ describe('agent run routes', () => {
     const response = await invokeSse(createAgentRouter(agents, runs));
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('text/event-stream');
+    expect(response.headers.get('x-accel-buffering')).toBe('no');
+    expect(response.headers.get('x-content-type-options')).toBe('nosniff');
     expect(response.body).toContain(`event: run\ndata: {"run"`);
     expect(response.body).toContain(`event: delta\ndata: {"runId":"${runId}","content":"ok"}`);
     expect(response.body).toContain('event: completed');

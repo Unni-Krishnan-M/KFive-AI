@@ -101,7 +101,7 @@ const OBJECT_ID = /^[a-f\d]{24}$/i;
 
 function requireObjectId(value: unknown, label: string): string {
   if (typeof value !== 'string' || !OBJECT_ID.test(value)) throw new WorkflowError(`${label} is invalid.`, 'INVALID_WORKFLOW_ID', 400);
-  return value;
+  return value.toLowerCase();
 }
 
 function plainObject(value: unknown, label: string): Record<string, unknown> {

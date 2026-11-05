@@ -1,6 +1,6 @@
 import { ConnectionOptions, Queue, QueueEvents, Worker } from 'bullmq';
 import { logger } from '@/utils/logger';
-import { getEnvironment } from './environment';
+import { getQueueRedisUrl } from './redis';
 import { attachCodeRunQueueEvents, CodeRunReconciler } from '@/services/codeRunReconciler';
 
 let aiProcessingQueue: Queue;
@@ -14,7 +14,7 @@ const workers: Worker[] = [];
 const CODE_RUN_RECONCILIATION_INTERVAL_MS = 10_000;
 
 export function getQueueConnection(): ConnectionOptions {
-  const parsed = new URL(process.env.QUEUE_REDIS_URL || getEnvironment().redisUrl);
+  const parsed = new URL(getQueueRedisUrl());
   return {
     host: parsed.hostname,
     port: parsed.port ? Number(parsed.port) : 6379,

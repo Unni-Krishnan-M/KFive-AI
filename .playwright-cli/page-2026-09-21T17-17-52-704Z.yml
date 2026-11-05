@@ -1,0 +1,93 @@
+- generic [ref=e312]:
+  - complementary [ref=e313]:
+    - generic [ref=e314]:
+      - generic [ref=e315]: KFive AI
+      - button "Collapse sidebar" [ref=e321] [cursor=pointer]
+    - generic [ref=e325]:
+      - generic [ref=e326] [cursor=pointer]:
+        - generic [ref=e327]: Search
+        - generic [ref=e332]:
+          - generic [ref=e333]: ⌘
+          - generic [ref=e334]: K
+      - navigation [ref=e335]:
+        - link "Dashboard" [ref=e336] [cursor=pointer]:
+          - /url: /app/dashboard
+        - link "AI Chat" [ref=e344] [cursor=pointer]:
+          - /url: /app/chat
+        - link "Code Lab" [ref=e349] [cursor=pointer]:
+          - /url: /app/code
+        - link "Agents" [ref=e356] [cursor=pointer]:
+          - /url: /app/agents
+        - link "Documents" [ref=e362] [cursor=pointer]:
+          - /url: /app/documents
+        - link "Knowledge / RAG" [ref=e368] [cursor=pointer]:
+          - /url: /app/knowledge
+        - link "Repository Analyzer" [ref=e374] [cursor=pointer]:
+          - /url: /app/repositories
+        - link "Workflows" [ref=e381] [cursor=pointer]:
+          - /url: /app/workflows
+        - link "Dataset Lab" [ref=e390] [cursor=pointer]:
+          - /url: /app/datasets
+        - link "Model Benchmarks" [ref=e397] [cursor=pointer]:
+          - /url: /app/benchmarks
+        - link "Notebooks" [ref=e403] [cursor=pointer]:
+          - /url: /app/notebooks
+        - link "Voice Assistant" [ref=e409] [cursor=pointer]:
+          - /url: /app/voice
+        - link "Models" [ref=e415] [cursor=pointer]:
+          - /url: /app/models
+        - link "Projects" [ref=e428] [cursor=pointer]:
+          - /url: /app/projects
+        - link "Workspace" [ref=e433] [cursor=pointer]:
+          - /url: /app/workspace
+        - link "PDF Utilities" [ref=e439] [cursor=pointer]:
+          - /url: /app/files
+    - generic [ref=e444]:
+      - generic [ref=e445]:
+        - generic [ref=e446]: W
+        - generic [ref=e448]:
+          - paragraph [ref=e449]: Workflow Browser
+          - paragraph [ref=e450]: workflowbr_921261@example.test
+      - generic [ref=e451]:
+        - link "Profile" [ref=e452] [cursor=pointer]:
+          - /url: /app/profile
+        - link "Settings" [ref=e456] [cursor=pointer]:
+          - /url: /app/settings
+        - button "Toggle theme" [ref=e460] [cursor=pointer]
+        - button "Sign out" [ref=e467] [cursor=pointer]
+  - main [ref=e471]:
+    - generic [ref=e473]:
+      - generic [ref=e474]:
+        - generic [ref=e475]:
+          - generic [ref=e476]:
+            - heading "Workflows" [level=1] [ref=e477]
+            - generic [ref=e482]: Experimental
+          - paragraph [ref=e483]: Build and execute the supported fixed linear workflow with durable history.
+        - generic [ref=e484]:
+          - button "Refresh workflows" [ref=e485] [cursor=pointer]
+          - button "New workflow" [disabled] [ref=e491]
+      - alert [ref=e493]: Workflow prompt templates, system prompts, immutable definition snapshots, run inputs, generated output, provider metadata, and timelines are persisted. Do not include passwords, tokens, or other secrets.
+      - alert [ref=e498]: The ollama request timed out.
+      - generic [ref=e499]:
+        - complementary [ref=e500]:
+          - generic [ref=e501]:
+            - heading "Saved workflows" [level=2] [ref=e502]
+            - generic [ref=e503]: "0"
+          - paragraph [ref=e505]: No saved workflows in this scope.
+        - main [ref=e506]:
+          - paragraph [ref=e514]: Select or create a workflow.
+          - generic [ref=e515]:
+            - heading "Planned nodes" [level=2] [ref=e516]
+            - paragraph [ref=e517]: These Phase 10 node types are unavailable in this bounded slice. They cannot be added or executed.
+            - generic [ref=e518]:
+              - button "Smart Model RouterPlanned" [disabled] [ref=e519]
+              - button "RAGPlanned" [disabled] [ref=e520]
+              - button "DocumentPlanned" [disabled] [ref=e521]
+              - button "PDF ExtractPlanned" [disabled] [ref=e522]
+              - button "OCRPlanned" [disabled] [ref=e523]
+              - button "Structured ExtractPlanned" [disabled] [ref=e524]
+              - button "Code RunnerPlanned" [disabled] [ref=e525]
+              - button "AgentPlanned" [disabled] [ref=e526]
+              - button "ConditionPlanned" [disabled] [ref=e527]
+              - button "TransformPlanned" [disabled] [ref=e528]
+              - button "DatasetPlanned" [disabled] [ref=e529]

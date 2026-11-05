@@ -1,5 +1,5 @@
 import { Express } from 'express';
-import authRoutes from './auth';
+import { createAuthRouter } from './auth';
 import chatRoutes from './chat';
 import userRoutes from './user';
 import ollamaRoutes from './ollama';
@@ -44,7 +44,7 @@ export function setupRoutes(app: Express, config: EnvironmentConfig): void {
 
   // API Routes
   // Public API Routes
-  app.use(`${basePath}/auth`, authLimiter, authRoutes);
+  app.use(`${basePath}/auth`, authLimiter, createAuthRouter(config));
 
   // Protected API Routes
   app.use(`${basePath}/chat`, authenticateToken, chatRoutes);

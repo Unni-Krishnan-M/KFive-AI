@@ -15,6 +15,7 @@ const baseConfig: EnvironmentConfig = {
   aiDefaultModel: 'phi3',
   aiMaxOutputTokens: 2048,
   aiTimeoutMs: 30000,
+  trustedProxyHops: 1,
   openAiCompatibleSupportsEmbeddings: false,
   openAiCompatibleSupportsStructuredOutput: false,
   customLlmSupportsEmbeddings: false,
@@ -26,6 +27,8 @@ const baseConfig: EnvironmentConfig = {
   corsOrigins: ['http://localhost:3000'],
   jwtSecret: '01234567890123456789012345678901',
   jwtRefreshSecret: 'abcdefghijklmnopqrstuvwxyz123456',
+  jwtExpiresIn: '15m',
+  jwtRefreshExpiresIn: '7d',
   codeRunnerMode: 'disabled',
   notebookExecutionEnabled: false,
 };

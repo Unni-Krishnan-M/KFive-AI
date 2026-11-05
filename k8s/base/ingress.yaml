@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kfive
+  namespace: kfive
+  annotations:
+    # The loopback-only Traefik profile does not publish an external load-balancer
+    # address, so Kubernetes Ingress status intentionally remains empty.
+    argocd.argoproj.io/ignore-healthcheck: "true"
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+  labels: {app.kubernetes.io/name: kfive, app.kubernetes.io/component: ingress, app.kubernetes.io/part-of: kfive}
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: kfive.local
+      http:
+        paths:
+          - path: /socket.io
+            pathType: Prefix
+            backend: {service: {name: backend, port: {number: 5000}}}
+          - path: /api
+            pathType: Prefix
+            backend: {service: {name: backend, port: {number: 5000}}}
+          - path: /
+            pathType: Prefix
+            backend: {service: {name: frontend, port: {number: 8080}}}

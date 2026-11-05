@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: alertmanager-data
+  namespace: kfive-observability
+  labels: {app.kubernetes.io/name: alertmanager, app.kubernetes.io/part-of: kfive}
+  annotations: {argocd.argoproj.io/sync-options: "Prune=confirm,Delete=false"}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: {requests: {storage: 512Mi}}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-data
+  namespace: kfive-observability
+  labels: {app.kubernetes.io/name: prometheus, app.kubernetes.io/part-of: kfive}
+  annotations: {argocd.argoproj.io/sync-options: "Prune=confirm,Delete=false"}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: {requests: {storage: 2Gi}}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-data
+  namespace: kfive-observability
+  labels: {app.kubernetes.io/name: grafana, app.kubernetes.io/part-of: kfive}
+  annotations: {argocd.argoproj.io/sync-options: "Prune=confirm,Delete=false"}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: {requests: {storage: 512Mi}}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: loki-data
+  namespace: kfive-observability
+  labels: {app.kubernetes.io/name: loki, app.kubernetes.io/part-of: kfive}
+  annotations: {argocd.argoproj.io/sync-options: "Prune=confirm,Delete=false"}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: {requests: {storage: 2Gi}}

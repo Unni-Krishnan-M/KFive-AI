@@ -4,7 +4,7 @@ const http = require('node:http');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
-const { createBridge, listenSocket, upstreamAddress } = require('./server.cjs');
+const { createBridge, listenSocket, listenTcp, tcpListenAddress, upstreamAddress } = require('./server.cjs');
 
 async function fixture(t, handler, options = {}) {
   const upstream = http.createServer(handler);
@@ -35,6 +35,21 @@ test('only literal loopback HTTP origins are accepted', () => {
   for (const value of ['http://example.com', 'http://localhost', 'http://127.0.0.1/api', 'http://user:pass@127.0.0.1', 'https://127.0.0.1', 'http://127.0.0.1?target=evil', 'http://127.0.0.1#x']) assert.throws(() => upstreamAddress(value));
   assert.equal(upstreamAddress('http://127.0.0.1:11434').port, '11434');
   assert.equal(upstreamAddress('http://[::1]:11434').hostname, '[::1]');
+});
+
+test('TCP listener accepts only literal loopback or RFC1918 addresses', async t => {
+  for (const value of ['0.0.0.0', '::', 'example.com', '8.8.8.8', '169.254.1.1', '172.15.0.1', '172.32.0.1']) {
+    assert.throws(() => tcpListenAddress(value));
+  }
+  for (const value of ['127.0.0.1', '10.1.2.3', '172.20.0.1', '192.168.50.1']) {
+    assert.equal(tcpListenAddress(value), value);
+  }
+
+  const server = http.createServer((_req, res) => res.end('ok'));
+  const address = await listenTcp(server, '127.0.0.1', 0);
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  assert.equal(address.address, '127.0.0.1');
+  assert.ok(address.port > 0);
 });
 
 test('proxies JSON/streaming through a restricted Unix socket without credentials', async t => {

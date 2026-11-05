@@ -7,19 +7,21 @@ cd "$repo_dir"
 with_code_lab=0
 with_notebook=0
 with_host_ollama=0
+with_documents=0
 build_args=(--build)
 while (( $# > 0 )); do
   case "$1" in
     --with-code-lab) with_code_lab=1 ;;
     --with-notebook) with_notebook=1 ;;
     --with-host-ollama) with_host_ollama=1 ;;
+    --with-documents) with_documents=1 ;;
     --no-build) build_args=(--no-build) ;;
     --help|-h)
-      echo "Usage: $0 [--with-code-lab] [--with-notebook] [--with-host-ollama] [--no-build]"
+      echo "Usage: $0 [--with-code-lab] [--with-notebook] [--with-host-ollama] [--with-documents] [--no-build]"
       exit 0
       ;;
     *)
-      echo "Usage: $0 [--with-code-lab] [--with-notebook] [--with-host-ollama] [--no-build]" >&2
+      echo "Usage: $0 [--with-code-lab] [--with-notebook] [--with-host-ollama] [--with-documents] [--no-build]" >&2
       exit 2
       ;;
   esac
@@ -33,7 +35,9 @@ fi
 
 run_compose() {
   local args=() code_mode=disabled notebook_enabled=false
-  if (( with_host_ollama )); then args+=(-f docker-compose.yml -f docker-compose.ollama-host.yml); fi
+  if (( with_host_ollama || with_documents )); then args+=(-f docker-compose.yml); fi
+  if (( with_host_ollama )); then args+=(-f docker-compose.ollama-host.yml); fi
+  if (( with_documents )); then args+=(-f docker-compose.documents.yml); fi
   if (( with_code_lab )); then args+=(--profile code-lab); code_mode=container; fi
   if (( with_notebook )); then args+=(--profile notebook); notebook_enabled=true; fi
   env COMPOSE_PROFILES= CODE_RUNNER_MODE=$code_mode NOTEBOOK_EXECUTION_ENABLED=$notebook_enabled \

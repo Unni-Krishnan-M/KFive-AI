@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik
+  namespace: kfive
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: kfive
+spec:
+  type: NodePort
+  selector: {app.kubernetes.io/name: traefik}
+  ports:
+    - {name: web, port: 80, targetPort: web, nodePort: 30080}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traefik
+  namespace: kfive
+  labels: &labels
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: kfive
+spec:
+  replicas: 1
+  selector: {matchLabels: {app.kubernetes.io/name: traefik}}
+  template:
+    metadata: {labels: *labels}
+    spec:
+      serviceAccountName: traefik
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: traefik
+          image: traefik:v3.2.5
+          imagePullPolicy: IfNotPresent
+          args:
+            - --entrypoints.web.address=:8000
+            - --entrypoints.health.address=:9000
+            - --providers.file.directory=/etc/traefik/dynamic
+            - --providers.file.watch=true
+            - --api.dashboard=false
+            - --ping=true
+            - --ping.entrypoint=health
+            - --accesslog=true
+            - --accesslog.format=json
+            - --accesslog.fields.names.RequestPath=drop
+          ports:
+            - {name: web, containerPort: 8000}
+            - {name: health, containerPort: 9000}
+          readinessProbe: &traefikProbe
+            httpGet: {path: /ping, port: health}
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 12
+          livenessProbe:
+            <<: *traefikProbe
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 25m, memory: 32Mi}
+            limits: {cpu: 250m, memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+            - {name: dynamic, mountPath: /etc/traefik/dynamic, readOnly: true}
+      volumes:
+        - {name: tmp, emptyDir: {sizeLimit: 16Mi}}
+        - name: dynamic
+          projected:
+            sources:
+              - configMap:
+                  name: traefik-dynamic
+                  items: [{key: core.yaml, path: core.yaml}]
+              - configMap:
+                  name: traefik-observability-dynamic
+                  optional: true
+                  items: [{key: observability.yaml, path: observability.yaml}]

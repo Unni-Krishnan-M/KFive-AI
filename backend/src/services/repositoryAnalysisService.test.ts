@@ -3,11 +3,14 @@ import {
   RepositoryAnalysisRecord,
   RepositoryAnalysisRepository,
   RepositoryAnalysisService,
+  productionRepositoryZipAnalyzer,
 } from './repositoryAnalysisService';
+import { analyzeRepositoryZipIsolated } from './repositoryArchiveIsolation';
 import { RepositoryArchiveReport } from './repositoryArchiveAnalyzer';
 import { ProjectError } from './projectService';
 import { RepositoryAnalysisModel } from '../models/RepositoryAnalysis';
 import { ProjectMutationLease } from './projectMutationLease';
+import { RepositoryImporterUnavailableError } from './repositoryImporterClient';
 
 const ownerId = '64b000000000000000000001';
 const otherOwnerId = '64b000000000000000000002';
@@ -42,6 +45,9 @@ function fakeProjects(status: 'active' | 'archived' = 'active') {
 const upload = { buffer: Buffer.from('zip'), originalname: 'repo.zip', mimetype: 'application/zip', size: 3 };
 
 describe('RepositoryAnalysisService', () => {
+  it('uses the isolated parser adapter for the production default', () => {
+    expect(productionRepositoryZipAnalyzer).toBe(analyzeRepositoryZipIsolated);
+  });
   it('creates an active-project report and explicitly removes owner/internal fields', async () => {
     const repository = fakeRepository();
     const projects = fakeProjects();
@@ -94,6 +100,17 @@ describe('RepositoryAnalysisService', () => {
       code: 'INVALID_REPOSITORY_INPUT', statusCode: 400,
     });
     expect(repository.list).not.toHaveBeenCalled();
+  });
+
+  it('rejects a page beyond the last retained page without returning contradictory metadata', async () => {
+    const repository = fakeRepository({
+      list: jest.fn().mockResolvedValue({ records: [], total: 1 }),
+    } as any);
+    const service = new RepositoryAnalysisService(repository, fakeProjects() as any, jest.fn(), () => true);
+
+    await expect((service.list as any)(ownerId, undefined, undefined, '2')).rejects.toMatchObject({
+      code: 'INVALID_REPOSITORY_INPUT', statusCode: 400,
+    });
   });
 
   it('uses an unscoped-only workspace storage filter and an exact project storage filter', async () => {
@@ -223,6 +240,24 @@ describe('RepositoryAnalysisService', () => {
       scope: { type: 'project', projectId, projectStatus: 'archived' },
       dependencies: [{ id: 'mongodb', status: 'unavailable', message: 'MongoDB is unavailable.' }],
     });
+  });
+
+  it('reports importer availability independently and fails uploads closed with a safe 503', async () => {
+    const analyzer = jest.fn().mockRejectedValue(new RepositoryImporterUnavailableError()) as any;
+    analyzer.isAvailable = jest.fn().mockResolvedValue(false);
+    const repository = fakeRepository();
+    const service = new RepositoryAnalysisService(repository, fakeProjects() as any, analyzer, () => true);
+    await expect(service.status(ownerId)).resolves.toMatchObject({
+      available: true, canAnalyze: false,
+      dependencies: [
+        { id: 'mongodb', status: 'available' },
+        { id: 'repository-importer', status: 'unavailable', message: 'Repository importer is unavailable.' },
+      ],
+    });
+    await expect(service.create(ownerId, {}, upload)).rejects.toMatchObject({
+      code: 'REPOSITORY_ANALYZER_UNAVAILABLE', statusCode: 503, message: 'Repository importer is unavailable.',
+    });
+    expect(repository.create).not.toHaveBeenCalled();
   });
 
   it('enforces the per-owner retention cap before analysis', async () => {

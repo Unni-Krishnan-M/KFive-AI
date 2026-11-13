@@ -78,6 +78,39 @@ services:
     security_opt: [no-new-privileges:true]
     logging: *bounded-logging
 
+  repository-importer:
+    image: ${KFIVE_BACKEND_IMAGE:?Set an immutable KFIVE_BACKEND_IMAGE}
+    user: "10001:10002"
+    command: ["node", "--max-old-space-size=128", "backend/dist/repositoryImporterServerMain.js"]
+    environment:
+      NODE_ENV: production
+      REPOSITORY_IMPORTER_SOCKET_PATH: /run/kfive-repository-importer/importer.sock
+    volumes:
+      - repository-importer-socket:/run/kfive-repository-importer
+    network_mode: none
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m
+    healthcheck:
+      test: ["CMD", "node", "backend/dist/repositoryImporterHealthMain.js"]
+      interval: 10s
+      timeout: 2s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+    stop_grace_period: 5s
+    init: true
+    pids_limit: 48
+    cap_drop: [ALL]
+    ulimits:
+      core: 0
+    deploy:
+      resources:
+        limits: {cpus: "1.0", memory: 512M, pids: 48}
+        reservations: {cpus: "0.1", memory: 128M}
+    security_opt: [no-new-privileges:true]
+    logging: *bounded-logging
+
   backend:
     image: ${KFIVE_BACKEND_IMAGE:?Set an immutable KFIVE_BACKEND_IMAGE}
     environment:
@@ -114,15 +147,20 @@ services:
       TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:?Set TRUST_PROXY_HOPS to 2}
       CODE_RUNNER_MODE: disabled
       NOTEBOOK_EXECUTION_ENABLED: "false"
+      REPOSITORY_IMPORTER_MODE: socket
+      REPOSITORY_IMPORTER_SOCKET_PATH: /run/kfive-repository-importer/importer.sock
       LOG_FILE: /app/logs/app.log
       QUEUE_CONCURRENCY: ${QUEUE_CONCURRENCY:-2}
     depends_on:
       mongodb: {condition: service_healthy}
       redis: {condition: service_healthy}
       chromadb: {condition: service_healthy}
+      repository-importer: {condition: service_started}
     volumes:
       - backend-uploads:/app/uploads
       - backend-logs:/app/logs
+      - repository-importer-socket:/run/kfive-repository-importer:ro
+    group_add: ["10002"]
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=64m
     read_only: true
@@ -229,6 +267,10 @@ volumes:
     name: ${KFIVE_VOLUME_PREFIX:-kfive-production}_backend_uploads
   backend-logs:
     name: ${KFIVE_VOLUME_PREFIX:-kfive-production}_backend_logs
+  repository-importer-socket:
+    name: ${KFIVE_PRODUCTION_PROJECT:-kfive-production}_repository_importer_socket
+    labels:
+      com.kfive.ephemeral: "true"
 
 networks:
   edge:

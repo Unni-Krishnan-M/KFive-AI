@@ -94,9 +94,9 @@ function cryptoSafeName(value) {
 
 test('production compose publishes only a loopback frontend and isolates persistent data', () => {
   const model = yaml.load(readFileSync('docker-compose.production.yml', 'utf8'));
-  assert.deepEqual(Object.keys(model.services).sort(), ['backend', 'benchmark-worker', 'chromadb', 'frontend', 'mongodb', 'redis']);
+  assert.deepEqual(Object.keys(model.services).sort(), ['backend', 'benchmark-worker', 'chromadb', 'frontend', 'mongodb', 'redis', 'repository-importer']);
   assert.deepEqual(model.services.frontend.ports, ['${KFIVE_EDGE_BIND_ADDRESS:-127.0.0.1}:${KFIVE_EDGE_HTTP_PORT:-8080}:8080']);
-  for (const service of ['backend', 'benchmark-worker', 'mongodb', 'redis', 'chromadb']) {
+  for (const service of ['backend', 'benchmark-worker', 'mongodb', 'redis', 'chromadb', 'repository-importer']) {
     assert.equal(model.services[service].ports, undefined, `${service} must not publish a host port`);
   }
   assert.equal(model.networks['data-internal'].internal, true);
@@ -113,7 +113,7 @@ test('production compose publishes only a loopback frontend and isolates persist
   assert.deepEqual(model.services.chromadb.networks, ['data-internal']);
   assert.deepEqual(model.services.backend.networks.slice().sort(), ['app-internal', 'data-internal', 'provider-egress']);
   assert.deepEqual(model.services['benchmark-worker'].networks.slice().sort(), ['data-internal', 'provider-egress']);
-  assert.equal(Object.values(model.services).filter((service) => service.networks.includes('edge')).length, 1);
+  assert.equal(Object.values(model.services).filter((service) => service.networks?.includes('edge')).length, 1);
   for (const service of Object.values(model.services)) {
     assert.equal(service.restart, 'unless-stopped');
     assert.ok(service.deploy?.resources?.limits?.memory, 'every production service needs a memory limit');
@@ -121,8 +121,51 @@ test('production compose publishes only a loopback frontend and isolates persist
     assert.deepEqual(service.security_opt, ['no-new-privileges:true']);
     assert.deepEqual(service.logging, {'driver': 'local', 'options': {'max-size': '10m', 'max-file': '5'}});
   }
-  assert.deepEqual(Object.keys(model.volumes).sort(), ['backend-logs', 'backend-uploads', 'chromadb-data', 'mongodb-data', 'redis-data']);
-  for (const volume of Object.values(model.volumes)) assert.match(volume.name, /^\$\{KFIVE_VOLUME_PREFIX/);
+  assert.deepEqual(Object.keys(model.volumes).sort(), ['backend-logs', 'backend-uploads', 'chromadb-data', 'mongodb-data', 'redis-data', 'repository-importer-socket']);
+  for (const name of ['backend-logs', 'backend-uploads', 'chromadb-data', 'mongodb-data', 'redis-data']) {
+    assert.match(model.volumes[name].name, /^\$\{KFIVE_VOLUME_PREFIX/);
+  }
+  assert.equal(model.volumes['repository-importer-socket'].name, '${KFIVE_PRODUCTION_PROJECT:-kfive-production}_repository_importer_socket');
+  assert.deepEqual(model.volumes['repository-importer-socket'].labels, {'com.kfive.ephemeral': 'true'});
+
+  const importer = model.services['repository-importer'];
+  assert.equal(importer.image, model.services.backend.image);
+  assert.equal(importer.user, '10001:10002');
+  assert.deepEqual(importer.command, ['node', '--max-old-space-size=128', 'backend/dist/repositoryImporterServerMain.js']);
+  assert.deepEqual(importer.environment, {
+    NODE_ENV: 'production',
+    REPOSITORY_IMPORTER_SOCKET_PATH: '/run/kfive-repository-importer/importer.sock',
+  });
+  assert.deepEqual(importer.volumes, ['repository-importer-socket:/run/kfive-repository-importer']);
+  assert.equal(importer.network_mode, 'none');
+  assert.equal(importer.networks, undefined);
+  assert.equal(importer.read_only, true);
+  assert.deepEqual(importer.tmpfs, ['/tmp:rw,noexec,nosuid,nodev,size=32m']);
+  assert.equal(importer.init, true);
+  assert.equal(importer.pids_limit, 48);
+  assert.equal(importer.deploy.resources.limits.cpus, '1.0');
+  assert.equal(importer.deploy.resources.limits.memory, '512M');
+  assert.deepEqual(importer.cap_drop, ['ALL']);
+  assert.deepEqual(importer.ulimits, {core: 0});
+  assert.equal(importer.stop_grace_period, '5s');
+  assert.deepEqual(importer.healthcheck.test, ['CMD', 'node', 'backend/dist/repositoryImporterHealthMain.js']);
+  for (const forbidden of ['ports', 'secrets', 'configs', 'extra_hosts', 'depends_on']) {
+    assert.equal(importer[forbidden], undefined, `repository importer must not declare ${forbidden}`);
+  }
+
+  const backend = model.services.backend;
+  assert.equal(backend.environment.REPOSITORY_IMPORTER_MODE, 'socket');
+  assert.equal(backend.environment.REPOSITORY_IMPORTER_SOCKET_PATH, '/run/kfive-repository-importer/importer.sock');
+  assert.deepEqual(backend.depends_on['repository-importer'], {condition: 'service_started'});
+  assert.ok(backend.volumes.includes('repository-importer-socket:/run/kfive-repository-importer:ro'));
+  assert.deepEqual(backend.group_add, ['10002']);
+
+  const backupSources = [
+    readFileSync('scripts/production-backup.cjs', 'utf8'),
+    readFileSync('scripts/production-backup-lib.cjs', 'utf8'),
+    readFileSync('scripts/production-restore.cjs', 'utf8'),
+  ].join('\n');
+  assert.doesNotMatch(backupSources, /repository[-_]importer/i, 'ephemeral importer socket must stay outside backup and restore sets');
   const mongoInitializer = readFileSync('deploy/mongodb/init-app-user.js', 'utf8');
   assert.match(mongoInitializer, /createUser/);
   assert.match(mongoInitializer, /role: 'readWrite'/);

@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import Joi from 'joi';
+import { REPOSITORY_IMPORTER_SOCKET_PATH } from '@/services/repositoryArchiveIsolationProtocol';
 
 dotenv.config();
 
@@ -45,6 +46,8 @@ export interface EnvironmentConfig {
   notebookVerifierImage?: string;
   documentProcessorUrl?: string;
   ocrServiceUrl?: string;
+  repositoryImporterMode: 'process' | 'socket';
+  repositoryImporterSocketPath?: string;
 }
 
 function boundedDuration(name: string, minSeconds: number, maxSeconds: number) {
@@ -115,6 +118,11 @@ const schema = Joi.object({
   NOTEBOOK_VERIFIER_IMAGE: Joi.string().trim().max(500).allow(''),
   DOCUMENT_PROCESSOR_URL: Joi.string().uri({ scheme: ['http', 'https'] }).allow(''),
   OCR_SERVICE_URL: Joi.string().uri({ scheme: ['http', 'https'] }).allow(''),
+  REPOSITORY_IMPORTER_MODE: Joi.string().valid('process', 'socket').default('process'),
+  REPOSITORY_IMPORTER_SOCKET_PATH: Joi.when('REPOSITORY_IMPORTER_MODE', {
+    is: 'socket', then: Joi.string().valid(REPOSITORY_IMPORTER_SOCKET_PATH).required(),
+    otherwise: Joi.string().valid('').default(''),
+  }),
 }).unknown(true).custom((value, helpers) => {
   if (!value.MONGODB_URL && !value.MONGODB_URI) {
     return helpers.error('any.custom', { message: 'MONGODB_URL is required' });
@@ -254,6 +262,8 @@ export function parseEnvironment(source: NodeJS.ProcessEnv): EnvironmentConfig {
     notebookVerifierImage: cleanOptional(value.NOTEBOOK_VERIFIER_IMAGE),
     documentProcessorUrl: cleanOptional(value.DOCUMENT_PROCESSOR_URL),
     ocrServiceUrl: cleanOptional(value.OCR_SERVICE_URL),
+    repositoryImporterMode: value.REPOSITORY_IMPORTER_MODE,
+    repositoryImporterSocketPath: cleanOptional(value.REPOSITORY_IMPORTER_SOCKET_PATH),
   };
 }
 

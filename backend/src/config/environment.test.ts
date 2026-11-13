@@ -12,6 +12,21 @@ const baseEnvironment = {
 };
 
 describe('parseEnvironment', () => {
+  it('requires the fixed importer socket only in explicit socket mode', () => {
+    expect(parseEnvironment(baseEnvironment)).toMatchObject({ repositoryImporterMode: 'process' });
+    expect(parseEnvironment({ ...baseEnvironment, REPOSITORY_IMPORTER_MODE: 'socket',
+      REPOSITORY_IMPORTER_SOCKET_PATH: '/run/kfive-repository-importer/importer.sock' }))
+      .toMatchObject({ repositoryImporterMode: 'socket',
+        repositoryImporterSocketPath: '/run/kfive-repository-importer/importer.sock' });
+    expect(() => parseEnvironment({ ...baseEnvironment, REPOSITORY_IMPORTER_MODE: 'socket' }))
+      .toThrow(/REPOSITORY_IMPORTER_SOCKET_PATH/);
+    expect(() => parseEnvironment({ ...baseEnvironment, REPOSITORY_IMPORTER_MODE: 'socket',
+      REPOSITORY_IMPORTER_SOCKET_PATH: '/tmp/other.sock' })).toThrow(/REPOSITORY_IMPORTER_SOCKET_PATH/);
+    expect(() => parseEnvironment({ ...baseEnvironment,
+      REPOSITORY_IMPORTER_SOCKET_PATH: '/run/kfive-repository-importer/importer.sock' }))
+      .toThrow(/REPOSITORY_IMPORTER_SOCKET_PATH/);
+  });
+
   it('accepts an optional absolute Ollama Unix socket path', () => {
     expect(parseEnvironment({ ...baseEnvironment, OLLAMA_SOCKET_PATH: '/run/kfive/ollama.sock' }))
       .toMatchObject({ ollamaSocketPath: '/run/kfive/ollama.sock' });

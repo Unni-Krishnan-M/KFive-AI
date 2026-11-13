@@ -50,6 +50,39 @@ services:
     networks: [kfive-network]
     security_opt: [no-new-privileges:true]
 
+  repository-importer:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: repository-importer
+    user: "10001:10002"
+    command: ["node", "--max-old-space-size=128", "backend/dist/repositoryImporterServerMain.js"]
+    environment:
+      NODE_ENV: production
+      REPOSITORY_IMPORTER_SOCKET_PATH: /run/kfive-repository-importer/importer.sock
+    volumes:
+      - repository_importer_socket:/run/kfive-repository-importer
+    network_mode: none
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m
+    cpus: 1.0
+    mem_limit: 512m
+    pids_limit: 48
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    ulimits:
+      core: 0
+    healthcheck:
+      test: ["CMD", "node", "backend/dist/repositoryImporterHealthMain.js"]
+      interval: 10s
+      timeout: 2s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    stop_grace_period: 5s
+    init: true
+
   backend:
     build:
       context: .
@@ -92,6 +125,8 @@ services:
       NOTEBOOK_VERIFIER_IMAGE: ${NOTEBOOK_VERIFIER_IMAGE:-}
       DOCUMENT_PROCESSOR_URL: ${DOCUMENT_PROCESSOR_URL:-}
       OCR_SERVICE_URL: ${OCR_SERVICE_URL:-}
+      REPOSITORY_IMPORTER_MODE: socket
+      REPOSITORY_IMPORTER_SOCKET_PATH: /run/kfive-repository-importer/importer.sock
       LOG_FILE: /app/logs/app.log
       QUEUE_CONCURRENCY: ${QUEUE_CONCURRENCY:-2}
     extra_hosts:
@@ -100,9 +135,12 @@ services:
       mongodb: { condition: service_healthy }
       redis: { condition: service_healthy }
       chromadb: { condition: service_healthy }
+      repository-importer: { condition: service_started }
     volumes:
       - backend_uploads:/app/uploads
       - backend_logs:/app/logs
+      - repository_importer_socket:/run/kfive-repository-importer:ro
+    group_add: ["10002"]
     ports:
       - ${BACKEND_BIND_ADDRESS:-127.0.0.1}:5000:5000
     healthcheck:
@@ -248,6 +286,7 @@ volumes:
   chromadb_data:
   backend_uploads:
   backend_logs:
+  repository_importer_socket:
 
 networks:
   kfive-network:

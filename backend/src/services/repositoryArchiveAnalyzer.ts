@@ -129,11 +129,21 @@ function safeZipReadError(error: unknown): RepositoryArchiveError {
   return new RepositoryArchiveError('The uploaded ZIP could not be safely read.', 'INVALID_REPOSITORY_ARCHIVE', 400);
 }
 
-function hasEncryptedCentralEntry(buffer: Buffer): boolean {
+function inspectAndSanitizeZipEnd(buffer: Buffer): { buffer: Buffer; encrypted: boolean } {
   const minimumEocd = 22;
   const searchStart = Math.max(0, buffer.length - 65_557);
-  for (let eocd = buffer.length - minimumEocd; eocd >= searchStart; eocd -= 1) {
-    if (buffer.readUInt32LE(eocd) !== 0x06054b50) continue;
+  const signature = Buffer.from([0x50, 0x4b, 0x05, 0x06]);
+  const maximumCandidates = 8;
+  const maximumHeaderVisits = REPOSITORY_LIMITS.entries + 1;
+  let candidateCount = 0;
+  let headerVisits = 0;
+  let oversizedCandidates = 0;
+  let selected: { eocd: number; commentLength: number; encrypted: boolean } | undefined;
+  let searchEnd = buffer.length - minimumEocd;
+  while (searchEnd >= searchStart) {
+    const eocd = buffer.lastIndexOf(signature, searchEnd);
+    if (eocd < searchStart) break;
+    searchEnd = eocd - 1;
     const commentLength = buffer.readUInt16LE(eocd + 20);
     const countOnDisk = buffer.readUInt16LE(eocd + 8);
     const count = buffer.readUInt16LE(eocd + 10);
@@ -141,39 +151,47 @@ function hasEncryptedCentralEntry(buffer: Buffer): boolean {
     const centralOffset = buffer.readUInt32LE(eocd + 16);
     if (eocd + minimumEocd + commentLength !== buffer.length || buffer.readUInt16LE(eocd + 4) !== 0
       || buffer.readUInt16LE(eocd + 6) !== 0 || countOnDisk !== count
-      || centralOffset > eocd || centralSize > eocd - centralOffset || centralOffset + centralSize !== eocd) continue;
+      || centralOffset > eocd || centralSize > eocd - centralOffset || centralOffset + centralSize !== eocd
+      || count === 0xffff || centralSize === 0xffffffff || centralOffset === 0xffffffff
+      || count * 46 > centralSize) continue;
+    candidateCount += 1;
+    if (candidateCount > maximumCandidates) {
+      throw new RepositoryArchiveError('The uploaded file has ambiguous ZIP end records.', 'INVALID_REPOSITORY_ARCHIVE', 400);
+    }
+    if (count > REPOSITORY_LIMITS.entries) {
+      oversizedCandidates += 1;
+      continue;
+    }
+    if (headerVisits + count > maximumHeaderVisits) {
+      throw new RepositoryArchiveError('The uploaded file has ambiguous ZIP end records.', 'INVALID_REPOSITORY_ARCHIVE', 400);
+    }
     let cursor = centralOffset;
     let encrypted = false;
     let valid = true;
     for (let index = 0; index < count; index += 1) {
+      headerVisits += 1;
       if (cursor + 46 > eocd || buffer.readUInt32LE(cursor) !== 0x02014b50) { valid = false; break; }
       if ((buffer.readUInt16LE(cursor + 8) & 1) !== 0) encrypted = true;
       const next = cursor + 46 + buffer.readUInt16LE(cursor + 28) + buffer.readUInt16LE(cursor + 30) + buffer.readUInt16LE(cursor + 32);
       if (!Number.isSafeInteger(next) || next > eocd) { valid = false; break; }
       cursor = next;
     }
-    if (valid && cursor === eocd) return encrypted;
+    if (!valid || cursor !== eocd) continue;
+    if (selected) {
+      throw new RepositoryArchiveError('The uploaded file has ambiguous ZIP end records.', 'INVALID_REPOSITORY_ARCHIVE', 400);
+    }
+    selected = { eocd, commentLength, encrypted };
   }
-  return false;
-}
-
-function sanitizeZipComment(buffer: Buffer): Buffer {
-  const minimumEocd = 22;
-  const searchStart = Math.max(0, buffer.length - 65_557);
-  for (let eocd = buffer.length - minimumEocd; eocd >= searchStart; eocd -= 1) {
-    if (buffer.readUInt32LE(eocd) !== 0x06054b50) continue;
-    const commentLength = buffer.readUInt16LE(eocd + 20);
-    const centralSize = buffer.readUInt32LE(eocd + 12);
-    const centralOffset = buffer.readUInt32LE(eocd + 16);
-    if (eocd + minimumEocd + commentLength !== buffer.length || buffer.readUInt16LE(eocd + 4) !== 0
-      || buffer.readUInt16LE(eocd + 6) !== 0 || buffer.readUInt16LE(eocd + 8) !== buffer.readUInt16LE(eocd + 10)
-      || centralOffset > eocd || centralSize > eocd - centralOffset || centralOffset + centralSize !== eocd) continue;
-    if (commentLength === 0) return buffer;
-    const sanitized = Buffer.from(buffer);
-    sanitized.fill(0, eocd + minimumEocd);
-    return sanitized;
+  if (!selected) {
+    if (candidateCount === 1 && oversizedCandidates === 1) {
+      throw new RepositoryArchiveError('The ZIP contains more than 2000 entries.', 'REPOSITORY_ENTRY_LIMIT_EXCEEDED', 413);
+    }
+    throw new RepositoryArchiveError('The uploaded file is not a valid ZIP archive.', 'INVALID_REPOSITORY_ARCHIVE', 400);
   }
-  throw new RepositoryArchiveError('The uploaded file is not a valid ZIP archive.', 'INVALID_REPOSITORY_ARCHIVE', 400);
+  if (selected.commentLength === 0) return { buffer, encrypted: selected.encrypted };
+  const sanitized = Buffer.from(buffer);
+  sanitized.fill(0, selected.eocd + minimumEocd);
+  return { buffer: sanitized, encrypted: selected.encrypted };
 }
 
 function readEntryContent(
@@ -360,12 +378,13 @@ export async function analyzeRepositoryZip(
   if (signature !== '504b0304' && signature !== '504b0506') {
     throw new RepositoryArchiveError('The uploaded file is not a valid ZIP archive.', 'INVALID_REPOSITORY_ARCHIVE', 400);
   }
-  if (hasEncryptedCentralEntry(buffer)) {
+  const deadline = now() + REPOSITORY_LIMITS.timeoutMs;
+  const inspected = inspectAndSanitizeZipEnd(buffer);
+  if (inspected.encrypted) {
     throw new RepositoryArchiveError('Encrypted ZIP entries are not supported.', 'REPOSITORY_ARCHIVE_ENCRYPTED', 400);
   }
-  const deadline = now() + REPOSITORY_LIMITS.timeoutMs;
   let zip: ZipFile;
-  try { zip = await zipFromBuffer(sanitizeZipComment(buffer)); } catch (error) {
+  try { zip = await zipFromBuffer(inspected.buffer); } catch (error) {
     throw safeZipReadError(error);
   }
   if (zip.entryCount > REPOSITORY_LIMITS.entries) {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { repositoryHistoryScope } from './repositoryAnalyzer';
-import { canCreateRepositoryAnalysis, canDeleteRepositoryAnalysis, effectiveRepositoryProjectStatus, isRepositoryScopeRequestCurrent, normalizeRepositoryAnalyses, normalizeRepositoryAnalysis, normalizeRepositoryAnalysisPage, normalizeRepositoryStatus, repositoryAnalysisScopeKey, validateRepositoryArchive, validateRepositoryZipSignature } from './repositoryAnalyzer';
+import { canCreateRepositoryAnalysis, canDeleteRepositoryAnalysis, effectiveRepositoryProjectStatus, isRepositoryScopeRequestCurrent, normalizeRepositoryAnalyses, normalizeRepositoryAnalysis, normalizeRepositoryAnalysisPage, normalizeRepositoryStatus, repositoryAnalysisScopeKey, repositoryPageAfterDelete, validateRepositoryArchive, validateRepositoryZipSignature } from './repositoryAnalyzer';
 
 const complete = {
   id: 'analysis-1', projectId: 'project-1', name: 'KFive', status: 'completed', analyzerVersion: 1,
@@ -53,6 +53,22 @@ describe('repository analyzer contract', () => {
     expect(normalizeRepositoryAnalysisPage({ data: {
       analyses: [summary], pagination: { page: 0, pageSize: 50, total: 100, totalPages: 2, maxPages: 10 },
     } })).toBeUndefined();
+    for (const pagination of [
+      { page: 2, pageSize: 50, total: 1, totalPages: 1, maxPages: 10 },
+      { page: 1, pageSize: 50, total: 100, totalPages: 1, maxPages: 10 },
+      { page: 1, pageSize: 50, total: 100, totalPages: 2, maxPages: 1 },
+    ]) expect(normalizeRepositoryAnalysisPage({ data: { analyses: [summary], pagination } })).toBeUndefined();
+    expect(normalizeRepositoryAnalysisPage({ data: {
+      analyses: Array.from({ length: 51 }, () => summary),
+      pagination: { page: 1, pageSize: 50, total: 51, totalPages: 2, maxPages: 10 },
+    } })).toBeUndefined();
+  });
+
+  it('retreats exactly one page only after deleting the final visible report', () => {
+    expect(repositoryPageAfterDelete(2, 1)).toBe(1);
+    expect(repositoryPageAfterDelete(3, 1)).toBe(2);
+    expect(repositoryPageAfterDelete(2, 2)).toBe(2);
+    expect(repositoryPageAfterDelete(1, 1)).toBe(1);
   });
 
   it('rejects incomplete, invalid-digest, and overlong hostile records', () => {

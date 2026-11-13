@@ -19,6 +19,7 @@ import {
   normalizeRepositoryAnalysis,
   normalizeRepositoryStatus,
   repositoryAnalysisScopeKey,
+  repositoryPageAfterDelete,
   repositoryHistoryScope,
   validateRepositoryArchive,
   validateRepositoryZipSignature,
@@ -263,7 +264,7 @@ export default function RepositoryAnalyzerPage() {
       await repositoryApi.deleteAnalysis(selected.id);
       if (!requestIsCurrent(requestScopeKey, deleteRequestRef.current, requestId)) return;
       setSelected(undefined);
-      const targetPage = analyses.length === 1 && pagination.page > 1 ? pagination.page - 1 : pagination.page;
+      const targetPage = repositoryPageAfterDelete(pagination.page, analyses.length);
       await refresh(targetPage);
       if (!requestIsCurrent(requestScopeKey, deleteRequestRef.current, requestId)) return;
       toast.success('Repository analysis deleted.');

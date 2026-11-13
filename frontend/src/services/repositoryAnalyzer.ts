@@ -51,6 +51,10 @@ export function isRepositoryScopeRequestCurrent(
   return currentScopeKey === requestScopeKey && currentRequestId === requestId;
 }
 
+export function repositoryPageAfterDelete(currentPage: number, visibleCount: number): number {
+  return visibleCount === 1 && currentPage > 1 ? currentPage - 1 : currentPage;
+}
+
 const object = (value: unknown): UnknownRecord | undefined => value !== null && typeof value === 'object' && !Array.isArray(value) ? value as UnknownRecord : undefined;
 const unsafeTextCharacter = /[\p{Cc}\p{Cf}]/u;
 const safeString = (value: unknown, maximum: number): string | undefined => {
@@ -157,7 +161,7 @@ export function normalizeRepositoryAnalysisPage(payload: unknown): RepositoryAna
   const totalPages = count(pagination.totalPages); const maxPages = count(pagination.maxPages);
   if (analyses.length !== root.analyses.length || page === undefined || page < 1 || pageSize !== 50
     || total === undefined || totalPages === undefined || totalPages !== Math.max(1, Math.ceil(total / pageSize))
-    || maxPages === undefined || maxPages < 1 || page > maxPages || totalPages > maxPages || analyses.length > pageSize) return undefined;
+    || maxPages === undefined || maxPages < 1 || page > totalPages || page > maxPages || totalPages > maxPages || analyses.length > pageSize) return undefined;
   return { analyses, pagination: { page, pageSize, total, totalPages, maxPages } };
 }
 export function validateRepositoryArchive(file: Pick<File, 'name' | 'type' | 'size'>, maximumBytes = REPOSITORY_ARCHIVE_LIMIT_BYTES): string | undefined {

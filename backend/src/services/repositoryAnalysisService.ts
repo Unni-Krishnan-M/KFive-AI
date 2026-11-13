@@ -3,9 +3,15 @@ import { ProjectModel } from '@/models/Project';
 import mongoose from 'mongoose';
 import { ProjectError, ProjectService, projectService } from '@/services/projectService';
 import { ProjectMutationLease, projectMutationLease } from '@/services/projectMutationLease';
-import { REPOSITORY_LIMITS, RepositoryArchiveError, RepositoryArchiveReport, analyzeRepositoryZip } from './repositoryArchiveAnalyzer';
+import { REPOSITORY_LIMITS, RepositoryArchiveError, RepositoryArchiveReport } from './repositoryArchiveAnalyzer';
+import { analyzeRepositoryZipIsolated } from './repositoryArchiveIsolation';
+import {
+  RepositoryImporterBusyError,
+  RepositoryImporterUnavailableError,
+  repositoryImporterAnalyzerFromEnvironment,
+} from './repositoryImporterClient';
 
-export type RepositoryAnalysisErrorCode = 'INVALID_REPOSITORY_INPUT' | 'REPOSITORY_ANALYSIS_NOT_FOUND' | 'REPOSITORY_ANALYSIS_FAILED' | 'REPOSITORY_ANALYZER_BUSY' | 'REPOSITORY_ANALYSIS_LIMIT_REACHED';
+export type RepositoryAnalysisErrorCode = 'INVALID_REPOSITORY_INPUT' | 'REPOSITORY_ANALYSIS_NOT_FOUND' | 'REPOSITORY_ANALYSIS_FAILED' | 'REPOSITORY_ANALYZER_BUSY' | 'REPOSITORY_ANALYZER_UNAVAILABLE' | 'REPOSITORY_ANALYSIS_LIMIT_REACHED';
 
 export class RepositoryAnalysisError extends Error {
   readonly isOperational = true;
@@ -82,7 +88,12 @@ export const mongooseRepositoryAnalysisRepository: RepositoryAnalysisRepository 
 
 export interface RepositoryUpload { buffer: Buffer; originalname: string; mimetype: string; size: number }
 export interface RepositoryAnalysisCreateInput { name?: unknown; projectId?: unknown }
-export type RepositoryZipAnalyzer = (buffer: Buffer, originalName: string, mimeType: string) => Promise<RepositoryArchiveReport>;
+export interface RepositoryZipAnalyzer {
+  (buffer: Buffer, originalName: string, mimeType: string): Promise<RepositoryArchiveReport>;
+  isAvailable?: () => Promise<boolean>;
+}
+export const productionRepositoryZipAnalyzer: RepositoryZipAnalyzer = repositoryImporterAnalyzerFromEnvironment(process.env)
+  ?? analyzeRepositoryZipIsolated;
 
 const OBJECT_ID = /^[a-f\d]{24}$/i;
 
@@ -178,7 +189,7 @@ export class RepositoryAnalysisService {
   constructor(
     private readonly repository: RepositoryAnalysisRepository = mongooseRepositoryAnalysisRepository,
     private readonly projects: Pick<ProjectService, 'resolveActiveProject' | 'resolveOwnedProject'> = projectService,
-    private readonly analyzer: RepositoryZipAnalyzer = analyzeRepositoryZip,
+    private readonly analyzer: RepositoryZipAnalyzer = productionRepositoryZipAnalyzer,
     private readonly databaseAvailable: () => boolean = () => mongoose.connection.readyState === 1,
     private readonly projectLease: Pick<ProjectMutationLease, 'run'> = projectMutationLease,
   ) {}
@@ -187,12 +198,20 @@ export class RepositoryAnalysisService {
     const ownerId = requireOwnerId(ownerIdValue);
     const project = await this.projects.resolveOwnedProject(ownerId, projectIdValue);
     const databaseAvailable = this.databaseAvailable();
+    let analyzerAvailable = true;
+    if (this.analyzer.isAvailable) {
+      try { analyzerAvailable = await this.analyzer.isAvailable(); } catch { analyzerAvailable = false; }
+    }
     return {
       available: databaseAvailable,
-      canAnalyze: databaseAvailable && (!project || project.status === 'active'),
+      canAnalyze: databaseAvailable && analyzerAvailable && (!project || project.status === 'active'),
       scope: { type: project ? 'project' : 'workspace', ...(project ? { projectId: String(project._id), projectStatus: project.status } : {}) },
       capabilities: { zip: true, githubUrl: false, localPath: false, extraction: false, execution: false, network: false },
-      dependencies: [{ id: 'mongodb', status: databaseAvailable ? 'available' : 'unavailable', ...(!databaseAvailable ? { message: 'MongoDB is unavailable.' } : {}) }],
+      dependencies: [
+        { id: 'mongodb', status: databaseAvailable ? 'available' : 'unavailable', ...(!databaseAvailable ? { message: 'MongoDB is unavailable.' } : {}) },
+        ...(this.analyzer.isAvailable ? [{ id: 'repository-importer', status: analyzerAvailable ? 'available' : 'unavailable',
+          ...(!analyzerAvailable ? { message: 'Repository importer is unavailable.' } : {}) }] : []),
+      ],
       limits: REPOSITORY_LIMITS,
     };
   }
@@ -223,6 +242,12 @@ export class RepositoryAnalysisService {
       try { report = await this.analyzer(upload.buffer, originalName, upload.mimetype); }
       catch (error) {
         if (error instanceof RepositoryArchiveError) throw error;
+        if (error instanceof RepositoryImporterBusyError) {
+          throw new RepositoryAnalysisError('The repository analyzer is busy. Try again shortly.', 'REPOSITORY_ANALYZER_BUSY', 429);
+        }
+        if (error instanceof RepositoryImporterUnavailableError) {
+          throw new RepositoryAnalysisError('Repository importer is unavailable.', 'REPOSITORY_ANALYZER_UNAVAILABLE', 503);
+        }
         throw new RepositoryAnalysisError('The repository ZIP could not be analyzed safely.', 'REPOSITORY_ANALYSIS_FAILED', 422);
       }
       const publish = async () => {
@@ -249,15 +274,18 @@ export class RepositoryAnalysisService {
       throw new RepositoryAnalysisError('Choose either a project or deleted-project history.', 'INVALID_REPOSITORY_INPUT', 400);
     }
     if (scopeValue === 'orphaned') {
+      let result: { records: RepositoryAnalysisRecord[]; total: number };
       try {
-        const result = await this.repository.list(ownerId, undefined, true, page);
-        return {
-          analyses: result.records.map(publicAnalysisSummary),
-          pagination: { page, pageSize: REPOSITORY_ANALYSIS_PAGE_SIZE, total: result.total,
-            totalPages: Math.max(1, Math.ceil(result.total / REPOSITORY_ANALYSIS_PAGE_SIZE)), maxPages: REPOSITORY_ANALYSIS_MAX_PAGES },
-        };
+        result = await this.repository.list(ownerId, undefined, true, page);
       }
       catch { throw new RepositoryAnalysisError('Repository analysis storage is unavailable.', 'REPOSITORY_ANALYSIS_FAILED', 503); }
+      const totalPages = Math.max(1, Math.ceil(result.total / REPOSITORY_ANALYSIS_PAGE_SIZE));
+      if (page > totalPages) throw new RepositoryAnalysisError('Repository history page does not exist.', 'INVALID_REPOSITORY_INPUT', 400);
+      return {
+        analyses: result.records.map(publicAnalysisSummary),
+        pagination: { page, pageSize: REPOSITORY_ANALYSIS_PAGE_SIZE, total: result.total,
+          totalPages, maxPages: REPOSITORY_ANALYSIS_MAX_PAGES },
+      };
     }
     let projectId: string | undefined;
     try {
@@ -271,10 +299,12 @@ export class RepositoryAnalysisService {
     let result: { records: RepositoryAnalysisRecord[]; total: number };
     try { result = await this.repository.list(ownerId, projectId, false, page); }
     catch { throw new RepositoryAnalysisError('Repository analysis storage is unavailable.', 'REPOSITORY_ANALYSIS_FAILED', 503); }
+    const totalPages = Math.max(1, Math.ceil(result.total / REPOSITORY_ANALYSIS_PAGE_SIZE));
+    if (page > totalPages) throw new RepositoryAnalysisError('Repository history page does not exist.', 'INVALID_REPOSITORY_INPUT', 400);
     return {
       analyses: result.records.map(publicAnalysisSummary),
       pagination: { page, pageSize: REPOSITORY_ANALYSIS_PAGE_SIZE, total: result.total,
-        totalPages: Math.max(1, Math.ceil(result.total / REPOSITORY_ANALYSIS_PAGE_SIZE)), maxPages: REPOSITORY_ANALYSIS_MAX_PAGES },
+        totalPages, maxPages: REPOSITORY_ANALYSIS_MAX_PAGES },
     };
   }
 

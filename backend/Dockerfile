@@ -17,13 +17,25 @@ WORKDIR /app
 COPY --from=build --chown=node:node /workspace/node_modules ./node_modules
 COPY --from=build --chown=node:node /workspace/backend/package.json ./backend/package.json
 COPY --from=build --chown=node:node /workspace/backend/dist ./backend/dist
-RUN mkdir -p /app/uploads /app/logs && chown -R node:node /app/uploads /app/logs
+RUN groupadd --gid 10002 kfive-importer-socket \
+    && useradd --uid 10001 --gid 10002 --no-create-home --shell /usr/sbin/nologin kfive-importer \
+    && mkdir -p /app/uploads /app/logs /run/kfive-repository-importer \
+    && chown -R node:node /app/uploads /app/logs \
+    && chown 10001:10002 /run/kfive-repository-importer \
+    && chmod 0770 /run/kfive-repository-importer
 
 USER node
 EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD ["node", "-e", "fetch('http://127.0.0.1:5000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
 CMD ["node", "backend/dist/server.js"]
+
+# The repository importer uses the same reviewed production graph without the
+# API's identity or HTTP health metadata at runtime. Compose adds no network.
+FROM app-runtime AS repository-importer
+USER 10001:10002
+HEALTHCHECK NONE
+CMD ["node", "--max-old-space-size=128", "backend/dist/repositoryImporterServerMain.js"]
 
 # Install the broker-only Docker client in a source-independent stage so
 # application edits do not repeatedly download its package graph.

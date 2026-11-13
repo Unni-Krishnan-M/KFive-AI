@@ -43,6 +43,29 @@ function makeZip(inputs: ZipInput[]): Buffer {
   return Buffer.concat([...local, ...central, end]);
 }
 
+function makeHostileEndRecordCandidates(): Buffer {
+  const centralEntries = 2_000;
+  const candidates = 3;
+  const centralOffset = 4;
+  const centralBytes = centralEntries * 46;
+  const buffer = Buffer.alloc(centralOffset + centralBytes + 1 + candidates * 22);
+  buffer.writeUInt32LE(0x04034b50, 0);
+  for (let index = 0; index < centralEntries; index += 1) {
+    buffer.writeUInt32LE(0x02014b50, centralOffset + index * 46);
+  }
+  const candidateStart = centralOffset + centralBytes + 1;
+  for (let index = 0; index < candidates; index += 1) {
+    const offset = candidateStart + index * 22;
+    buffer.writeUInt32LE(0x06054b50, offset);
+    buffer.writeUInt16LE(centralEntries, offset + 8);
+    buffer.writeUInt16LE(centralEntries, offset + 10);
+    buffer.writeUInt32LE(offset - centralOffset, offset + 12);
+    buffer.writeUInt32LE(centralOffset, offset + 16);
+    buffer.writeUInt16LE(buffer.length - offset - 22, offset + 20);
+  }
+  return buffer;
+}
+
 async function expectCode(zip: Buffer, code: string): Promise<void> {
   await expect(analyzeRepositoryZip(zip, 'repo.zip', 'application/zip')).rejects.toMatchObject({ code });
 }
@@ -162,6 +185,63 @@ describe('repository ZIP analyzer', () => {
     const withComment = Buffer.concat([base, comment]);
     withComment.writeUInt16LE(comment.length, base.length - 2);
     await expect(analyzeRepositoryZip(withComment, 'repo.zip', 'application/zip')).resolves.toMatchObject({ summary: { fileCount: 1 } });
+  });
+
+  it('bounds central-header work across hostile end-record candidates', async () => {
+    const hostile = makeHostileEndRecordCandidates();
+    const original = Buffer.prototype.readUInt32LE;
+    let reads = 0;
+    const spy = jest.spyOn(Buffer.prototype, 'readUInt32LE').mockImplementation(function (this: Buffer, ...args: unknown[]) {
+      reads += 1;
+      return original.call(this, args[0] as number | undefined);
+    });
+    try {
+      await expect(analyzeRepositoryZip(hostile, 'repo.zip', 'application/zip'))
+        .rejects.toMatchObject({ code: 'INVALID_REPOSITORY_ARCHIVE' });
+    } finally {
+      spy.mockRestore();
+    }
+    expect(reads).toBeLessThanOrEqual(5_000);
+  });
+
+  it('accepts the maximum classic ZIP comment and rejects ambiguous or ZIP64 end records', async () => {
+    const base = makeZip([{ name: 'readme.md', content: 'safe' }]);
+    const maximumComment = Buffer.concat([base, Buffer.alloc(65_535, 0x61)]);
+    maximumComment.writeUInt16LE(65_535, base.length - 2);
+    await expect(analyzeRepositoryZip(maximumComment, 'repo.zip', 'application/zip'))
+      .resolves.toMatchObject({ summary: { fileCount: 1 } });
+
+    const zip64 = Buffer.from(base);
+    zip64.writeUInt16LE(0xffff, zip64.length - 22 + 8);
+    zip64.writeUInt16LE(0xffff, zip64.length - 22 + 10);
+    await expectCode(zip64, 'INVALID_REPOSITORY_ARCHIVE');
+    for (const field of [12, 16]) {
+      const sentinel = Buffer.from(base);
+      sentinel.writeUInt32LE(0xffffffff, sentinel.length - 22 + field);
+      await expectCode(sentinel, 'INVALID_REPOSITORY_ARCHIVE');
+    }
+
+    const firstEocd = base.length - 22;
+    const centralOffset = base.readUInt32LE(firstEocd + 16);
+    const central = base.subarray(centralOffset, firstEocd);
+    const secondEocd = Buffer.alloc(22);
+    secondEocd.writeUInt32LE(0x06054b50, 0); secondEocd.writeUInt16LE(1, 8); secondEocd.writeUInt16LE(1, 10);
+    secondEocd.writeUInt32LE(central.length, 12); secondEocd.writeUInt32LE(base.length, 16);
+    const ambiguous = Buffer.concat([base, central, secondEocd]);
+    ambiguous.writeUInt16LE(central.length + secondEocd.length, firstEocd + 20);
+    await expectCode(ambiguous, 'INVALID_REPOSITORY_ARCHIVE');
+  });
+
+  it('accepts an empty classic ZIP and rejects multi-disk end records', async () => {
+    await expect(analyzeRepositoryZip(makeZip([]), 'empty.zip', 'application/zip'))
+      .resolves.toMatchObject({ summary: { fileCount: 0, directoryCount: 0 } });
+    const base = makeZip([{ name: 'readme.md', content: 'safe' }]);
+    const nonzeroDisk = Buffer.from(base);
+    nonzeroDisk.writeUInt16LE(1, nonzeroDisk.length - 22 + 4);
+    await expectCode(nonzeroDisk, 'INVALID_REPOSITORY_ARCHIVE');
+    const mismatchedDiskCount = Buffer.from(base);
+    mismatchedDiskCount.writeUInt16LE(0, mismatchedDiskCount.length - 22 + 8);
+    await expectCode(mismatchedDiskCount, 'INVALID_REPOSITORY_ARCHIVE');
   });
 
   it('maps malformed archives to a safe stable error', async () => {

@@ -232,7 +232,12 @@ function readEntryContent(
   });
 }
 
-function validatePath(raw: string, collisions: Map<string, 'file' | 'directory'>): { canonical: string; directory: boolean; depth: number } {
+interface PathCollisionState {
+  entries: Map<string, 'file' | 'directory'>;
+  descendantParents: Set<string>;
+}
+
+function validatePath(raw: string, collisions: PathCollisionState): { canonical: string; directory: boolean; depth: number } {
   if (!raw || raw.length > REPOSITORY_LIMITS.pathBytes || raw.includes('\\')
     || containsUnsafeText(raw) || raw.startsWith('/') || /^[a-z]:/i.test(raw)) {
     throw new RepositoryArchiveError('The ZIP contains an unsafe entry path.', 'REPOSITORY_ENTRY_INVALID', 400);
@@ -251,11 +256,12 @@ function validatePath(raw: string, collisions: Map<string, 'file' | 'directory'>
   }
   const collisionKey = (directory ? canonical.slice(0, -1) : canonical).toLowerCase();
   const parentKeys = normalizedSegments.slice(0, -1).map((_, index) => normalizedSegments.slice(0, index + 1).join('/').toLowerCase());
-  if (collisions.has(collisionKey) || parentKeys.some((key) => collisions.get(key) === 'file')
-    || (!directory && [...collisions.keys()].some((key) => key.startsWith(`${collisionKey}/`)))) {
+  if (collisions.entries.has(collisionKey) || parentKeys.some((key) => collisions.entries.get(key) === 'file')
+    || (!directory && collisions.descendantParents.has(collisionKey))) {
     throw new RepositoryArchiveError('The ZIP contains colliding entry paths.', 'REPOSITORY_ENTRY_INVALID', 400);
   }
-  collisions.set(collisionKey, directory ? 'directory' : 'file');
+  collisions.entries.set(collisionKey, directory ? 'directory' : 'file');
+  for (const parentKey of parentKeys) collisions.descendantParents.add(parentKey);
   return { canonical, directory, depth: segments.length };
 }
 
@@ -399,7 +405,7 @@ export async function analyzeRepositoryZip(
   const signals: RepositorySignal[] = [];
   const warnings: RepositoryWarning[] = [];
   const languages = new Map<string, { files: number; declaredBytes: number }>();
-  const collisions = new Map<string, 'file' | 'directory'>();
+  const collisions: PathCollisionState = { entries: new Map(), descendantParents: new Set() };
   let totalDeclared = 0;
   let totalRead = 0;
   let fileCount = 0;

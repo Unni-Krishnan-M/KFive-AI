@@ -91,6 +91,8 @@ services:
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=32m
+    mem_limit: 512m
+    memswap_limit: 512m
     healthcheck:
       test: ["CMD", "node", "backend/dist/repositoryImporterHealthMain.js"]
       interval: 10s

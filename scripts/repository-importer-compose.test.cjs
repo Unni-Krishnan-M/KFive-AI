@@ -33,11 +33,14 @@ function assertImporter(service, socketVolume, production = false) {
     assert.equal(service[forbidden], undefined, `repository importer must not declare ${forbidden}`);
   }
   if (production) {
+    assert.equal(service.mem_limit, '512m');
+    assert.equal(service.memswap_limit, '512m');
     assert.equal(service.deploy.resources.limits.cpus, '1.0');
     assert.equal(service.deploy.resources.limits.memory, '512M');
   } else {
     assert.equal(service.cpus, 1);
     assert.equal(service.mem_limit, '512m');
+    assert.equal(service.memswap_limit, '512m');
     assert.equal(service.build.target, 'repository-importer');
   }
 }

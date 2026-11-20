@@ -113,11 +113,28 @@ describe('repository ZIP analyzer', () => {
     await expectCode(makeZip([{ name: 'Readme.md' }, { name: 'README.md' }]), 'REPOSITORY_ENTRY_INVALID');
     await expectCode(makeZip([{ name: 'cafe\u0301.txt', flags: 1 << 11 }, { name: 'caf\u00e9.txt', flags: 1 << 11 }]), 'REPOSITORY_ENTRY_INVALID');
     await expectCode(makeZip([{ name: 'folder' }, { name: 'folder/file.txt' }]), 'REPOSITORY_ENTRY_INVALID');
+    await expectCode(makeZip([{ name: 'folder/file.txt' }, { name: 'folder' }]), 'REPOSITORY_ENTRY_INVALID');
+    await expectCode(makeZip([{ name: 'folder/' }, { name: 'folder' }]), 'REPOSITORY_ENTRY_INVALID');
+    await expectCode(makeZip([{ name: 'folder' }, { name: 'folder/' }]), 'REPOSITORY_ENTRY_INVALID');
     await expectCode(makeZip([{ name: 'link', mode: 0o120777 }]), 'REPOSITORY_ENTRY_INVALID');
     await expectCode(makeZip([{ name: 'mac-link', mode: 0o120777, host: 19 }]), 'REPOSITORY_ENTRY_INVALID');
     await expectCode(makeZip([{ name: 'volume', host: 0, mode: 0, dosAttributes: 0x08 }]), 'REPOSITORY_ENTRY_INVALID');
     await expectCode(makeZip([{ name: 'not-directory', host: 0, mode: 0, dosAttributes: 0x10 }]), 'REPOSITORY_ENTRY_INVALID');
     await expectCode(makeZip([{ name: 'secret.txt', flags: 1 }]), 'REPOSITORY_ARCHIVE_ENCRYPTED');
+  });
+
+  it('bounds maximum-entry path collision work without scanning all prior keys', async () => {
+    const inputs = Array.from({ length: 2_000 }, (_, index) => ({
+      name: `root/${String(index).padStart(4, '0')}/${'a'.repeat(450)}-${index}.txt`,
+    }));
+    const keys = jest.spyOn(Map.prototype, 'keys');
+    try {
+      await expect(analyzeRepositoryZip(makeZip(inputs), 'repo.zip', 'application/zip'))
+        .resolves.toMatchObject({ summary: { fileCount: 2_000, maxDepth: 3 } });
+      expect(keys).not.toHaveBeenCalled();
+    } finally {
+      keys.mockRestore();
+    }
   });
 
   it('rejects unsafe Unicode, non-empty directories and excess entry count', async () => {

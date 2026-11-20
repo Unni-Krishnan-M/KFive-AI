@@ -68,6 +68,7 @@ services:
       - /tmp:rw,noexec,nosuid,nodev,size=32m
     cpus: 1.0
     mem_limit: 512m
+    memswap_limit: 512m
     pids_limit: 48
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]

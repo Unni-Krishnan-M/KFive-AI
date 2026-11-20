@@ -6,7 +6,7 @@ import {
   RepositoryArchiveReport,
 } from './repositoryArchiveAnalyzer';
 
-const REQUEST_MAGIC = Buffer.from('KFR1');
+export const REPOSITORY_ARCHIVE_REQUEST_MAGIC = Buffer.from('KFR1');
 export const REPOSITORY_IMPORTER_SOCKET_PATH = '/run/kfive-repository-importer/importer.sock';
 export const REPOSITORY_IMPORTER_HEALTH_REQUEST = Buffer.from('KFH1');
 export const REPOSITORY_IMPORTER_HEALTH_RESPONSE = Buffer.from('KFH1OK');
@@ -52,12 +52,12 @@ export function encodeRepositoryArchiveRequest(request: RepositoryArchiveRequest
   const metadata = Buffer.from(JSON.stringify({ v: 1, originalName: request.originalName, mimeType: request.mimeType }), 'utf8');
   if (metadata.length > REPOSITORY_ARCHIVE_METADATA_BYTES) throw new Error('Repository archive request is invalid.');
   const header = Buffer.alloc(12);
-  REQUEST_MAGIC.copy(header); header.writeUInt32BE(metadata.length, 4); header.writeUInt32BE(request.buffer.length, 8);
+  REPOSITORY_ARCHIVE_REQUEST_MAGIC.copy(header); header.writeUInt32BE(metadata.length, 4); header.writeUInt32BE(request.buffer.length, 8);
   return Buffer.concat([header, metadata, request.buffer]);
 }
 
 export function decodeRepositoryArchiveRequest(input: Buffer): RepositoryArchiveRequest {
-  if (!Buffer.isBuffer(input) || input.length < 12 || !input.subarray(0, 4).equals(REQUEST_MAGIC)) throw new Error('Invalid repository archive frame.');
+  if (!Buffer.isBuffer(input) || input.length < 12 || !input.subarray(0, 4).equals(REPOSITORY_ARCHIVE_REQUEST_MAGIC)) throw new Error('Invalid repository archive frame.');
   const metadataLength = input.readUInt32BE(4); const archiveLength = input.readUInt32BE(8);
   if (metadataLength === 0 || metadataLength > REPOSITORY_ARCHIVE_METADATA_BYTES || archiveLength === 0
     || archiveLength > REPOSITORY_LIMITS.archiveBytes || input.length !== 12 + metadataLength + archiveLength) {

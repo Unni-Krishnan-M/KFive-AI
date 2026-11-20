@@ -145,6 +145,8 @@ test('production compose publishes only a loopback frontend and isolates persist
   assert.equal(importer.pids_limit, 48);
   assert.equal(importer.deploy.resources.limits.cpus, '1.0');
   assert.equal(importer.deploy.resources.limits.memory, '512M');
+  assert.equal(importer.mem_limit, '512m');
+  assert.equal(importer.memswap_limit, '512m');
   assert.deepEqual(importer.cap_drop, ['ALL']);
   assert.deepEqual(importer.ulimits, {core: 0});
   assert.equal(importer.stop_grace_period, '5s');

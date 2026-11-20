@@ -30,6 +30,7 @@ const baseConfig: EnvironmentConfig = {
   jwtExpiresIn: '15m',
   jwtRefreshExpiresIn: '7d',
   codeRunnerMode: 'disabled',
+  repositoryImporterMode: 'process',
   notebookExecutionEnabled: false,
 };
 

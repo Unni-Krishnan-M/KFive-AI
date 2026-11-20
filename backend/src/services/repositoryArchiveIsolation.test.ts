@@ -31,6 +31,10 @@ function makeZip(name = 'readme.md', content = 'safe', flags = 0): Buffer {
 }
 
 describe('isolated repository ZIP analyzer', () => {
+  // Real child startup can be delayed by the full parallel backend suite; the
+  // analyzer's own deadlines remain the behavior under test.
+  jest.setTimeout(20_000);
+
   it('returns a provenance-checked report through the real child process', async () => {
     const zip = makeZip();
     const analyze = createIsolatedRepositoryZipAnalyzer();

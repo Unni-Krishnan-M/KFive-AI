@@ -13,6 +13,7 @@ import {
 } from './repositoryImporterClient';
 import { startRepositoryImporterServer } from './repositoryImporterServer';
 import { analyzeRepositoryZip, RepositoryArchiveReport } from './repositoryArchiveAnalyzer';
+import { encodeRepositoryArchiveRequest } from './repositoryArchiveIsolationProtocol';
 
 function crc32(content: Buffer): number {
   let crc = 0xffffffff;
@@ -41,6 +42,10 @@ function makeZip(name = 'package.json', content = '{"name":"socket-test"}', flag
 }
 
 describe('repository importer Unix-socket boundary', () => {
+  // Real child startup can be delayed by the full parallel backend suite; the
+  // client and analyzer retain their own production deadlines.
+  jest.setTimeout(20_000);
+
   let directory: string;
   let socketPath: string;
 
@@ -105,6 +110,66 @@ describe('repository importer Unix-socket boundary', () => {
 
     const recovered = await startRepositoryImporterServer({ socketPath });
     await recovered.close();
+  });
+
+  it('assembles a maximum fragmented frame without cumulative Buffer.concat copies', async () => {
+    const request = {
+      buffer: Buffer.alloc(10 * 1024 * 1024, 0x61),
+      originalName: 'maximum.zip',
+      mimeType: 'application/zip',
+    };
+    const frame = encodeRepositoryArchiveRequest(request);
+    const report = await analyzeRepositoryZip(makeZip(), 'repository.zip', 'application/zip');
+    const importer = await startRepositoryImporterServer({
+      socketPath,
+      inputTimeoutMs: 10_000,
+      analyzer: async (buffer, name, type) => ({
+        ...report,
+        source: { ...report.source, originalName: name, mimeType: type, compressedBytes: buffer.length },
+      }),
+    });
+    const concat = jest.spyOn(Buffer, 'concat');
+    try {
+      const response = await new Promise<string>((resolve, reject) => {
+        const socket = net.createConnection({ path: socketPath });
+        const output: string[] = [];
+        socket.once('connect', () => {
+          for (let offset = 0; offset < frame.length; offset += 4096) socket.write(frame.subarray(offset, offset + 4096));
+        });
+        socket.on('data', (chunk: Buffer) => output.push(chunk.toString('utf8')));
+        socket.once('end', () => resolve(output.join('')));
+        socket.once('error', reject);
+      });
+      expect(JSON.parse(response)).toMatchObject({ v: 1, ok: true, report: { source: { compressedBytes: request.buffer.length } } });
+      expect(concat).not.toHaveBeenCalled();
+    } finally {
+      concat.mockRestore();
+      await importer.close();
+    }
+  });
+
+  it('caps pre-input connections, expires partial frames, and recovers health', async () => {
+    const importer = await startRepositoryImporterServer({
+      socketPath, inputTimeoutMs: 200, maxActive: 1, maxConnections: 2,
+      analyzer: async () => { throw new Error('partial input must not start analysis'); },
+    });
+    const openPartial = () => new Promise<net.Socket>((resolve, reject) => {
+      const socket = net.createConnection({ path: socketPath });
+      socket.once('connect', () => { socket.write('K'); resolve(socket); });
+      socket.once('error', reject);
+    });
+    try {
+      const first = await openPartial(); const second = await openPartial();
+      const excess = net.createConnection({ path: socketPath });
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('excess importer connection remained open')), 1_000);
+        excess.once('close', () => { clearTimeout(timer); resolve(); });
+        excess.once('error', () => undefined);
+      });
+      await Promise.all([first, second].map((socket) => new Promise<void>((resolve) => socket.once('close', () => resolve()))));
+      const analyze = createRepositoryImporterAnalyzer({ socketPath, connectTimeoutMs: 500 });
+      await expect(analyze.isAvailable()).resolves.toBe(true);
+    } finally { await importer.close(); }
   });
 
   it('bounds daemon concurrency and returns a typed busy result for the third request', async () => {

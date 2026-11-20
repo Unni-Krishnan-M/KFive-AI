@@ -6,6 +6,7 @@ import { REPOSITORY_LIMITS, RepositoryArchiveError, RepositoryArchiveReport } fr
 import { createIsolatedRepositoryZipAnalyzer } from './repositoryArchiveIsolation';
 import {
   REPOSITORY_ARCHIVE_METADATA_BYTES,
+  REPOSITORY_ARCHIVE_REQUEST_MAGIC,
   REPOSITORY_IMPORTER_HEALTH_REQUEST,
   REPOSITORY_IMPORTER_HEALTH_RESPONSE,
   decodeRepositoryArchiveRequest,
@@ -28,6 +29,7 @@ export interface RepositoryImporterServerOptions {
   parentMode?: number;
   inputTimeoutMs?: number;
   maxActive?: number;
+  maxConnections?: number;
   setSocketMode?: (socketPath: string, mode: number) => Promise<void>;
 }
 
@@ -37,6 +39,49 @@ export interface RepositoryImporterServer {
 }
 
 interface SocketIdentity { dev: number; ino: number; uid: number; gid: number; mode: number }
+
+type FrameAssembly = { state: 'pending' | 'invalid' } | { state: 'complete'; input: Buffer };
+
+class RepositoryImporterFrameAssembler {
+  private input = Buffer.allocUnsafe(12);
+  private inputBytes = 0;
+  private expectedBytes: number | undefined;
+
+  append(chunk: Buffer): FrameAssembly {
+    if (chunk.length === 0) return { state: 'pending' };
+    if (this.inputBytes + chunk.length > MAXIMUM_REQUEST_BYTES) return { state: 'invalid' };
+    let sourceOffset = 0;
+    while (sourceOffset < chunk.length) {
+      const boundary = this.expectedBytes ?? (this.inputBytes < 4 ? 4 : 12);
+      const take = Math.min(chunk.length - sourceOffset, boundary - this.inputBytes);
+      chunk.copy(this.input, this.inputBytes, sourceOffset, sourceOffset + take);
+      this.inputBytes += take; sourceOffset += take;
+      if (this.inputBytes === 4 && this.expectedBytes === undefined) {
+        const prefix = this.input.subarray(0, 4);
+        if (prefix.equals(REPOSITORY_IMPORTER_HEALTH_REQUEST)) {
+          return sourceOffset === chunk.length
+            ? { state: 'complete', input: Buffer.from(REPOSITORY_IMPORTER_HEALTH_REQUEST) }
+            : { state: 'invalid' };
+        }
+        if (!prefix.equals(REPOSITORY_ARCHIVE_REQUEST_MAGIC)) return { state: 'invalid' };
+      }
+      if (this.inputBytes === 12 && this.expectedBytes === undefined) {
+        const metadataBytes = this.input.readUInt32BE(4); const archiveBytes = this.input.readUInt32BE(8);
+        if (metadataBytes === 0 || metadataBytes > REPOSITORY_ARCHIVE_METADATA_BYTES || archiveBytes === 0
+          || archiveBytes > REPOSITORY_LIMITS.archiveBytes) return { state: 'invalid' };
+        this.expectedBytes = 12 + metadataBytes + archiveBytes;
+        const frame = Buffer.allocUnsafe(this.expectedBytes);
+        this.input.copy(frame, 0, 0, 12); this.input = frame;
+      }
+      if (this.expectedBytes !== undefined && this.inputBytes === this.expectedBytes) {
+        return sourceOffset === chunk.length
+          ? { state: 'complete', input: this.input }
+          : { state: 'invalid' };
+      }
+    }
+    return { state: 'pending' };
+  }
+}
 
 function identity(stat: Stats): SocketIdentity {
   return { dev: stat.dev, ino: stat.ino, uid: stat.uid, gid: stat.gid, mode: stat.mode & 0o777 };
@@ -108,8 +153,10 @@ export async function startRepositoryImporterServer(options: RepositoryImporterS
   const expectedGid = options.expectedGid ?? process.getgid?.() ?? -1;
   const inputTimeoutMs = options.inputTimeoutMs ?? 2_000;
   const maxActive = options.maxActive ?? 2;
+  const maxConnections = options.maxConnections ?? 4;
   if (!Number.isSafeInteger(inputTimeoutMs) || inputTimeoutMs < 10 || inputTimeoutMs > 10_000
-    || !Number.isSafeInteger(maxActive) || maxActive < 1 || maxActive > 2) {
+    || !Number.isSafeInteger(maxActive) || maxActive < 1 || maxActive > 2
+    || !Number.isSafeInteger(maxConnections) || maxConnections < maxActive || maxConnections > 4) {
     throw new Error('Repository importer server limits are invalid.');
   }
   await prepareSocketPath(socketPath, expectedUid, expectedGid, options.parentMode);
@@ -118,10 +165,10 @@ export async function startRepositoryImporterServer(options: RepositoryImporterS
   const server = net.createServer({ allowHalfOpen: true }, (socket) => {
     if (closing) { socket.destroy(); return; }
     sockets.add(socket); socket.once('close', () => sockets.delete(socket)); socket.on('error', () => undefined);
-    const chunks: Buffer[] = []; let inputBytes = 0; let responded = false; let handling = false;
+    const assembler = new RepositoryImporterFrameAssembler(); let responded = false; let handling = false;
     const inputTimer = setTimeout(() => socket.destroy(), inputTimeoutMs);
     const handleRequest = async (input: Buffer) => {
-      handling = true; clearTimeout(inputTimer); socket.pause();
+      handling = true; clearTimeout(inputTimer);
       if (input.equals(REPOSITORY_IMPORTER_HEALTH_REQUEST)) {
         responded = true; socket.end(REPOSITORY_IMPORTER_HEALTH_RESPONSE); return;
       }
@@ -146,21 +193,9 @@ export async function startRepositoryImporterServer(options: RepositoryImporterS
     };
     socket.on('data', (chunk: Buffer) => {
       if (handling) { socket.destroy(); return; }
-      inputBytes += chunk.length;
-      if (inputBytes > MAXIMUM_REQUEST_BYTES) { clearTimeout(inputTimer); socket.destroy(); return; }
-      chunks.push(chunk);
-      const input = Buffer.concat(chunks, inputBytes);
-      if (inputBytes === REPOSITORY_IMPORTER_HEALTH_REQUEST.length
-        && input.equals(REPOSITORY_IMPORTER_HEALTH_REQUEST)) {
-        void handleRequest(input); return;
-      }
-      if (inputBytes < 12) return;
-      const metadataBytes = input.readUInt32BE(4); const archiveBytes = input.readUInt32BE(8);
-      if (metadataBytes === 0 || metadataBytes > REPOSITORY_ARCHIVE_METADATA_BYTES || archiveBytes === 0
-        || archiveBytes > REPOSITORY_LIMITS.archiveBytes) { socket.destroy(); return; }
-      const expectedBytes = 12 + metadataBytes + archiveBytes;
-      if (inputBytes > expectedBytes) { socket.destroy(); return; }
-      if (inputBytes === expectedBytes) void handleRequest(input);
+      const assembled = assembler.append(chunk);
+      if (assembled.state === 'invalid') { clearTimeout(inputTimer); socket.destroy(); return; }
+      if (assembled.state === 'complete') void handleRequest(assembled.input);
     });
     socket.once('end', () => {
       if (!responded) socket.destroy();
@@ -172,6 +207,7 @@ export async function startRepositoryImporterServer(options: RepositoryImporterS
       }
     });
   });
+  server.maxConnections = maxConnections;
   await listen(server, socketPath);
   let createdIdentity: SocketIdentity | undefined;
   let bound: Stats;
@@ -188,6 +224,7 @@ export async function startRepositoryImporterServer(options: RepositoryImporterS
       throw new Error('Repository importer socket attributes are unsafe.');
     }
   } catch (error) {
+    for (const socket of sockets) socket.destroy();
     await closeListener(server);
     if (createdIdentity) {
       try {

@@ -3,17 +3,22 @@ import { Types } from 'mongoose';
 import { RagSourceModel } from '@/models/RagSource';
 import { ProjectModel } from '@/models/Project';
 import { ProjectError, ProjectRecord } from './projectService';
-import { AiProviderClient } from './aiProvider';
+import { AiProviderClient, AiProviderUnavailableError, AiProviderTimeoutError, AiProviderResponseError, AiProviderAbortedError } from './aiProvider';
+import { RagIndexingLease } from './ragIndexingLease';
 import { PROVIDER_DISCOVERY_TIMEOUT_MS } from './ai/providerDeadline';
 import { ChromaClientError, ChromaQueryResult } from './chromaClient';
 import { projectMutationLease } from './projectMutationLease';
 import {
   RagService,
+  RagServiceError,
   RagSourceRecord,
   RagSourceRepository,
   RagVectorStore,
   validateRagSourceInput,
   mongooseRagSourceRepository,
+  publishedSourceWhere,
+  createRagVectorStore,
+  isRetryableIndexingError,
 } from './ragService';
 
 const ownerId = '64b000000000000000000001';
@@ -170,6 +175,94 @@ function service(
 }
 
 describe('RagService', () => {
+  it('retries only typed transient adapter errors', () => {
+    for (const error of [new AiProviderUnavailableError('ollama'), new AiProviderTimeoutError('ollama'),
+      new ChromaClientError('unavailable', 'UNAVAILABLE', true)]) expect(isRetryableIndexingError(error)).toBe(true);
+    for (const error of [new Error('unknown'), { retryable: true }, new AiProviderResponseError('ollama', 'invalid'),
+      new AiProviderAbortedError('ollama'), new ChromaClientError('rejected', 'REQUEST_REJECTED'),
+      new ChromaClientError('invalid', 'INVALID_RESPONSE', true)]) expect(isRetryableIndexingError(error)).toBe(false);
+  });
+
+  it('passes transient classification through claimed indexing without exposing provider details', async () => {
+    const content = 'retry content';
+    const source = readySource({ status: 'indexing', contentHash: require('crypto').createHash('sha256').update(content).digest('hex') });
+    const repo = repository([source]);
+    const claim = { sourceId, token: '12345678-1234-1234-1234-123456789abc', attempt: 1, content };
+    const renewal = jest.spyOn(RagIndexingLease.prototype, 'renew').mockResolvedValue(true);
+    const lookup = jest.spyOn(RagSourceModel, 'findById').mockReturnValue({ lean: async () => source } as never);
+    try {
+      const ai = provider({ embed: jest.fn().mockRejectedValue(new AiProviderTimeoutError('ollama')) });
+      await expect(service(repo, ai).executeIndexingClaim(claim)).rejects.toBeDefined();
+      expect(repo.markFailed).toHaveBeenCalledWith(ownerId, sourceId, expect.any(String), undefined, claim, true);
+    } finally { renewal.mockRestore(); lookup.mockRestore(); }
+  });
+
+  it('bounds Chroma timeout independently of the valid long AI timeout', () => {
+    expect(() => createRagVectorStore(config({ aiTimeoutMs: 600_000 }))).not.toThrow();
+    expect(createRagVectorStore(config({ chromaUrl: undefined }))).toBeUndefined();
+  });
+
+  it('constrains vector ranking to the published generation of each source', () => {
+    const secondId = '64b000000000000000000202';
+    expect(publishedSourceWhere(ownerId, projectId, [readySource({ indexingGeneration: 'generation' }), readySource({ _id: secondId })]))
+      .toEqual({ $and: [{ $and: [{ ownerId }, { scopeKey: `project:${projectId}` }] }, { $or: [
+        { $and: [{ sourceId }, { indexingGeneration: 'generation' }] }, { sourceId: secondId },
+      ] }] });
+    expect(() => publishedSourceWhere(ownerId, undefined, [])).toThrow();
+  });
+
+  it('persists a queued snapshot without embedding when background indexing is enabled', async () => {
+    const repo = repository();
+    const ai = provider();
+    const vectors = vectorStore();
+    const result = await service(repo, ai, vectors, config({ ragBackgroundIndexingEnabled: true }))
+      .ingest(ownerId, { name: 'Queued', mediaType: 'text/plain', content: 'Durable input' });
+    expect(result.status).toBe('queued');
+    expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ contentSnapshot: 'Durable input', status: 'queued' }));
+    expect(result).not.toHaveProperty('contentSnapshot');
+    expect(ai.embed).not.toHaveBeenCalled();
+    expect(vectors.upsert).not.toHaveBeenCalled();
+  });
+
+  it('retrieves only the published vector generation, rejecting stale and mismatched attempts', async () => {
+    const generation = '12345678-1234-1234-1234-123456789abc';
+    const stale = '87654321-1234-1234-1234-123456789abc';
+    const vectors = vectorStore();
+    const metadata = { ownerId, sourceId, scopeKey: `project:${projectId}`, chunkIndex: 0 };
+    (vectors.query as jest.Mock).mockResolvedValue({
+      ids: [`${sourceId}:${stale}:0`, `${sourceId}:0`, `${sourceId}:${stale}:0`, `${sourceId}:${generation}:0`],
+      documents: ['stale', 'legacy', 'forged generation', 'current content'],
+      metadatas: [{ ...metadata, indexingGeneration: stale }, metadata,
+        { ...metadata, indexingGeneration: generation }, { ...metadata, indexingGeneration: generation }],
+      distances: [0.01, 0.02, 0.03, 0.1],
+    });
+    const result = await service(repository([readySource({ indexingGeneration: generation })]), provider(), vectors)
+      .query(ownerId, { question: 'Current content?', projectId });
+    expect(result.references).toHaveLength(1);
+    expect(result.references[0].snippet).toBe('current content');
+  });
+
+  it('returns a bounded cursor page without exposing its lookahead record', async () => {
+    const repo = repository();
+    const rows = Array.from({ length: 51 }, (_, i) => readySource({ _id: (1000 - i).toString(16).padStart(24, '0') }));
+    (repo.list as jest.Mock).mockResolvedValue(rows);
+    const result = await service(repo).listPage(ownerId, undefined, undefined, '');
+    expect(result.sources).toHaveLength(50);
+    expect(result.pagination).toEqual({ pageSize: 50, nextCursor: String(rows[49]._id) });
+    expect(result.sources.some(item => item.id === String(rows[50]._id))).toBe(false);
+    expect(repo.list).toHaveBeenCalledWith(ownerId, undefined, false, { before: undefined, limit: 51 });
+    (repo.list as jest.Mock).mockResolvedValue([rows[50]]);
+    const last = await service(repo).listPage(ownerId, undefined, undefined, result.pagination.nextCursor);
+    expect(last.pagination.nextCursor).toBeNull();
+    expect(repo.list).toHaveBeenLastCalledWith(ownerId, undefined, false, { before: result.pagination.nextCursor, limit: 51 });
+  });
+
+  it.each([undefined, null, {}, ['abc'], 'bad', 'a'.repeat(25)])('rejects invalid pagination cursors before querying (%j)', async cursor => {
+    const repo = repository();
+    await expect(service(repo).listPage(ownerId, undefined, undefined, cursor)).rejects.toMatchObject({ code: 'INVALID_RAG_INPUT' });
+    expect(repo.list).not.toHaveBeenCalled();
+  });
+
   it('lists recovery metadata without resolving a deleted project or exposing vector storage', async () => {
     const repo = repository();
     (repo.list as jest.Mock).mockResolvedValue([readySource()]);
@@ -375,7 +468,7 @@ describe('RagService', () => {
     });
     expect(result.references).toHaveLength(1);
     expect(vectors.query).toHaveBeenCalledWith(collectionId, expect.objectContaining({
-      where: { $and: [{ ownerId }, { scopeKey: `project:${projectId}` }] },
+      where: { $and: [{ $and: [{ ownerId }, { scopeKey: `project:${projectId}` }] }, { sourceId }] },
     }));
     await rag.delete(ownerId.toUpperCase(), sourceId.toUpperCase());
     expect(vectors.deleteWhere).toHaveBeenCalledWith(collectionId, {
@@ -477,6 +570,8 @@ describe('RagService', () => {
     expect(resolveActive).toHaveBeenCalledWith(ownerId, projectId);
     expect(result).toMatchObject({ id: sourceId, status: 'ready', projectId, embedding: { provider: 'ollama', model: 'embed-model', dimension: 2 } });
     expect(result).not.toHaveProperty('contentHash');
+    expect(result).not.toHaveProperty('contentSnapshot');
+    expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ contentSnapshot: expect.any(String) }));
     expect(result).not.toHaveProperty('collectionId');
     expect(vectors.getOrCreateCollection).toHaveBeenCalledWith(expect.stringMatching(/^kfive-rag-v1-[a-f\d]{32}$/), {
       'hnsw:space': 'cosine', chunkingVersion: 1,
@@ -503,7 +598,7 @@ describe('RagService', () => {
     expect(repo.markFailed).toHaveBeenCalledWith(ownerId, sourceId, 'RAG_VECTOR_STORE_UNAVAILABLE', {
       collectionId,
       collectionName: expect.stringMatching(/^kfive-rag-v1-/),
-    });
+    }, undefined, false);
     expect(repo.records[0]).toMatchObject({
       status: 'failed', errorCode: 'RAG_VECTOR_STORE_UNAVAILABLE', collectionId,
     });
@@ -540,7 +635,7 @@ describe('RagService', () => {
 
     expect(resolveOwned).toHaveBeenCalledWith(ownerId, projectId);
     expect(vectors.query).toHaveBeenCalledWith(collectionId, expect.objectContaining({
-      where: { $and: [{ ownerId }, { scopeKey: `project:${projectId}` }] },
+      where: { $and: [{ $and: [{ ownerId }, { scopeKey: `project:${projectId}` }] }, { sourceId }] },
     }));
     expect(result.references).toEqual([expect.objectContaining({
       marker: '[S1]', sourceId, chunkIndex: 1, snippet: 'trusted retrieved text', distance: 0.25,
@@ -670,6 +765,19 @@ describe('RagService', () => {
       expect(ai.embed).not.toHaveBeenCalled();
       expect(repo.create).not.toHaveBeenCalled();
     }
+  });
+
+  it('returns the concurrent document winner even when it consumes the final quota slot', async () => {
+    const repo = repository();
+    const ai = provider();
+    (repo.findByOwnerAndDocumentId as jest.Mock).mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(readySource({ sourceKind: 'document', documentId }));
+    (repo.create as jest.Mock).mockRejectedValue(new RagServiceError('Full', 'RAG_SOURCE_LIMIT_EXCEEDED', 409));
+    const document = { _id: documentId, originalName: 'scan.pdf', mimeType: 'application/pdf',
+      status: 'completed', content: 'Stable fact.', pageCount: 1 };
+    await expect(service(repo, ai, vectorStore(), config(), undefined, undefined, jest.fn().mockResolvedValue(document))
+      .ingestDocument(ownerId, documentId)).resolves.toMatchObject({ created: false, source: { id: sourceId, documentId } });
+    expect(ai.embed).not.toHaveBeenCalled();
   });
 
   it('returns an existing document source idempotently without embedding twice', async () => {

@@ -10,6 +10,7 @@ import {
   nextKnowledgeRefreshDelay,
   normalizeKnowledgeQuery,
   normalizeKnowledgeSources,
+  normalizeKnowledgePage,
   normalizeKnowledgeStatus,
   sourceMediaType,
   validateKnowledgeFile,
@@ -175,5 +176,27 @@ describe('knowledge contract normalization', () => {
   it('bounds automatic source refresh with backoff', () => {
     expect([1, 2, 3, 4, 5, 6].map(nextKnowledgeRefreshDelay)).toEqual([1000, 2000, 4000, 8000, 8000, 8000]);
     expect(nextKnowledgeRefreshDelay(7)).toBeUndefined();
+  });
+});
+
+describe('knowledge cursor pages', () => {
+  const rows = Array.from({ length: 50 }, (_, index) => ({
+    id: (1000 - index).toString(16).padStart(24, '0'), name: 'source', mediaType: 'text/plain', status: 'ready',
+  }));
+  const page = { sources: rows, count: 50, pagination: { pageSize: 50, nextCursor: rows[49].id } };
+  it('accepts bounded continuation and an empty terminal page', () => {
+    expect(normalizeKnowledgePage({ data: page })?.nextCursor).toBe(rows[49].id);
+    expect(normalizeKnowledgePage({ sources: [], count: 0, pagination: { pageSize: 50, nextCursor: null } }))
+      .toEqual({ sources: [], nextCursor: null });
+  });
+  it('rejects missing metadata, duplicate/reordered IDs, malformed records, and forged continuation', () => {
+    for (const invalid of [
+      { sources: rows }, { ...page, count: 1 },
+      { ...page, sources: [...rows].reverse() },
+      { ...page, sources: rows.map(() => rows[0]) },
+      { ...page, sources: [...rows.slice(1), {}] },
+      { ...page, pagination: { pageSize: 50, nextCursor: rows[0].id } },
+      { ...page, pagination: { pageSize: 200, nextCursor: null } },
+    ]) expect(normalizeKnowledgePage(invalid)).toBeUndefined();
   });
 });

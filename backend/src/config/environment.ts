@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import Joi from 'joi';
+import { IMMUTABLE_CONTAINER_IMAGE } from '@/utils/containerImage';
 import { REPOSITORY_IMPORTER_SOCKET_PATH } from '@/services/repositoryArchiveIsolationProtocol';
 
 dotenv.config();
@@ -21,6 +22,7 @@ export interface EnvironmentConfig {
   mongodbUrl: string;
   redisUrl: string;
   chromaUrl?: string;
+  ragBackgroundIndexingEnabled?: boolean;
   ollamaBaseUrl?: string;
   ollamaSocketPath?: string;
   openaiBaseUrl?: string;
@@ -78,6 +80,7 @@ const schema = Joi.object({
   MONGODB_URL: Joi.string().uri({ scheme: ['mongodb', 'mongodb+srv'] }),
   MONGODB_URI: Joi.string().uri({ scheme: ['mongodb', 'mongodb+srv'] }),
   REDIS_URL: Joi.string().uri({ scheme: ['redis', 'rediss'] }).required(),
+  RAG_BACKGROUND_INDEXING_ENABLED: Joi.boolean().truthy('true').falsy('false').default(false),
   CHROMA_URL: Joi.string().uri({ scheme: ['http', 'https'] }).allow(''),
   OLLAMA_BASE_URL: Joi.string().uri({ scheme: ['http', 'https'] }).allow(''),
   OLLAMA_SOCKET_PATH: Joi.string().max(100).allow('').custom((value, helpers) => {
@@ -207,6 +210,10 @@ const schema = Joi.object({
   if (value.NOTEBOOK_RUNTIME_IMAGE && value.NOTEBOOK_RUNTIME_IMAGE === value.NOTEBOOK_VERIFIER_IMAGE) {
     return helpers.error('any.custom', { message: 'Notebook runtime and verifier images must be distinct' });
   }
+  if (value.NOTEBOOK_EXECUTION_ENABLED && (!IMMUTABLE_CONTAINER_IMAGE.test(value.NOTEBOOK_RUNTIME_IMAGE)
+    || !IMMUTABLE_CONTAINER_IMAGE.test(value.NOTEBOOK_VERIFIER_IMAGE))) {
+    return helpers.error('any.custom', { message: 'Notebook images must be immutable sha256 content IDs or repository digests' });
+  }
   return value;
 }, 'cross-field environment validation');
 
@@ -237,6 +244,7 @@ export function parseEnvironment(source: NodeJS.ProcessEnv): EnvironmentConfig {
     mongodbUrl: value.MONGODB_URL || value.MONGODB_URI,
     redisUrl: value.REDIS_URL,
     chromaUrl: cleanOptional(value.CHROMA_URL),
+    ragBackgroundIndexingEnabled: value.RAG_BACKGROUND_INDEXING_ENABLED,
     ollamaBaseUrl: cleanOptional(value.OLLAMA_BASE_URL),
     ollamaSocketPath: cleanOptional(value.OLLAMA_SOCKET_PATH),
     openaiBaseUrl: cleanOptional(value.OPENAI_BASE_URL),

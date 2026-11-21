@@ -29,10 +29,10 @@ class FakeDocker implements NotebookDockerClient {
   constructor(private readonly verifierExit = 0) {}
   async run(args: readonly string[]): Promise<NotebookDockerResult> {
     const call = [...args]; this.calls.push(call);
-    if (call[0] === 'image' && call.includes('runtime:test')) return result(`sha256:${runtimeId}\n`);
-    if (call[0] === 'image' && call.includes('verifier:test')) return result(`sha256:${verifierId}\n`);
-    if (call[0] === 'create' && call.includes('runtime:test')) return result(`${runtimeContainer}\n`);
-    if (call[0] === 'create' && call.includes('verifier:test')) return result(`${verifierContainer}\n`);
+    if (call[0] === 'image' && call.includes(`sha256:${runtimeId}`)) return result(`sha256:${runtimeId}\n`);
+    if (call[0] === 'image' && call.includes(`sha256:${verifierId}`)) return result(`sha256:${verifierId}\n`);
+    if (call[0] === 'create' && call.includes(`sha256:${runtimeId}`)) return result(`${runtimeContainer}\n`);
+    if (call[0] === 'create' && call.includes(`sha256:${verifierId}`)) return result(`${verifierContainer}\n`);
     if (call[0] === 'inspect') return result('{"OOMKilled":false,"ExitCode":0}\n');
     if (call[0] === 'exec' && call.includes('kfive_notebook_runtime.exporter')) return result(successfulEnvelope());
     if (call[0] === 'exec' && call.includes('kfive_notebook_runtime.verifier')) return result('', this.verifierExit);
@@ -44,20 +44,64 @@ const request = { runId, cellTimeoutSeconds: 10,
   cells: [{ id: 'cell_one', type: 'code' as const, source: 'print(1)', tags: [] }] };
 
 describe('DockerNotebookExecutor', () => {
+  it('recognizes Docker AppArmor capability with profile metadata but rejects lookalikes', async () => {
+    const docker = new FakeDocker();
+    const executor = new DockerNotebookExecutor(docker, { runtimeImage: `sha256:${runtimeId}`, verifierImage: `sha256:${verifierId}` });
+    for (const capability of ['name=apparmor', 'name=apparmor,profile=default']) {
+      docker.run = jest.fn().mockResolvedValue(result(JSON.stringify(['name=seccomp,profile=builtin', capability])));
+      await expect(executor.verifyHostSecurity()).resolves.toBeUndefined();
+    }
+    for (const capability of ['name=apparmor-disabled', 'name=not-apparmor']) {
+      docker.run = jest.fn().mockResolvedValue(result(JSON.stringify(['name=seccomp,profile=builtin', capability])));
+      await expect(executor.verifyHostSecurity()).rejects.toThrow(/AppArmor/);
+    }
+  });
+
+  it('rejects mutable runtime or verifier references before contacting Docker', () => {
+    const docker = new FakeDocker();
+    for (const [runtimeImage, verifierImage] of [
+      ['runtime:latest', `sha256:${verifierId}`],
+      [`sha256:${runtimeId}`, 'verifier:local'],
+      ['runtime@sha256:abc', `sha256:${verifierId}`],
+    ]) {
+      expect(() => new DockerNotebookExecutor(docker, { runtimeImage, verifierImage })).toThrow(/immutable/);
+    }
+    expect(docker.calls).toHaveLength(0);
+  });
+
+  it('creates both stages by resolved image ID when configured with registry digests', async () => {
+    const docker = new FakeDocker();
+    const original = docker.run.bind(docker);
+    docker.run = async (args) => {
+      if (args[0] === 'image') {
+        docker.calls.push([...args]);
+        return result(`sha256:${args.includes(`registry.test/runtime@sha256:${'e'.repeat(64)}`) ? runtimeId : verifierId}\n`);
+      }
+      return original(args);
+    };
+    await new DockerNotebookExecutor(docker, {
+      runtimeImage: `registry.test/runtime@sha256:${'e'.repeat(64)}`,
+      verifierImage: `registry.test/verifier@sha256:${'f'.repeat(64)}`,
+    }).execute(request);
+    const creates = docker.calls.filter((call) => call[0] === 'create');
+    expect(creates[0]).toContain(`sha256:${runtimeId}`);
+    expect(creates[1]).toContain(`sha256:${verifierId}`);
+  });
+
   it('canonicalizes empty cell tags before immutable identity verification', () => {
     expect(notebookInput(request.cells).cells[0].metadata).toEqual({});
     expect(notebookInput([{ ...request.cells[0], tags: ['training'] }]).cells[0].metadata).toEqual({ tags: ['training'] });
   });
 
   it('enforces resource, network, privilege, and mount isolation in both stages', () => {
-    const runtime = runtimeCreateArgs('runtime-name', 'runtime:test', {
+    const runtime = runtimeCreateArgs('runtime-name', `sha256:${runtimeId}`, {
       requireAppArmor: true, memoryBytes: 768 * 1024 * 1024, cpuCores: 1, processLimit: 128,
     });
     expect(runtime).toEqual(expect.arrayContaining(['--read-only', '--network', 'none', '--ipc', 'none',
       '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges:true', '--security-opt', 'apparmor=docker-default',
       '--user', '10001:10001', '--pids-limit', '128', '--entrypoint', '/usr/bin/sleep']));
     expect(runtime.join(' ')).not.toContain('docker.sock');
-    const verifier = verifierCreateArgs('verifier-name', 'verifier:test', true);
+    const verifier = verifierCreateArgs('verifier-name', `sha256:${verifierId}`, true);
     expect(verifier).toEqual(expect.arrayContaining(['--read-only', '--network', 'none', '--user', '10002:10002',
       '--entrypoint', '/usr/bin/sleep']));
     expect(verifier.join(' ')).not.toContain('docker.sock');
@@ -65,11 +109,11 @@ describe('DockerNotebookExecutor', () => {
 
   it('removes the stopped runtime before it creates the independent verifier', async () => {
     const docker = new FakeDocker();
-    const output = await new DockerNotebookExecutor(docker, { runtimeImage: 'runtime:test', verifierImage: 'verifier:test' }).execute(request);
+    const output = await new DockerNotebookExecutor(docker, { runtimeImage: `sha256:${runtimeId}`, verifierImage: `sha256:${verifierId}` }).execute(request);
     expect(output).toMatchObject({ status: 'succeeded', runtimeImageId: runtimeId, verifierImageId: verifierId,
       executedNotebookJson: expect.any(String), metrics: [], artifacts: [] });
     const runtimeRemove = docker.calls.findIndex((call) => call[0] === 'rm' && call.includes(runtimeContainer));
-    const verifierCreate = docker.calls.findIndex((call) => call[0] === 'create' && call.includes('verifier:test'));
+    const verifierCreate = docker.calls.findIndex((call) => call[0] === 'create' && call.includes(`sha256:${verifierId}`));
     expect(runtimeRemove).toBeGreaterThan(-1);
     expect(verifierCreate).toBeGreaterThan(runtimeRemove);
     expect(docker.calls.filter((call) => call[0] === 'create')).toHaveLength(2);
@@ -77,7 +121,7 @@ describe('DockerNotebookExecutor', () => {
 
   it('never accepts output when the verifier rejects it and cleans both containers', async () => {
     const docker = new FakeDocker(1);
-    await expect(new DockerNotebookExecutor(docker, { runtimeImage: 'runtime:test', verifierImage: 'verifier:test' }).execute(request))
+    await expect(new DockerNotebookExecutor(docker, { runtimeImage: `sha256:${runtimeId}`, verifierImage: `sha256:${verifierId}` }).execute(request))
       .rejects.toMatchObject({ code: 'NOTEBOOK_ISOLATION_FAILED' });
     expect(docker.calls.some((call) => call[0] === 'rm' && call.includes(runtimeContainer))).toBe(true);
     expect(docker.calls.some((call) => call[0] === 'rm' && call.includes(verifierContainer))).toBe(true);
@@ -85,7 +129,7 @@ describe('DockerNotebookExecutor', () => {
 
   it('does not create a user-code container for an already-cancelled request', async () => {
     const docker = new FakeDocker(); const controller = new AbortController(); controller.abort();
-    await expect(new DockerNotebookExecutor(docker, { runtimeImage: 'runtime:test', verifierImage: 'verifier:test' })
+    await expect(new DockerNotebookExecutor(docker, { runtimeImage: `sha256:${runtimeId}`, verifierImage: `sha256:${verifierId}` })
       .execute(request, controller.signal)).resolves.toMatchObject({ status: 'cancelled' });
     expect(docker.calls.some((call) => call[0] === 'create')).toBe(false);
   });
@@ -94,7 +138,7 @@ describe('DockerNotebookExecutor', () => {
     const docker = new FakeDocker();
     docker.run = jest.fn(async (args: readonly string[]) => args[0] === 'image'
       ? result(`sha256:${runtimeId}\n`) : result());
-    await expect(new DockerNotebookExecutor(docker, { runtimeImage: 'runtime:test', verifierImage: 'verifier:test' })
+    await expect(new DockerNotebookExecutor(docker, { runtimeImage: `sha256:${runtimeId}`, verifierImage: `sha256:${verifierId}` })
       .execute(request)).rejects.toThrow('same image');
   });
 });

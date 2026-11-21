@@ -1,0 +1,183 @@
+{
+  "topology": "native API/worker, loopback host Ollama, isolated Docker MongoDB/Redis",
+  "model": "phi3:latest",
+  "checks": [
+    "SSE disconnect/reconnect preserves durable six-call run and monotonic revisions",
+    "Chromium renders real run comparison and exports canonical six-call detail at desktop/tablet/mobile widths",
+    "Two compatible successful real host Ollama runs",
+    "Second user cannot list, read/export, reconnect, cancel, or delete owner record",
+    "Queued cancellation while worker offline executes zero calls",
+    "MongoDB/Redis/API/worker restart preserves complete record and safely dispatches queued run",
+    "Running cancellation terminalizes through MongoDB and worker Pub/Sub; provider resource cancellation not inferred",
+    "SIGKILL during a provider call, natural lease expiry, reconciliation and restart interrupt without another call-start",
+    "Persisted and public benchmark GPU snapshots contain no UUID fields",
+    "Exact fixture containers/network removed; existing volume identities unchanged"
+  ],
+  "modelDigest": "4f222292793889a9a40a020799cfd28d53f3e01af25d48e06c5e708610fc47e9",
+  "providerEvidence": [
+    {
+      "runId": "6b0091dc893ee777237c1d93",
+      "loaded": [
+        {
+          "name": "phi3:latest",
+          "digest": "4f222292793889a9a40a020799cfd28d53f3e01af25d48e06c5e708610fc47e9",
+          "size": 3810346925,
+          "sizeVram": 3810346925
+        }
+      ],
+      "wallDurationMs": 3220,
+      "providerDurationMs": 3052,
+      "computeProcesses": [
+        "/usr/lib/ollama/llama-server, 3659"
+      ],
+      "gpuOffloadObserved": true
+    },
+    {
+      "runId": "6b0091df893ee777237c1da7",
+      "loaded": [
+        {
+          "name": "phi3:latest",
+          "digest": "4f222292793889a9a40a020799cfd28d53f3e01af25d48e06c5e708610fc47e9",
+          "size": 3810346925,
+          "sizeVram": 3810346925
+        }
+      ],
+      "wallDurationMs": 3060,
+      "providerDurationMs": 2945,
+      "computeProcesses": [
+        "/usr/lib/ollama/llama-server, 3665"
+      ],
+      "gpuOffloadObserved": true
+    }
+  ],
+  "runs": [
+    {
+      "id": "6b0091dc893ee777237c1d93",
+      "status": "succeeded",
+      "wallDurationMs": 3220,
+      "aggregate": {
+        "passCount": 6,
+        "totalCalls": 6,
+        "medianTtftMs": 35,
+        "medianDurationMs": 294.5,
+        "medianOutputBytes": 179,
+        "outputTokens": 382,
+        "outputTokensPerSecond": 118.634
+      },
+      "gpu": {
+        "before": {
+          "available": true,
+          "sampledAt": "2026-11-20T18:30:52.394Z",
+          "devices": [
+            {
+              "index": 0,
+              "name": "NVIDIA GeForce RTX 5070 Laptop GPU",
+              "driverVersion": "620.70.06",
+              "memoryTotalMiB": 8151,
+              "memoryUsedMiB": 3962,
+              "memoryFreeMiB": 4189,
+              "utilizationPercent": 5,
+              "temperatureC": 51
+            }
+          ],
+          "summary": {
+            "deviceCount": 1,
+            "totalVramMiB": 8151,
+            "usedVramMiB": 3962,
+            "freeVramMiB": 4189
+          }
+        },
+        "after": {
+          "available": true,
+          "sampledAt": "2026-11-20T18:30:55.565Z",
+          "devices": [
+            {
+              "index": 0,
+              "name": "NVIDIA GeForce RTX 5070 Laptop GPU",
+              "driverVersion": "620.70.06",
+              "memoryTotalMiB": 8151,
+              "memoryUsedMiB": 3963,
+              "memoryFreeMiB": 4188,
+              "utilizationPercent": 93,
+              "temperatureC": 65
+            }
+          ],
+          "summary": {
+            "deviceCount": 1,
+            "totalVramMiB": 8151,
+            "usedVramMiB": 3963,
+            "freeVramMiB": 4188
+          }
+        }
+      }
+    },
+    {
+      "id": "6b0091df893ee777237c1da7",
+      "status": "succeeded",
+      "wallDurationMs": 3060,
+      "aggregate": {
+        "passCount": 6,
+        "totalCalls": 6,
+        "medianTtftMs": 18,
+        "medianDurationMs": 258,
+        "medianOutputBytes": 179,
+        "outputTokens": 382,
+        "outputTokensPerSecond": 124.837
+      },
+      "gpu": {
+        "before": {
+          "available": true,
+          "sampledAt": "2026-11-20T18:30:55.719Z",
+          "devices": [
+            {
+              "index": 0,
+              "name": "NVIDIA GeForce RTX 5070 Laptop GPU",
+              "driverVersion": "620.70.06",
+              "memoryTotalMiB": 8151,
+              "memoryUsedMiB": 3974,
+              "memoryFreeMiB": 4177,
+              "utilizationPercent": 72,
+              "temperatureC": 56
+            }
+          ],
+          "summary": {
+            "deviceCount": 1,
+            "totalVramMiB": 8151,
+            "usedVramMiB": 3974,
+            "freeVramMiB": 4177
+          }
+        },
+        "after": {
+          "available": true,
+          "sampledAt": "2026-11-20T18:30:58.751Z",
+          "devices": [
+            {
+              "index": 0,
+              "name": "NVIDIA GeForce RTX 5070 Laptop GPU",
+              "driverVersion": "620.70.06",
+              "memoryTotalMiB": 8151,
+              "memoryUsedMiB": 3980,
+              "memoryFreeMiB": 4171,
+              "utilizationPercent": 78,
+              "temperatureC": 67
+            }
+          ],
+          "summary": {
+            "deviceCount": 1,
+            "totalVramMiB": 8151,
+            "usedVramMiB": 3980,
+            "freeVramMiB": 4171
+          }
+        }
+      }
+    }
+  ],
+  "providerLoadedModel": [
+    {
+      "name": "phi3:latest",
+      "size": 3810346925,
+      "sizeVram": 3810346925
+    }
+  ],
+  "status": "PASS"
+}

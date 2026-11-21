@@ -1,5 +1,5 @@
-# Direct runtime surface. Every exposed package is pinned; pip resolves its
-# transitive dependencies during the image build until a reviewed hash lock is added.
+# Direct runtime surface. The complete reviewed CPython 3.12/Linux amd64 graph
+# and wheel hashes are recorded in requirements.lock; builds never resolve anew.
 ipykernel==6.29.5
 joblib==1.4.2
 matplotlib==3.9.3

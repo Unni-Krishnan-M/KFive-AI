@@ -1,0 +1,9 @@
+{
+  "topology": "isolated real MongoDB, synthetic provider/vector adapters",
+  "checks": [
+    "Replacement publishes; delayed expired worker cannot publish or remove replacement vectors; private snapshot removed",
+    "Two workers discover abandoned persisted claim; exactly one executes and publishes",
+    "Expired final attempt terminalizes; unclaimed legacy synchronous indexing is not stolen"
+  ],
+  "cleanup": "exact source ids and owner; no existing application data accessed"
+}

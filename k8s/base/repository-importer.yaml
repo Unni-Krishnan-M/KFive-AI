@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: repository-importer
+  namespace: kfive
+  labels: &labels
+    app.kubernetes.io/name: repository-importer
+    app.kubernetes.io/component: archive-parser
+    app.kubernetes.io/part-of: kfive
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app.kubernetes.io/name: repository-importer}}
+  template:
+    metadata: {labels: *labels}
+    spec:
+      # The bounded kind profile shares a node-local Unix socket, not TCP.
+      nodeSelector: {kubernetes.io/hostname: kfive-control-plane}
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10002
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: repository-importer
+          image: kfive-ai-backend:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+            - ulimit -c 0; exec node --max-old-space-size=128 backend/dist/repositoryImporterServerMain.js
+          env:
+            - {name: NODE_ENV, value: production}
+            - {name: REPOSITORY_IMPORTER_SOCKET_PATH, value: /run/kfive-repository-importer/importer.sock}
+          startupProbe:
+            exec: {command: [node, backend/dist/repositoryImporterHealthMain.js]}
+            periodSeconds: 2
+            timeoutSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            exec: {command: [node, backend/dist/repositoryImporterHealthMain.js]}
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            exec: {command: [node, backend/dist/repositoryImporterHealthMain.js]}
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 6
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: "1", memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: repository-importer-socket, mountPath: /run/kfive-repository-importer}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: repository-importer-socket
+          hostPath: {path: /run/kfive-repository-importer, type: Directory}
+        - name: tmp
+          emptyDir: {medium: Memory, sizeLimit: 32Mi}

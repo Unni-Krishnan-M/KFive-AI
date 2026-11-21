@@ -107,8 +107,14 @@ test('sets probes, resource bounds, and non-root security for every workload', (
   const hostPaths = workloads.flatMap((workload) => podSpec(workload).volumes || [])
     .filter((volume) => volume.hostPath);
   assert.deepEqual(hostPaths, [{
+    name: 'repository-importer-socket',
+    hostPath: { path: '/run/kfive-repository-importer', type: 'Directory' },
+  }, {
     name: 'ollama-socket',
     hostPath: { path: '/run/kfive-host-ollama', type: 'Directory' },
+  }, {
+    name: 'repository-importer-socket',
+    hostPath: { path: '/run/kfive-repository-importer', type: 'Directory' },
   }]);
 });
 
@@ -184,7 +190,9 @@ test('default-denies the application namespace and permits only the declared ser
     podSelector: {}, policyTypes: ['Ingress', 'Egress'],
   });
   const dns = policy('allow-dns-egress');
-  assert.deepEqual(dns.spec.podSelector, {});
+  assert.deepEqual(dns.spec.podSelector, { matchExpressions: [{
+    key: 'app.kubernetes.io/name', operator: 'NotIn', values: ['repository-importer'],
+  }] });
   assert.deepEqual(dns.spec.policyTypes, ['Egress']);
   assert.deepEqual(dns.spec.egress[0].to, [{
     namespaceSelector: {matchLabels: {'kubernetes.io/metadata.name': 'kube-system'}},

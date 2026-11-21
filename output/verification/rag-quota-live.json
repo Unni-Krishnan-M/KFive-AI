@@ -1,0 +1,17 @@
+{
+  "status": "PASS",
+  "topology": "isolated real MongoDB, production repository in independent Node processes; no provider calls",
+  "checks": [
+    "Read-only inspection and idempotent additive index migration preserve 196 legacy records across scopes/statuses",
+    "Real Mongo retry policy: server-time 5s/10s backoff, owner and stale-token fences, late heartbeat rejection, three-attempt cap, immediate terminal failure",
+    "Eight independent Node processes contend for four remaining slots: exactly four admits, 28 quota rejections, all legacy data unchanged",
+    "Deletion releases capacity; writer SIGKILL after insertion leaves one counted durable source; deleting legacy data opens exactly one additional slot",
+    "Independent owner fills 200 unique slots under eight-process contention and rejects source 201",
+    "Pre-existing over-limit owner retains all 201 records and cannot admit another source",
+    "Document duplicate consumes no extra slot; missing quota index fails closed; private slots are absent from default list projection",
+    "Mongo restart preserves source totals and enforcing unique index",
+    "Exact four fixture owners cleaned; no application database was accessed",
+    "Exact temporary container/network removed; pre-existing volume identities unchanged"
+  ],
+  "scratch": "/tmp/kfive-rag-quota-6188296f7fe13d6cN8WVqm"
+}

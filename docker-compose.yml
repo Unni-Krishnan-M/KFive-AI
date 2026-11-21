@@ -228,8 +228,8 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       NOTEBOOK_EXECUTION_ENABLED: "true"
-      NOTEBOOK_RUNTIME_IMAGE: ${NOTEBOOK_RUNTIME_IMAGE:-kfive-notebook-runtime:local}
-      NOTEBOOK_VERIFIER_IMAGE: ${NOTEBOOK_VERIFIER_IMAGE:-kfive-notebook-verifier:local}
+      NOTEBOOK_RUNTIME_IMAGE: ${NOTEBOOK_RUNTIME_IMAGE:-}
+      NOTEBOOK_VERIFIER_IMAGE: ${NOTEBOOK_VERIFIER_IMAGE:-}
       NOTEBOOK_REQUIRE_APPARMOR: ${NOTEBOOK_REQUIRE_APPARMOR:-true}
     depends_on:
       mongodb: { condition: service_healthy }

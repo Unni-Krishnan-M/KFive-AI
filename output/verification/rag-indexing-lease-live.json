@@ -1,0 +1,15 @@
+{
+  "topology": "native API, isolated Docker MongoDB/Redis; no worker or inference",
+  "checks": [
+    "workspace: exact 217-record traversal with tied timestamps and no duplicates",
+    "project: exact 103-record traversal with tied timestamps and no duplicates",
+    "orphaned: exact 57-record traversal with tied timestamps and no duplicates",
+    "stranger: exact 11-record traversal with tied timestamps and no duplicates",
+    "Cross-owner project access, malformed/mixed cursors, deleted cursor record, concurrent new insertion, and API restart pass",
+    "Mongo lease primitive: eight-way claim race, server-time expiry, stale renewal/publication rejection, and three-attempt limit pass with a one-second test lease",
+    "Exact fixture containers/network removed; existing volume identities unchanged"
+  ],
+  "fixtureRecords": 388,
+  "scope": "Seeded history metadata; real compiled API and MongoDB; no ingestion or inference claims",
+  "status": "PASS"
+}

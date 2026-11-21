@@ -1,0 +1,24 @@
+{
+  "status": "PASS",
+  "topology": "production native API/worker, real host Ollama, isolated MongoDB/Redis/Chroma, Chroma response-delay proxy",
+  "checks": [
+    "Real Ollama embedding/Chroma upsert followed by SIGKILL before publication; production API restart resumes after natural 30-second lease expiry and publishes generation 2",
+    "Real Chroma excludes 100 stale vectors before ranking; real Phi3 answer cites only the recovered source; second user cannot read/delete it",
+    "Real Chrome login/upload shows pending state and disabled deletion, auto-refreshes to ready after real indexing, and retains ready state on reload",
+    "Production API and Chrome reject source 201 with stable 409 quota error and visible recovery guidance; no source is created",
+    "MongoDB/Redis/Chroma and production API restart preserve published source/generation and actual vectors",
+    "Owner deletion removes current and abandoned vectors; exact two test accounts removed",
+    "Exact fixture containers/network removed; pre-existing volume identities unchanged"
+  ],
+  "models": [
+    {
+      "name": "all-minilm:22m",
+      "digest": "1b226e2802dbb772b5fc32a58f103ca1804ef7501331012de126ab22f67475ef"
+    },
+    {
+      "name": "phi3:latest",
+      "digest": "4f222292793889a9a40a020799cfd28d53f3e01af25d48e06c5e708610fc47e9"
+    }
+  ],
+  "scratch": "/tmp/kfive-rag-recovery-a5892a333bb2d4fbx7PGFq"
+}

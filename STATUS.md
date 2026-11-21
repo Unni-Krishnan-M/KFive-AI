@@ -1,5 +1,59 @@
 # KFive AI Status
 
+## Atomic Knowledge source quota — 2026-11-21
+
+Admission now stores a private integer slot on the same source document. A unique partial `{ ownerId, quotaSlot }` index bounds new sources to 200 per owner across all statuses and scopes. Concurrent slot conflicts retry only another free slot; document deduplication and ambiguous database failures do not silently consume extra capacity. Deletion releases capacity atomically with source removal. Missing or incompatible enforcing indexes fail closed.
+
+Legacy sources are preserved and reserve capacity without rewriting their data. Owners already over 200 keep their records and cannot add another. Before rollout, drain every old API writer: legacy writes without slots must not continue concurrently with the new admission algorithm. The additive migration does not delete or rewrite source data. With the target `MONGODB_URL` supplied through the approved environment, inspect using `node scripts/migrations/20261121-rag-quota-index.cjs`; add `--apply` to create the enforcing index, then inspect again before starting updated writers. This migration has been verified only in the isolated acceptance database, not applied to existing application data here.
+
+[Live quota evidence](output/verification/rag-quota-live.json) proves eight-process contention, 196 preserved legacy records plus exactly four admitted sources, rejection beyond 200, an independent owner's separate allowance, deletion/readmission, a writer killed after insertion, duplicate-document behavior, fail-closed missing index, and Mongo restart persistence. Fixture accounts/container/network were removed and existing volume identities preserved. Current backend build/lint and 80 focused RAG/Knowledge tests pass.
+
+The quota bounds source metadata/input count, not Chroma storage left by abandoned attempts. Automatic stale-vector garbage collection and late writes after deletion remain unfinished. Background recovery remains opt-in; remote/Kubernetes and distributed project coordination remain unverified.
+
+
+### RAG real recovery acceptance — 2026-11-21
+
+The opt-in background worker now passes production native-API acceptance with real host Ollama (`all-minilm:22m` embeddings and `phi3:latest` generation), isolated MongoDB/Redis/Chroma, and real Chrome. A response-delay proxy allows a real Chroma upsert to finish, then SIGKILL interrupts the API before publication. Restart waits for the natural 30-second lease expiry, claims attempt 2, and publishes only its generation. Private retry content is removed on publication. Chrome upload displays queued/indexing with deletion disabled, auto-refreshes to ready, and retains ready state after reload. All three datastores and the API restart with the source and vectors intact. Cross-owner read/delete rejection and owner deletion of both current/abandoned vectors pass.
+
+Retrieval now constrains Chroma ranking to the published generation of each ready source, preventing stale vectors from consuming its result window. Live acceptance seeds 100 obsolete vectors and still retrieves the valid source for a real Phi3 answer. A separately reproduced startup bug is fixed: valid AI timeouts longer than 120 seconds no longer violate the Chroma client's maximum; its timeout is capped independently.
+
+Evidence: [live report](output/verification/rag-recovery-live.json) and [browser screenshot](output/verification/rag-recovery-browser.png). Exact test accounts, vectors, temporary containers, and network were removed; existing volume identities were preserved. Non-root Chroma uses stdout logging in the verifier. Backend build/lint, all 84 backend suites / 601 tests, and 16 frontend Knowledge tests pass.
+
+This is a native local topology, not remote/Kubernetes or distributed project acceptance. Background indexing stays opt-in. Automatic stale-vector garbage collection (including late writes during deletion), atomic source quotas, legacy synchronous-orphan reconciliation, provider retry policy, and broader worker scheduling remain pending. Full master-platform completion remains active.
+
+
+### RAG worker checkpoint — 2026-11-21
+
+Opt-in `RAG_BACKGROUND_INDEXING_ENABLED=true` now persists queued ingestion and runs a bounded Mongo-backed polling worker inside the API process. Server-time claims, heartbeat renewal, generation-specific vector IDs, fenced publication, bounded exhausted-attempt terminalization, and shutdown draining are integrated. Default remains synchronous. Existing unclaimed synchronous records are not taken over.
+
+Backend build/lint and 91 focused tests pass; frontend build passes. Isolated real-Mongo acceptance with synthetic embedding/vector adapters passes two-worker claim contention, abandoned-claim discovery, expired-worker publication rejection, replacement-vector preservation, snapshot removal, and attempt exhaustion. The live test caught and fixed a private-field candidate projection bug. [Evidence](output/verification/rag-worker-live.json).
+
+This does not complete durable RAG acceptance. Real Ollama/Chroma crash/restart/browser acceptance, stale-generation vector garbage collection/retrieval saturation, atomic source quotas, and distributed project coordination remain. Provider errors currently terminalize rather than retry; expired abandoned claims retry at most three times. Source fixtures were deleted exactly. Docker initially reported a zombie-process removal failure; after the container exited, retry removed its exact container record successfully. No existing application volumes were modified.
+
+
+## 2026-11-21 Benchmark native-host/browser and limit acceptance — Implemented slices
+
+Real host Ollama/Phi3 runs now pass six-call execution, SSE reconnect, compatible-run browser comparison/export, second-user isolation, queued cancellation, complete MongoDB/Redis/API/worker restart, and SIGKILL/lease-expiry interruption without retrying an uncertain provider call. Sanitized NVIDIA snapshots plus matching Ollama VRAM allocation and NVIDIA process observations establish host GPU offload. The browser regression also found and fixed a comparison dropdown that exceeded its card at 375 pixels.
+
+A separate live local provider fixture passes exact 16-KiB UTF-8 output and overflow rejection, the unmodified 180-second timeout, provider-connection closure on cancellation, healthy two-worker serialization, 100-record retention/pagination/deletion/readmission, and concurrent active-owner admission. Disposable fixture cleanup preserves existing Docker volume identities. Backend/frontend builds and lint, 40 backend Benchmark tests, six frontend Benchmark model tests, tooling and syntax checks pass. See [evidence](output/verification/benchmark-host-live.md).
+
+Benchmarks remain **Experimental**: Compose bridge/container GPU, external-provider billing/cancellation, safe checkpoint takeover, lease-loss/stale-worker fencing, atomic multi-replica quota enforcement, and remote/Kubernetes acceptance are still pending. No external provider endpoint/key is configured in the checked repository environment; the required provider details have been requested. The next independent implementation work is durable RAG indexing/recovery and pagination. Notebook's AppArmor-host failure remains unresolved; the master platform goal is not complete.
+
+## 2026-11-20 Notebook dependency/image locking — Implemented source/build slice
+
+The selected CPython 3.12/Linux amd64 runtime now has a complete 52-package wheel-hash lock with all existing versions preserved. Both images build under mandatory hash checking and pass all 68 image tests. Enabled API/broker configuration rejects mutable image references; each execution creates its runtime and independent verifier by exact inspected content IDs. Local startup resolves build tags before exporting immutable IDs to Compose. Docker AppArmor capability metadata is recognized without relaxing the required profile or canary.
+
+Full backend regression passes 83 suites / 583 tests, along with backend build/lint, locking/tooling/Compose contracts, deterministic lock regeneration, and offline hash-tamper rejection. The real required AppArmor canary still fails at Docker runtime input preload: daemon logs show an AppArmor exec profile-transition `operation not permitted`. Exact canary container cleanup passes. Host profiles and privileges were not changed. Notebook remains **Experimental**; functioning AppArmor-host E2E, worker/browser acceptance of these images, horizontal fencing, and remote/Kubernetes proof remain pending. See [evidence](output/verification/notebook-locking.md).
+
+## 2026-11-20 Repository Analyzer local-kind importer — Implemented slice / Experimental feature
+
+- A separate non-root importer pod now serves the existing fixed Unix-socket protocol on the local kind node. The backend receives a read-only socket-directory mount and supplemental group access; importer mode is explicit with no process fallback.
+- Guarded node-local tmpfs provisioning, default-deny policy with DNS exclusion, no secrets/API token/application-data mounts, read-only root, dropped capabilities, runtime-default seccomp, 512 MiB/one CPU/zero swap/zero core limits, and a verified 256-PID pod cgroup bound provide the selected local boundary.
+- Real Traefik/API/Mongo acceptance passed two concurrent 9,699,328-byte/2,000-entry/20-manifest imports, peak two importer parser children, cross-owner `404`, three hostile rejections without persistence, nine datastore denials plus DNS TCP denial with positive controls, fixed unavailable behavior with existing-report reads, recovery, backend-restart persistence, seven exact-user/report cleanup, and unchanged Kubernetes Secret/PVC plus Compose volume identities.
+- Runtime review fixed inherited unlimited core dumps. Verifier review fixed virtual-Host routing and replaced waiting for deletion of retained terminated Pod API records with checking actual container termination; no finalizers or data volumes were removed. The host still retains some completed Pod records, so full pod garbage collection is not claimed.
+
+This is **Implemented local-kind acceptance**, not portable/multi-node Kubernetes, tenant isolation, registry-image immutability, exhaustive hostile-resource safety, or production certification. Repository Analyzer and Kubernetes remain **Experimental**. See [evidence](output/verification/repository-importer-kubernetes-live.md) and [the completion plan](docs/COMPLETION_PLAN.md).
+
 ## 2026-11-20 Repository Analyzer target-host resource acceptance — Implemented slice / Experimental feature
 
 - Replaced cumulative Unix-socket `Buffer.concat` assembly with one exact preallocated frame after bounded header validation. The importer now admits at most four total connections, expires partial input after two seconds, rejects delayed trailing data, and retains the two-active-parser limit.

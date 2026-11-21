@@ -283,8 +283,8 @@ export const documentApi = {
 export const knowledgeApi = {
   getStatus: (projectId?: string) =>
     apiClient.get('/knowledge/status', { params: projectId ? { projectId } : undefined }),
-  getSources: (projectId?: string, scope?: 'orphaned') =>
-    apiClient.get('/knowledge/sources', { params: { ...(projectId ? { projectId } : {}), ...(scope ? { scope } : {}) } }),
+  getSources: (projectId?: string, scope?: 'orphaned', cursor?: string) =>
+    apiClient.get('/knowledge/sources', { params: { ...(projectId ? { projectId } : {}), ...(scope ? { scope } : {}), ...(cursor !== undefined ? { cursor } : {}) } }),
   createSource: (data: {
     name: string;
     mediaType: 'text/plain' | 'text/markdown';

@@ -36,7 +36,7 @@ test('separates infrastructure and application ownership without gaps', () => {
     'redis.yaml', 'storage.yaml', 'traefik-rbac.yaml', 'traefik.yaml',
   ]);
   assert.deepEqual([...applicationFiles].sort(), [
-    'application-storage.yaml', 'backend.yaml', 'frontend.yaml',
+    'application-storage.yaml', 'backend.yaml', 'frontend.yaml', 'repository-importer.yaml',
   ]);
   assert.deepEqual([...infrastructureFiles].filter((file) => applicationFiles.has(file)), []);
 

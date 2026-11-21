@@ -27,12 +27,14 @@ spec:
   template:
     metadata: {labels: *labels}
     spec:
+      nodeSelector: {kubernetes.io/hostname: kfive-control-plane}
       automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
         runAsGroup: 1000
         fsGroup: 1000
+        supplementalGroups: [10002]
         seccompProfile: {type: RuntimeDefault}
       containers:
         - name: backend
@@ -66,7 +68,10 @@ spec:
             - {name: logs, mountPath: /app/logs}
             - {name: tmp, mountPath: /tmp}
             - {name: ollama-socket, mountPath: /run/ollama-bridge, readOnly: true}
+            - {name: repository-importer-socket, mountPath: /run/kfive-repository-importer, readOnly: true}
       volumes:
+        - name: repository-importer-socket
+          hostPath: {path: /run/kfive-repository-importer, type: Directory}
         - {name: uploads, persistentVolumeClaim: {claimName: backend-uploads}}
         - {name: logs, persistentVolumeClaim: {claimName: backend-logs}}
         - {name: tmp, emptyDir: {sizeLimit: 64Mi}}

@@ -174,15 +174,23 @@ if (( with_notebook )); then
     exit 1
   fi
   if [[ ${build_args[0]} == --build ]]; then
-    docker --host "$notebook_host" build --target runtime -t "$notebook_runtime_image" services/notebook-runtime
-    docker --host "$notebook_host" build --target verifier -t "$notebook_verifier_image" services/notebook-runtime
+    # Immutable selections identify prebuilt artifacts; never try to tag a build
+    # with a digest. Mutable local build names are resolved once below.
+    if [[ $notebook_runtime_image != sha256:* && $notebook_runtime_image != *@sha256:* ]]; then
+      docker --host "$notebook_host" build --target runtime -t "$notebook_runtime_image" services/notebook-runtime
+    fi
+    if [[ $notebook_verifier_image != sha256:* && $notebook_verifier_image != *@sha256:* ]]; then
+      docker --host "$notebook_host" build --target verifier -t "$notebook_verifier_image" services/notebook-runtime
+    fi
   fi
   runtime_id=$(docker --host "$notebook_host" image inspect --format '{{.Id}}' "$notebook_runtime_image")
   verifier_id=$(docker --host "$notebook_host" image inspect --format '{{.Id}}' "$notebook_verifier_image")
-  if [[ -z $runtime_id || -z $verifier_id || $runtime_id == "$verifier_id" ]]; then
+  if [[ ! $runtime_id =~ ^sha256:[a-f0-9]{64}$ || ! $verifier_id =~ ^sha256:[a-f0-9]{64}$ || $runtime_id == "$verifier_id" ]]; then
     echo "Notebook runtime and verifier did not resolve to distinct image identities." >&2
     exit 1
   fi
+  # Compose/API/broker all receive exact content IDs, never the mutable build tags.
+  export NOTEBOOK_RUNTIME_IMAGE="$runtime_id" NOTEBOOK_VERIFIER_IMAGE="$verifier_id"
 fi
 
 run_compose up "${build_args[@]}" -d

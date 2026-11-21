@@ -11,7 +11,7 @@ spec:
     path: k8s/base
     directory:
       recurse: false
-      include: '{application-storage.yaml,backend.yaml,frontend.yaml}'
+      include: '{application-storage.yaml,backend.yaml,frontend.yaml,repository-importer.yaml}'
   destination:
     server: https://kubernetes.default.svc
     namespace: kfive

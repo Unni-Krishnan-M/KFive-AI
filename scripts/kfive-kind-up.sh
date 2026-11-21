@@ -108,6 +108,9 @@ mounts=$(docker inspect "${cluster_name}-control-plane" --format '{{json .Mounts
 node -e 'const [raw,source]=process.argv.slice(1); const mounts=JSON.parse(raw); const found=mounts.find(m=>m.Type==="bind"&&m.Source===source&&m.Destination==="/run/kfive-host-ollama"&&m.RW===false); if(!found)throw new Error("kind node lacks the expected read-only Ollama socket bind mount")' "$mounts" "$ollama_socket_dir"
 docker exec "${cluster_name}-control-plane" cat /run/kfive-host-ollama/.kfive-owned \
   | cmp - "$ollama_socket_dir/.kfive-owned"
+docker exec "${cluster_name}-control-plane" cat /var/lib/kubelet/config.yaml \
+  | node -e 'const fs=require("fs"),yaml=require("js-yaml");const c=yaml.load(fs.readFileSync(0,"utf8"));if(c.podPidsLimit!==256||c.memorySwap?.swapBehavior!=="NoSwap")throw new Error("Existing kind node lacks the required PID/swap bounds; preserve its data and migrate deliberately before deploying the importer.")'
+docker exec -i "${cluster_name}-control-plane" sh -s < scripts/kind-repository-socket.sh
 
 docker image inspect kfive-ai-ollama-bridge:latest >/dev/null 2>&1 \
   || { echo "Missing local image: kfive-ai-ollama-bridge:latest" >&2; exit 1; }
@@ -203,7 +206,7 @@ if (( ! with_gitops )); then
   kubectl -n kfive rollout restart deployment/backend >/dev/null
 fi
 
-for workload in statefulset/mongodb statefulset/redis statefulset/chromadb deployment/backend deployment/frontend deployment/traefik; do
+for workload in statefulset/mongodb statefulset/redis statefulset/chromadb deployment/repository-importer deployment/backend deployment/frontend deployment/traefik; do
   kubectl -n kfive rollout status "$workload" --timeout=240s
 done
 

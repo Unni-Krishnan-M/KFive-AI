@@ -24,6 +24,8 @@ data:
   CORS_ORIGIN: http://kfive.local:8088
   CODE_RUNNER_MODE: disabled
   NOTEBOOK_EXECUTION_ENABLED: "false"
+  REPOSITORY_IMPORTER_MODE: socket
+  REPOSITORY_IMPORTER_SOCKET_PATH: /run/kfive-repository-importer/importer.sock
   QUEUE_CONCURRENCY: "2"
   LOG_FILE: /app/logs/app.log
 ---

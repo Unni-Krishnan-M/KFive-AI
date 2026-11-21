@@ -12,11 +12,17 @@ import { agentRunService } from './services/agentRunService';
 import { workflowRunService } from './services/workflowRunService';
 import { benchmarkService } from './services/benchmarkService';
 import { notebookRunService } from './services/notebookRunService';
+import { RagIndexingWorker } from './services/ragIndexingWorker';
+import { ragService } from './services/ragService';
 import { chatService } from './services/chatService';
 import { closeHttpServerIfListening } from './utils/httpServer';
 
 const config = getEnvironment();
 validateEnvironment();
+const ragIndexingWorker = new RagIndexingWorker(
+  (claim) => ragService.executeIndexingClaim(claim),
+  () => logger.error('Knowledge indexing worker operation failed'),
+);
 
 const app = createApp(config);
 const server = createServer(app);
@@ -129,6 +135,7 @@ async function gracefulShutdown(signal: string): Promise<void> {
     if (chatGenerationRecoveryTimer) clearInterval(chatGenerationRecoveryTimer);
     await new Promise<void>((resolve) => io.close(() => resolve()));
     await closeHttpServerIfListening(server);
+    await ragIndexingWorker.stop();
     await closeQueues();
     await disconnectRedis();
     await disconnectDatabase();
@@ -171,6 +178,7 @@ async function startServer(): Promise<void> {
       || benchmarkRecovery.deleted > 0 || benchmarkRecovery.requeued > 0) {
       logger.warn('Reconciled benchmark runs', benchmarkRecovery);
     }
+    if (config.ragBackgroundIndexingEnabled) ragIndexingWorker.start();
     startAgentRunRecoveryLoop();
     startWorkflowRunRecoveryLoop();
     startBenchmarkRunRecoveryLoop();

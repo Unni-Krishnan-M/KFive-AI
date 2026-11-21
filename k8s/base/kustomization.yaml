@@ -9,6 +9,7 @@ resources:
   - redis.yaml
   - chromadb.yaml
   - backend.yaml
+  - repository-importer.yaml
   - frontend.yaml
   - traefik-rbac.yaml
   - traefik.yaml

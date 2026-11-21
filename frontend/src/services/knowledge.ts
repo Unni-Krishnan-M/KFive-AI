@@ -270,3 +270,20 @@ export function nextKnowledgeRefreshDelay(attempt: number): number | undefined {
   if (!Number.isInteger(attempt) || attempt < 1 || attempt > 6) return undefined;
   return Math.min(1000 * (2 ** (attempt - 1)), 8000);
 }
+
+export function normalizeKnowledgePage(payload: unknown): { sources: KnowledgeSource[]; nextCursor: string | null } | undefined {
+  const root = record(unwrapApiData(payload));
+  const pagination = record(root?.pagination);
+  if (!root || !Array.isArray(root.sources) || root.sources.length > 50 || root.count !== root.sources.length
+    || pagination?.pageSize !== 50) return undefined;
+  const sources = normalizeKnowledgeSources(payload);
+  if (sources.length !== root.sources.length || new Set(sources.map(source => source.id)).size !== sources.length
+    || sources.some(source => !/^[a-f\d]{24}$/.test(source.id))) return undefined;
+  for (let index = 1; index < sources.length; index += 1) {
+    if (sources[index - 1].id <= sources[index].id) return undefined;
+  }
+  const nextCursor = pagination.nextCursor;
+  if (nextCursor !== null && (typeof nextCursor !== 'string' || sources.length !== 50
+    || nextCursor !== sources[49].id)) return undefined;
+  return { sources, nextCursor };
+}

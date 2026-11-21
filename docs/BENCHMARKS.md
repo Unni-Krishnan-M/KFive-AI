@@ -65,12 +65,31 @@ The same exercise verified a running workspace cancellation at 0/6, a project ca
 
 Before changing this slice from Experimental:
 
-1. Run the standard host-Ollama path after deliberately exposing its listener only to the Docker bridge, and separately exercise an opted-in remote provider.
-2. Produce a second successful compatible run and verify browser comparison behavior; compare recorded wall/TTFT values with provider logs.
-3. Verify target NVIDIA GPU snapshots without UUID exposure and independently prove whether the selected provider used that GPU.
-4. Exercise live timeout/output bounds, browser disconnect/reconnect, and provider-side cancellation behavior.
-5. Restart the API and worker during queued, checkpointed, and in-flight work; prove safe redispatch, no duplicate completed call, and interruption rather than retry for uncertain work.
-6. Verify a second user cannot list, read, cancel, delete, or export another owner's run.
-7. Test the 100-run retention boundary, concurrent start races, multi-replica fencing, worker heartbeat/lease loss, remote-provider billing, and persistence across complete MongoDB/Redis/API/worker restart.
+1. Verify the Compose worker-to-host bridge and container GPU grant separately from the now-verified native host worker. Exercise an explicitly approved external provider and its billing/cancellation behavior.
+2. Correlate call timings with provider logs under controlled load. Two compatible real runs and browser comparison/export now pass; provider-reported total durations are captured alongside wall time, but no hardware-performance claim is made.
+3. Exercise safe checkpoint takeover, stale-worker fencing, and heartbeat/lease loss across replicas. Native queued/datastore restart, in-flight SIGKILL interruption without retry, and healthy two-worker serialization now pass.
+4. Verify browser transport loss during active inference beyond the completed native SSE reconnect check, and external-provider behavior when cancellation is ignored.
+5. Replace the count-then-create retention check with an atomic multi-replica quota before claiming that boundary across replicas. Local 99/100/101 admission, deterministic pagination, deletion/readmission, and concurrent active-owner admission now pass.
+
+## Native host and contract acceptance — 2026-11-20–21
+
+The native API/worker path reaches the existing loopback-only host Ollama without changing its listener. Two real `phi3:latest` runs pass all six calls; sanitized worker GPU snapshots, Ollama's matching model digest/VRAM allocation, and NVIDIA's Ollama compute-process entry are recorded together. This establishes observed host GPU offload, not per-call attribution or container GPU access. Real Chromium login, comparison values, six-call export, and desktop/tablet/mobile comparison rendering are checked against the built frontend. Second-user rejection, queued cancellation, complete MongoDB/Redis/API/worker restart, and uncertain in-flight crash interruption also pass.
+
+A separate local Ollama-protocol fault fixture uses the same compiled API, production worker, MongoDB, and Redis. It verifies six exact 16-KiB UTF-8 responses, rejection of one additional character without persisting overflowing output, the unmodified 180-second timeout, provider-connection closure on cancellation, two-worker serialization, and retention/admission boundaries. Terminal records are seeded only to establish the 99-record precondition; admission, rejection, pagination, deletion, and readmission use authenticated APIs. The six-call/per-call bounds make the maximum valid run output 96 KiB, so the 128-KiB total bound is defensive and cannot independently be reached through valid calls.
+
+Both harness modes create only nonce-owned disposable datastores/networks and verify cleanup plus preservation of existing volume identities. See [evidence and limitations](../output/verification/benchmark-host-live.md).
+
+```bash
+npm run build:backend
+npm run verify:benchmark-host
+npm run verify:benchmark-contract
+
+# Optional browser path: build the frontend and point to an already installed Playwright module.
+npm run build:frontend
+KFIVE_PLAYWRIGHT_MODULE=/absolute/path/to/playwright \
+  node scripts/verify-benchmark-host-live.cjs --allow-live-test --browser
+```
+
+The browser check uses installed Chrome and local disposable accounts. It does not install browser dependencies, use production credentials, or weaken authentication. Its screenshots have no visual baseline; they are interaction evidence rather than a visual-regression or accessibility certification.
 
 Isolated model training, dataset-to-training lineage, ML metrics/artifacts, recommendations, and a general shared GPU queue spanning AI features remain **Planned**. Notebook execution is a separate Experimental queue/worker and does not share this benchmark lease.

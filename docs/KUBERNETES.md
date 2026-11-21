@@ -64,6 +64,14 @@ Ollama remains loopback-only on the host. A route-allowlisted, non-root, read-on
 
 This `hostPath` is a deliberate local-kind exception and is incompatible with Kubernetes Baseline/Restricted Pod Security admission. It must not be presented as a portable production topology. Remote deployments should use an authenticated remote provider or an independently secured provider service instead.
 
+## Repository importer boundary
+
+The local-kind profile now uses a separate non-root importer pod with no secrets, application data, API token, or permitted service-network traffic. The backend and importer are pinned to `kfive-control-plane` and communicate over a fixed `0660` Unix socket in a guarded node-local 1 MiB tmpfs. The backend mount is read-only. The namespace DNS allow rule excludes the importer. Its pod has startup/readiness/liveness socket probes, a read-only root, dropped capabilities, runtime-default seccomp, 32 MiB memory-backed scratch, 512 MiB memory, one CPU, zero swap, and zero core dumps. The kubelet enforces 256 PIDs per pod across this node.
+
+`kind:up` provisions and checks the socket directory before applying workloads; it rejects existing nodes with incompatible PID/swap bounds without deleting their data. The node-local directory is ephemeral and must be provisioned again after node loss. Applying the base YAML alone to an unprepared node is insufficient. This adds a second narrow local-kind hostPath exception; neither socket topology is portable production Kubernetes or compatible with Baseline/Restricted Pod Security admission. Image tags remain locally loaded mutable development tags.
+
+Run `npm run test:repository-importer-kubernetes` for contracts and `npm run kind:verify:repository-importer` for the opt-in real upload/network/outage/restart/cleanup acceptance. The latter scales only the importer and restarts the backend, creates seven temporary identities, and preflights every exact ID/email pair before deleting their reports and accounts. It checks Kubernetes PVC/Secret and existing Compose volume identities. See [the acceptance record](../output/verification/repository-importer-kubernetes-live.md), including the host's retained terminated-Pod-record limitation.
+
 ## Verified scope and limits
 
 On 2026-09-22, a clean cluster passed frontend and readiness routing, Socket.IO polling, authenticated registration/model discovery, real Phi3 chat streaming through host Ollama, bridge restart, MongoDB/backend restart, login with the same user id, and exact fixture cleanup. All six workloads were Ready and all five PVCs were Bound. See [the core live evidence](../output/verification/kind-core-live.md).

@@ -3,6 +3,7 @@ import { lstat, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { NotebookCell } from '@/models/Notebook';
+import { IMMUTABLE_CONTAINER_IMAGE } from '@/utils/containerImage';
 import {
   ExecFileNotebookDockerClient,
   NotebookDockerAbortedError,
@@ -10,7 +11,6 @@ import {
   NotebookDockerResult,
 } from './notebookDocker';
 
-const IMAGE = /^[A-Za-z0-9][A-Za-z0-9._/:@-]{0,499}$/;
 const CONTAINER_ID = /^[a-f0-9]{12,64}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
 const ARTIFACT_PATH = /^artifacts\/(?:[A-Za-z0-9_.-]+\/){0,7}[A-Za-z0-9_.-]+$/;
@@ -59,7 +59,7 @@ function requireSuccess(result: NotebookDockerResult, operation: string): Notebo
   return result;
 }
 function image(value: string, label: string): string {
-  if (!IMAGE.test(value) || value.startsWith('-')) throw new NotebookIsolationError(`${label} image reference is invalid.`);
+  if (!IMMUTABLE_CONTAINER_IMAGE.test(value)) throw new NotebookIsolationError(`${label} image reference must be immutable (sha256 content ID or repository digest).`);
   return value;
 }
 function canonicalJson(value: unknown): string { return `${JSON.stringify(value)}\n`; }
@@ -285,8 +285,8 @@ export class DockerNotebookExecutor {
     let options: unknown;
     try { options = JSON.parse(result.stdout); } catch { throw new NotebookIsolationError('Docker security options are invalid.'); }
     if (!Array.isArray(options) || !options.every((item) => typeof item === 'string')
-      || !options.some((item) => item.startsWith('name=seccomp'))
-      || (this.requireAppArmor && !options.some((item) => item === 'name=apparmor')))
+      || !options.some((item) => item.split(',')[0] === 'name=seccomp')
+      || (this.requireAppArmor && !options.some((item) => item.split(',')[0] === 'name=apparmor')))
       throw new NotebookIsolationError('Docker must provide seccomp and the configured AppArmor isolation policy.');
   }
 
@@ -328,7 +328,7 @@ export class DockerNotebookExecutor {
       await writeFile(join(input, 'manifest.json'), canonicalJson({ schemaVersion: 'kfive.notebook-job.v1', runId: request.runId,
         notebookFile: 'notebook.ipynb', cellTimeoutSeconds: request.cellTimeoutSeconds }), { mode: 0o444, flag: 'wx' });
       await writeFile(join(input, 'notebook.ipynb'), canonicalJson(notebookInput(request.cells)), { mode: 0o444, flag: 'wx' });
-      const created = requireSuccess(await this.docker.run(runtimeCreateArgs(runtimeName, this.runtimeImage, {
+      const created = requireSuccess(await this.docker.run(runtimeCreateArgs(runtimeName, `sha256:${identities.runtimeImageId}`, {
         requireAppArmor: this.requireAppArmor, memoryBytes: this.memoryBytes, cpuCores: this.cpuCores, processLimit: this.processLimit,
       }), { signal: controller.signal, maxOutputBytes: 64 * 1024 }), 'runtime create');
       runtimeId = created.stdout.trim(); if (!CONTAINER_ID.test(runtimeId)) throw new NotebookIsolationError('Runtime container id is invalid.');
@@ -360,7 +360,7 @@ export class DockerNotebookExecutor {
       await lifecycle?.runtimeRemoved();
       if (controller.signal.aborted) return { status: timedOut ? 'timed_out' : 'cancelled', durationMs: Date.now() - started,
         ...identities, metrics: [], artifacts: [] };
-      const verifierCreated = requireSuccess(await this.docker.run(verifierCreateArgs(verifierName, this.verifierImage,
+      const verifierCreated = requireSuccess(await this.docker.run(verifierCreateArgs(verifierName, `sha256:${identities.verifierImageId}`,
         this.requireAppArmor), { signal: controller.signal, maxOutputBytes: 64 * 1024 }), 'verifier create');
       verifierId = verifierCreated.stdout.trim(); if (!CONTAINER_ID.test(verifierId)) throw new NotebookIsolationError('Verifier container id is invalid.');
       requireSuccess(await this.docker.run(['start', verifierId],

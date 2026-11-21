@@ -176,15 +176,21 @@ describe('parseEnvironment', () => {
     expect(() => parseEnvironment({ ...baseEnvironment, NOTEBOOK_EXECUTION_ENABLED: 'true',
       NOTEBOOK_RUNTIME_IMAGE: 'same:image', NOTEBOOK_VERIFIER_IMAGE: 'same:image' })).toThrow(/must be distinct/);
     const config = parseEnvironment({ ...baseEnvironment, KFIVE_PROCESS: 'notebook-worker',
-      NOTEBOOK_EXECUTION_ENABLED: 'true', NOTEBOOK_RUNTIME_IMAGE: 'runtime:test', NOTEBOOK_VERIFIER_IMAGE: 'verifier:test' });
+      NOTEBOOK_EXECUTION_ENABLED: 'true', NOTEBOOK_RUNTIME_IMAGE: `sha256:${'a'.repeat(64)}`, NOTEBOOK_VERIFIER_IMAGE: `sha256:${'b'.repeat(64)}` });
     expect(config).toMatchObject({ processKind: 'notebook-worker', notebookExecutionEnabled: true,
-      notebookRuntimeImage: 'runtime:test', notebookVerifierImage: 'verifier:test' });
+      notebookRuntimeImage: `sha256:${'a'.repeat(64)}`, notebookVerifierImage: `sha256:${'b'.repeat(64)}` });
+  });
+
+  it('requires immutable notebook images when execution is enabled', () => {
+    expect(() => parseEnvironment({ ...baseEnvironment, NOTEBOOK_EXECUTION_ENABLED: 'true',
+      NOTEBOOK_RUNTIME_IMAGE: 'runtime:local', NOTEBOOK_VERIFIER_IMAGE: `sha256:${'b'.repeat(64)}` }))
+      .toThrow(/immutable/);
   });
 
   it('does not require API signing secrets in the portless notebook worker', () => {
     const { JWT_SECRET: _jwt, JWT_REFRESH_SECRET: _refresh, ...workerEnvironment } = baseEnvironment;
     const config = parseEnvironment({ ...workerEnvironment, NODE_ENV: 'production', KFIVE_PROCESS: 'notebook-worker',
-      NOTEBOOK_EXECUTION_ENABLED: 'true', NOTEBOOK_RUNTIME_IMAGE: 'runtime:test', NOTEBOOK_VERIFIER_IMAGE: 'verifier:test' });
+      NOTEBOOK_EXECUTION_ENABLED: 'true', NOTEBOOK_RUNTIME_IMAGE: `sha256:${'a'.repeat(64)}`, NOTEBOOK_VERIFIER_IMAGE: `sha256:${'b'.repeat(64)}` });
     expect(config.jwtSecret).toBe('kfive-worker-no-http-authentication-00000001');
   });
 });

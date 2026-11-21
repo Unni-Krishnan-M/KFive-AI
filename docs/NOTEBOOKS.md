@@ -34,6 +34,26 @@ stat -c '%g' /var/run/docker.sock
 
 `NOTEBOOK_REQUIRE_APPARMOR=true` is the fail-closed default and also requires Docker seccomp. The 2026-09-02 CachyOS live test had seccomp but no AppArmor, so it explicitly used `NOTEBOOK_REQUIRE_APPARMOR=false`. That proves the local functional/container lifecycle path under reduced host isolation; it is not a production hardening certification. Keep the default for production-capable hosts.
 
+## Dependency and image locks
+
+`services/notebook-runtime/requirements.lock` records all 52 package versions and SHA-256 wheel hashes from the previously tested CPython 3.12/Linux amd64 runtime. Builds use `--require-hashes --only-binary=:all:` and `pip check`; `requirements.in` is the direct dependency review surface, not the build installation input. The Python 3.12.11/bookworm base remains digest-pinned. This lock intentionally covers one target; other architectures or Python versions require separately reviewed wheel locks. Hash locking prevents unreviewed artifact changes; it is not a vulnerability audit or a guarantee of byte-identical image builds.
+
+With execution enabled, the API and broker require distinct `sha256:<64 lowercase hex>` image IDs or `repository@sha256:<64 lowercase hex>` references. The broker resolves these once per execution and creates both containers by the exact resulting content IDs. Mutable tags are rejected by the executor and enabled configuration. The local startup helper may build/select development tags, then exports only their inspected content IDs to Compose. To keep selections stable across future helper invocations, configure the exact IDs or registry digests explicitly. Direct Compose users must provide the immutable references themselves; there is no mutable fallback.
+
+To rebuild and verify the locked artifacts without replacing the existing local tags:
+
+```bash
+docker build --target runtime -t kfive-notebook-runtime:locked services/notebook-runtime
+docker build --target verifier -t kfive-notebook-verifier:locked services/notebook-runtime
+npm run build:backend
+npm run test:notebook-lock
+npm run verify:notebook-lock
+```
+
+The opt-in final command runs a harmless print-only notebook through both real stages with AppArmor required and checks the baseline container set after cleanup. On the current host it fails closed at Docker's input-preload exec because AppArmor cannot apply the container profile. The locked image builds and 68 in-image tests pass, but the required AppArmor-host path remains **unverified**. See [locking and host evidence](../output/verification/notebook-locking.md).
+
+To update the lock, first review a complete resolved package graph for this target, download its wheels without installing or executing them, and run `python3 scripts/lock-notebook-wheels.py <wheel-directory>`. The generator hashes the actual wheel bytes, rejects duplicate/ambiguous metadata, and checks the direct pins. Review the resulting version/hash diff, rebuild both images (which runs `pip check` and the full image suite), compare installed metadata with the intended graph, and rerun the AppArmor canary. See [pip's hash-checking guidance](https://pip.pypa.io/en/stable/topics/secure-installs/).
+
 ## Verification evidence
 
 - The host runtime suite has 68 checks: 65 pass and three real-kernel/image checks skip because nbclient/nbformat are image-only.
@@ -45,7 +65,7 @@ stat -c '%g' /var/run/docker.sock
 
 - Python only; Run executes the saved notebook as a whole, not a persistent interactive kernel or individual cell.
 - Status uses polling rather than SSE. Artifact metadata is shown, but there is no artifact-download API.
-- Runtime dependency versions are constrained but the transitive Python graph and local image tags are not pinned by immutable digest.
+- The selected CPython 3.12/Linux amd64 graph and execution image identities are locked; other platforms, registry publication/signing/provenance, and byte-for-byte reproducible builds remain outside this acceptance.
 - The Redis lease and Mongo compare-and-swap checks are fail-closed for the current one-worker design, but there is no transactionally shared fencing epoch across Redis and Mongo for horizontally scaled notebook workers. Run only one notebook worker.
 - No age-based/bulk run retention, remote/Kubernetes notebook proof, multi-tenant penetration test, or production AppArmor-host E2E has been completed.
 - Notebook source, outputs, metrics, and artifacts are application-readable persistent data. Do not put secrets in cells.

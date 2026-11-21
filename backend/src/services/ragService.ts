@@ -1,10 +1,11 @@
 import { createHash } from 'crypto';
+import { RagIndexingClaim, RagIndexingLease, RAG_INDEXING_MAX_ATTEMPTS } from './ragIndexingLease';
 import { Types } from 'mongoose';
 import { ProjectModel } from '@/models/Project';
 import { DocumentModel } from '@/models/Document';
-import { RagSourceErrorCode, RagSourceMediaType, RagSourceModel, RagSourceStatus } from '@/models/RagSource';
+import { RagSourceErrorCode, RagSourceMediaType, RagSourceModel, RagSourceStatus, RAG_MAX_SOURCES_PER_OWNER, RAG_QUOTA_INDEX_NAME } from '@/models/RagSource';
 import { EnvironmentConfig, getEnvironment } from '@/config/environment';
-import { AiProviderClient, getAiProvider } from './aiProvider';
+import { AiProviderClient, AiProviderError, getAiProvider } from './aiProvider';
 import { withProviderDiscoveryDeadline } from './ai/providerDeadline';
 import { ChromaClient, ChromaClientError, ChromaMetadata, ChromaQueryResult, ChromaWhere } from './chromaClient';
 import { ProjectError, ProjectRecord, projectService } from './projectService';
@@ -50,6 +51,13 @@ export class RagServiceError extends Error {
   }
 }
 
+export function isRetryableIndexingError(error: unknown): boolean {
+  // Only adapter-classified transient errors qualify. Validation, cancellation,
+  // authorization, profile changes and unknown errors must not trigger retries.
+  return (error instanceof AiProviderError || error instanceof ChromaClientError) && error.retryable
+    && ['PROVIDER_UNAVAILABLE', 'REQUEST_TIMEOUT', 'PROVIDER_ERROR', 'UNAVAILABLE', 'REQUEST_REJECTED'].includes(error.code);
+}
+
 export interface RagSourceRecord {
   _id: unknown;
   ownerId: unknown;
@@ -72,6 +80,7 @@ export interface RagSourceRecord {
   collectionId?: string;
   collectionName?: string;
   errorCode?: RagSourceErrorCode;
+  indexingGeneration?: string;
   indexedAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;
@@ -86,19 +95,20 @@ export interface RagSourceCreateData {
   documentOcrApplied?: boolean;
   name: string;
   mediaType: RagSourceMediaType;
-  status: 'indexing';
+  status: 'queued' | 'indexing';
   characterCount: number;
   byteCount: number;
   chunkCount: 0;
   chunkingVersion: 1;
   contentHash: string;
+  contentSnapshot: string;
   embeddingProvider: string;
   embeddingModel: string;
 }
 
 export interface RagSourceRepository {
   create(data: RagSourceCreateData): Promise<RagSourceRecord>;
-  list(ownerId: string, projectId?: string, orphaned?: boolean): Promise<RagSourceRecord[]>;
+  list(ownerId: string, projectId?: string, orphaned?: boolean, page?: { before?: string; limit: number }): Promise<RagSourceRecord[]>;
   listReadyInScope(ownerId: string, projectId?: string): Promise<RagSourceRecord[]>;
   findByOwnerAndId(ownerId: string, sourceId: string): Promise<RagSourceRecord | null>;
   findByOwnerAndDocumentId(ownerId: string, documentId: string): Promise<RagSourceRecord | null>;
@@ -108,12 +118,15 @@ export interface RagSourceRepository {
     collectionId: string;
     collectionName: string;
     indexedAt: Date;
-  }): Promise<RagSourceRecord | null>;
+    indexingGeneration?: string;
+  }, claim?: RagIndexingClaim): Promise<RagSourceRecord | null>;
   markFailed(
     ownerId: string,
     sourceId: string,
     errorCode: RagSourceErrorCode,
-    vectorLocation?: { collectionId: string; collectionName: string }
+    vectorLocation?: { collectionId: string; collectionName: string },
+    claim?: RagIndexingClaim,
+    retryable?: boolean
   ): Promise<void>;
   deleteByOwnerAndId(ownerId: string, sourceId: string): Promise<RagSourceRecord | null>;
 }
@@ -125,16 +138,45 @@ function projectFilter(projectId?: string, globalOnly = false): Record<string, u
 
 export const mongooseRagSourceRepository: RagSourceRepository = {
   async create(data) {
-    return RagSourceModel.create(data) as unknown as Promise<RagSourceRecord>;
+    // The source and its admission slot are one atomic insert, so a process
+    // crash cannot leak a reservation or release capacity before source removal.
+    await RagSourceModel.init();
+    const indexes = await RagSourceModel.collection.indexes();
+    const quotaIndex = indexes.find((index) => index.name === RAG_QUOTA_INDEX_NAME);
+    if (!quotaIndex?.unique || quotaIndex.key.ownerId !== 1 || quotaIndex.key.quotaSlot !== 1
+      || Object.keys(quotaIndex.key).length !== 2
+      || JSON.stringify(quotaIndex.partialFilterExpression) !== JSON.stringify({ quotaSlot: { $type: 'number' } })) {
+      throw new Error('Knowledge quota index is unavailable');
+    }
+    // Legacy sources are preserved. Once old writers are drained this count
+    // can only fall; reserve that many low slots instead of rewriting records.
+    const legacy = await RagSourceModel.find({ ownerId: data.ownerId, quotaSlot: { $exists: false } })
+      .select({ _id: 1 }).limit(RAG_MAX_SOURCES_PER_OWNER).lean();
+    const occupied = await RagSourceModel.find({ ownerId: data.ownerId, quotaSlot: { $exists: true } })
+      .select({ _id: 0, quotaSlot: 1 }).limit(RAG_MAX_SOURCES_PER_OWNER).lean();
+    const used = new Set(occupied.map((source) => source.quotaSlot));
+    for (let slot = legacy.length; slot < RAG_MAX_SOURCES_PER_OWNER; slot++) {
+      if (used.has(slot)) continue;
+      try {
+        return await RagSourceModel.create({ ...data, quotaSlot: slot }) as unknown as RagSourceRecord;
+      } catch (error) {
+        // Only admission-slot contention is retryable. Document deduplication,
+        // validation errors, and ambiguous database failures retain their meaning.
+        if (!isQuotaSlotCollision(error)) throw error;
+      }
+    }
+    throw new RagServiceError('Knowledge source limit reached (200 per account). Delete a completed or failed source before adding another.',
+      'RAG_SOURCE_LIMIT_EXCEEDED', 409);
   },
-  async list(ownerId, projectId, orphaned = false) {
+  async list(ownerId, projectId, orphaned = false, page) {
+    const cursorFilter = page?.before ? { _id: { $lt: new Types.ObjectId(page.before) } } : {};
     if (orphaned) {
       return RagSourceModel.aggregate([
-        { $match: { ownerId: new Types.ObjectId(ownerId), projectId: { $exists: true, $ne: null } } },
+        { $match: { ownerId: new Types.ObjectId(ownerId), projectId: { $exists: true, $ne: null }, ...cursorFilter } },
         { $lookup: { from: ProjectModel.collection.name, localField: 'projectId', foreignField: '_id', as: 'linkedProject' } },
         { $match: { 'linkedProject.0': { $exists: false } } },
-        { $sort: { createdAt: -1, _id: -1 } },
-        { $limit: 200 },
+        { $sort: page ? { _id: -1 } : { createdAt: -1, _id: -1 } },
+        { $limit: page?.limit ?? 200 },
         { $project: {
           _id: 1, projectId: 1, sourceKind: 1, documentId: 1,
           documentPageCount: 1, documentOcrApplied: 1, name: 1, mediaType: 1, status: 1,
@@ -144,9 +186,9 @@ export const mongooseRagSourceRepository: RagSourceRepository = {
         } },
       ]) as Promise<RagSourceRecord[]>;
     }
-    return RagSourceModel.find({ ownerId, ...projectFilter(projectId, true) })
-      .sort({ createdAt: -1 })
-      .limit(200)
+    return RagSourceModel.find({ ownerId, ...projectFilter(projectId, true), ...cursorFilter })
+      .sort(page ? { _id: -1 } : { createdAt: -1, _id: -1 })
+      .limit(page?.limit ?? 200)
       .lean() as unknown as Promise<RagSourceRecord[]>;
   },
   async listReadyInScope(ownerId, projectId) {
@@ -161,17 +203,26 @@ export const mongooseRagSourceRepository: RagSourceRepository = {
   async findByOwnerAndDocumentId(ownerId, documentId) {
     return RagSourceModel.findOne({ ownerId, documentId }).lean() as unknown as Promise<RagSourceRecord | null>;
   },
-  async markReady(ownerId, sourceId, values) {
+  async markReady(ownerId, sourceId, values, claim) {
     return RagSourceModel.findOneAndUpdate(
-      { _id: sourceId, ownerId, status: 'indexing' },
-      { $set: { ...values, status: 'ready' }, $unset: { errorCode: 1 } },
+      { ownerId, ...(claim ? new RagIndexingLease().ownershipFilter(claim)
+        : { _id: sourceId, status: 'indexing', 'indexingLease.token': { $exists: false } }) },
+      { $set: { ...values, status: 'ready' }, $unset: { errorCode: 1, contentSnapshot: 1 } },
       { new: true, runValidators: true }
     ).lean() as unknown as Promise<RagSourceRecord | null>;
   },
-  async markFailed(ownerId, sourceId, errorCode, vectorLocation) {
+  async markFailed(ownerId, sourceId, errorCode, vectorLocation, claim, retryable) {
+    const retry = retryable && claim && claim.attempt < RAG_INDEXING_MAX_ATTEMPTS;
     await RagSourceModel.updateOne(
-      { _id: sourceId, ownerId, status: 'indexing' },
-      { $set: { status: 'failed', errorCode, ...(vectorLocation || {}) } }
+      { ownerId, ...(claim ? new RagIndexingLease().ownershipFilter(claim)
+        : { _id: sourceId, status: 'indexing', 'indexingLease.token': { $exists: false } }) },
+      retry ? [{ $set: {
+        status: 'queued', errorCode, ...(vectorLocation || {}),
+        // Persist backoff using Mongo time; queued status fences late heartbeats.
+        'indexingLease.expiresAt': { $add: ['$$NOW', 5000 * 2 ** (claim.attempt - 1)] },
+        updatedAt: '$$NOW',
+      } }] : { $set: { status: 'failed', errorCode, ...(vectorLocation || {}) } },
+      retry ? { timestamps: false } : {}
     );
   },
   async deleteByOwnerAndId(ownerId, sourceId) {
@@ -234,7 +285,7 @@ export interface RagDependencyStatus {
     };
     chroma: { configured: boolean; available: boolean; code?: RagErrorCode };
   };
-  limits: { maxSourceBytes: number; maxChunks: number; maxTopK: number };
+  limits: { maxSourceBytes: number; maxChunks: number; maxTopK: number; maxSourcesPerOwner: number };
 }
 
 interface ValidatedSourceInput {
@@ -423,8 +474,8 @@ function isDuplicateKeyError(error: unknown): boolean {
   return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 11000);
 }
 
-function defaultVectorStore(config: EnvironmentConfig): RagVectorStore | undefined {
-  return config.chromaUrl ? new ChromaClient({ baseUrl: config.chromaUrl, timeoutMs: config.aiTimeoutMs }) : undefined;
+export function createRagVectorStore(config: EnvironmentConfig): RagVectorStore | undefined {
+  return config.chromaUrl ? new ChromaClient({ baseUrl: config.chromaUrl, timeoutMs: Math.min(config.aiTimeoutMs, 120_000) }) : undefined;
 }
 
 export class RagService {
@@ -433,7 +484,7 @@ export class RagService {
   constructor(
     private readonly repository: RagSourceRepository = mongooseRagSourceRepository,
     private readonly provider: AiProviderClient = getAiProvider(),
-    vectorStore: RagVectorStore | undefined = defaultVectorStore(getEnvironment()),
+    vectorStore: RagVectorStore | undefined = createRagVectorStore(getEnvironment()),
     private readonly config: EnvironmentConfig = getEnvironment(),
     private readonly resolveActiveProject: (ownerId: string, projectId: unknown) => Promise<ProjectRecord | undefined> =
       (ownerId, projectId) => projectService.resolveActiveProject(ownerId, projectId),
@@ -489,7 +540,7 @@ export class RagService {
           ...(!chromaAvailable ? { code: 'RAG_VECTOR_STORE_UNAVAILABLE' as const } : {}),
         },
       },
-      limits: { maxSourceBytes: RAG_MAX_SOURCE_BYTES, maxChunks: RAG_MAX_CHUNKS, maxTopK: RAG_MAX_TOP_K },
+      limits: { maxSourceBytes: RAG_MAX_SOURCE_BYTES, maxChunks: RAG_MAX_CHUNKS, maxTopK: RAG_MAX_TOP_K, maxSourcesPerOwner: RAG_MAX_SOURCES_PER_OWNER },
     };
   }
 
@@ -504,6 +555,21 @@ export class RagService {
     const projectId = optionalProjectId(projectIdValue);
     await this.resolveOwnedProject(ownerId, projectId);
     return (await this.repository.list(ownerId, projectId)).map(publicSource);
+  }
+
+  async listPage(ownerIdValue: unknown, projectIdValue: unknown, scopeValue: unknown, cursorValue: unknown) {
+    const ownerId = requireObjectId(ownerIdValue, 'Owner id');
+    const before = cursorValue === '' ? undefined : requireObjectId(cursorValue, 'Source cursor');
+    if (scopeValue !== undefined && (scopeValue !== 'orphaned' || projectIdValue !== undefined)) {
+      throw new RagServiceError('Knowledge scope is invalid.', 'INVALID_RAG_INPUT', 400);
+    }
+    const projectId = optionalProjectId(projectIdValue);
+    if (scopeValue !== 'orphaned') await this.resolveOwnedProject(ownerId, projectId);
+    const records = await this.repository.list(ownerId, projectId, scopeValue === 'orphaned', { before, limit: 51 });
+    const sources = records.slice(0, 50).map(publicSource);
+    return { sources, count: sources.length, pagination: {
+      pageSize: 50, nextCursor: records.length > 50 ? sources[49].id : null,
+    } };
   }
 
   async ingest(ownerIdValue: unknown, value: unknown): Promise<PublicRagSource> {
@@ -568,12 +634,13 @@ export class RagService {
         ...(input.documentOcrApplied !== undefined ? { documentOcrApplied: input.documentOcrApplied } : {}),
         name: input.name,
         mediaType: input.mediaType,
-        status: 'indexing',
+        status: this.config.ragBackgroundIndexingEnabled ? 'queued' : 'indexing',
         characterCount: input.content.length,
         byteCount: Buffer.byteLength(input.content, 'utf8'),
         chunkCount: 0,
         chunkingVersion: 1,
         contentHash: createHash('sha256').update(input.content).digest('hex'),
+        contentSnapshot: input.content,
         embeddingProvider: this.provider.id,
         embeddingModel: model,
       });
@@ -582,17 +649,56 @@ export class RagService {
     try {
       source = input.projectId ? await projectMutationLease.run(input.projectId, create) : await create();
     } catch (error) {
-      if (!input.documentId || !isDuplicateKeyError(error)) throw error;
+      const admissionRace = error instanceof RagServiceError && error.code === 'RAG_SOURCE_LIMIT_EXCEEDED';
+      if (!input.documentId || (!isDuplicateKeyError(error) && !admissionRace)) throw error;
       const existing = await this.repository.findByOwnerAndDocumentId(ownerId, input.documentId);
       if (!existing) throw error;
       return { source: publicSource(existing), created: false };
     }
+    if (this.config.ragBackgroundIndexingEnabled) return { source: publicSource(source), created: true };
+    return this.indexPrepared(source, input, chunks);
+  }
+
+  async executeIndexingClaim(claim: RagIndexingClaim): Promise<void> {
+    const lease = new RagIndexingLease();
+    if (!await lease.renew(claim)) return;
+    const source = await RagSourceModel.findById(claim.sourceId).lean<RagSourceRecord>();
+    if (!source) return;
+    if (source.contentHash !== createHash('sha256').update(claim.content).digest('hex')
+      || source.embeddingProvider !== this.provider.id || source.embeddingModel !== this.config.aiEmbeddingModel) {
+      await this.repository.markFailed(String(source.ownerId), claim.sourceId, 'RAG_INGESTION_FAILED', undefined, claim);
+      return;
+    }
+    const projectId = source.projectId ? String(source.projectId) : undefined;
+    const prepared = source.sourceKind === 'document'
+      ? chunkDocumentContent(claim.content, source.documentPageCount)
+      : { content: claim.content, chunks: chunkRagContent(claim.content) };
+    await this.indexPrepared(source, {
+      name: source.name, mediaType: source.mediaType, content: prepared.content, projectId,
+      sourceKind: source.sourceKind ?? 'text',
+      ...(source.documentId ? { documentId: String(source.documentId) } : {}),
+      documentPageCount: source.documentPageCount, documentOcrApplied: source.documentOcrApplied,
+    }, prepared.chunks, claim);
+  }
+
+  private async indexPrepared(
+    source: RagSourceRecord,
+    input: PreparedSourceInput,
+    chunks: RagChunk[],
+    claim?: RagIndexingClaim
+  ): Promise<{ source: PublicRagSource; created: boolean }> {
+    const ownerId = String(source.ownerId);
+    const model = source.embeddingModel as string;
     const sourceId = String(source._id);
+    const assertOwnership = async () => {
+      if (claim && !await new RagIndexingLease().renew(claim)) throw new Error('Indexing ownership lost');
+    };
     let collection: { id: string; name: string; metadata?: ChromaMetadata | null } | undefined;
     try {
       const vectors: number[][] = [];
       let dimension: number | undefined;
       for (let offset = 0; offset < chunks.length; offset += RAG_EMBEDDING_BATCH_SIZE) {
+        await assertOwnership();
         const batch = chunks.slice(offset, offset + RAG_EMBEDDING_BATCH_SIZE);
         const response = await this.provider.embed({ model, input: batch.map((chunk) => chunk.text) });
         if (response.provider !== this.provider.id || response.model !== model) {
@@ -605,6 +711,7 @@ export class RagService {
       if (!dimension) {
         throw new RagServiceError('The embedding provider returned an invalid result.', 'RAG_INVALID_EMBEDDING_RESPONSE', 502);
       }
+      await assertOwnership();
       const name = collectionName(ownerId, this.provider.id, model, dimension);
       collection = await (this.vectorStore as RagVectorStore).getOrCreateCollection(name, {
         'hnsw:space': 'cosine',
@@ -622,14 +729,16 @@ export class RagService {
         await (this.vectorStore as RagVectorStore).getMaxBatchSize()
       ));
       for (let offset = 0; offset < chunks.length; offset += maxBatch) {
+        await assertOwnership();
         const batch = chunks.slice(offset, offset + maxBatch);
         await (this.vectorStore as RagVectorStore).upsert(collection.id, batch.map((chunk, index) => ({
-          id: `${sourceId}:${chunk.index}`,
+          id: ragVectorId(sourceId, chunk.index, claim?.token),
           embedding: vectors[offset + index],
           document: chunk.text,
           metadata: {
             ownerId,
             sourceId,
+            ...(claim ? { indexingGeneration: claim.token } : {}),
             scopeKey: scopeKey(input.projectId),
             chunkIndex: chunk.index,
             sourceName: input.name,
@@ -648,7 +757,8 @@ export class RagService {
           collectionId: indexedCollection.id,
           collectionName: indexedCollection.name,
           indexedAt: this.now(),
-        });
+          ...(claim ? { indexingGeneration: claim.token } : {}),
+        }, claim);
       };
       // Network indexing stays outside the project lease. Only publication is
       // serialized with archive/delete, so an obsolete scope never becomes ready.
@@ -661,14 +771,16 @@ export class RagService {
       if (collection) {
         await this.vectorStore?.deleteWhere(
           collection.id,
-          ownerScopeAndSourceWhere(ownerId, sourceId, input.projectId)
+          claim ? { $and: [ownerScopeAndSourceWhere(ownerId, sourceId, input.projectId), { indexingGeneration: { $eq: claim.token } }] } : ownerScopeAndSourceWhere(ownerId, sourceId, input.projectId)
         ).catch(() => undefined);
       }
       await this.repository.markFailed(
         ownerId,
         sourceId,
         fixedFailureCode(error),
-        collection ? { collectionId: collection.id, collectionName: collection.name } : undefined
+        collection ? { collectionId: collection.id, collectionName: collection.name } : undefined,
+        claim,
+        isRetryableIndexingError(error)
       ).catch(() => undefined);
       throw this.normalizeOperationalError(error, 'ingestion');
     }
@@ -691,7 +803,7 @@ export class RagService {
         // Archived projects and unexpected resolver failures remain protected.
         if (!projectId || !(error instanceof ProjectError) || error.code !== 'PROJECT_NOT_FOUND') throw error;
       }
-      if (source.status === 'indexing') {
+      if (source.status === 'indexing' || source.status === 'queued') {
         throw new RagServiceError('Knowledge source is still indexing. Retry deletion after indexing finishes.', 'RAG_SOURCE_BUSY', 409);
       }
       if (source.collectionId) {
@@ -767,7 +879,7 @@ export class RagService {
       results = await (this.vectorStore as RagVectorStore).query(profile.collectionId, {
         embedding: queryVector,
         nResults: Math.min(100, input.topK * 4),
-        where: ownerAndScopeWhere(ownerId, input.projectId),
+        where: publishedSourceWhere(ownerId, input.projectId, sources),
       });
     } catch {
       throw new RagServiceError('The configured vector store is unavailable.', 'RAG_VECTOR_STORE_UNAVAILABLE', 503);
@@ -819,7 +931,8 @@ export class RagService {
         || !Number.isInteger(chunkIndex)
         || (chunkIndex as number) < 0
         || (chunkIndex as number) >= source.chunkCount
-        || results.ids[index] !== `${sourceId}:${chunkIndex}`
+        || metadata.indexingGeneration !== source.indexingGeneration
+        || results.ids[index] !== ragVectorId(sourceId, chunkIndex as number, source.indexingGeneration)
         || snippet.length > 1_400
         || typeof distance !== 'number'
         || !Number.isFinite(distance)
@@ -897,3 +1010,23 @@ export class RagService {
 }
 
 export const ragService = new RagService();
+
+export function ragVectorId(sourceId: string, index: number, generation?: string): string {
+  return generation ? `${sourceId}:${generation}:${index}` : `${sourceId}:${index}`;
+}
+
+// Filter before nearest-neighbor ranking so abandoned attempts cannot consume
+// the bounded result window. Legacy records still use source-scoped IDs.
+export function publishedSourceWhere(ownerId: string, projectId: string | undefined, sources: RagSourceRecord[]): ChromaWhere {
+  if (!sources.length || sources.length > 200) throw new Error('Invalid ready source selection');
+  const selected = sources.map((source): ChromaWhere => source.indexingGeneration
+    ? { $and: [{ sourceId: String(source._id) }, { indexingGeneration: source.indexingGeneration }] }
+    : { sourceId: String(source._id) });
+  return { $and: [ownerAndScopeWhere(ownerId, projectId), selected.length === 1 ? selected[0] : { $or: selected }] };
+}
+
+function isQuotaSlotCollision(error: unknown): boolean {
+  if (!isDuplicateKeyError(error)) return false;
+  const pattern = (error as { keyPattern?: Record<string, unknown> }).keyPattern;
+  return pattern?.ownerId === 1 && pattern?.quotaSlot === 1 && Object.keys(pattern).length === 2;
+}

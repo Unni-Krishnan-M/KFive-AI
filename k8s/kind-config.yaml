@@ -6,6 +6,12 @@ networking:
   serviceSubnet: 10.96.0.0/16
 nodes:
   - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: KubeletConfiguration
+        podPidsLimit: 256
+        memorySwap:
+          swapBehavior: NoSwap
     extraMounts:
       - hostPath: /tmp/kfive-kind-ollama
         containerPath: /run/kfive-host-ollama

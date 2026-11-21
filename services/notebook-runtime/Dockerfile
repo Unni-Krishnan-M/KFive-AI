@@ -7,9 +7,9 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONDONTWRITEBYTECODE=1
 WORKDIR /build
 RUN python -m venv /opt/venv
-COPY requirements.in ./requirements.in
+COPY requirements.lock ./requirements.lock
 RUN --mount=type=cache,id=kfive-notebook-pip,target=/root/.cache/pip \
-    /opt/venv/bin/python -m pip install --only-binary=:all: --retries 10 --timeout 300 -r requirements.in \
+    /opt/venv/bin/python -m pip install --require-hashes --only-binary=:all: --retries 10 --timeout 300 -r requirements.lock \
     && /opt/venv/bin/python -m pip check \
     && rm -rf /opt/venv/lib/python3.12/site-packages/pip* /opt/venv/bin/pip*
 

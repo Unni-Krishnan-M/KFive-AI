@@ -36,6 +36,7 @@ function fakeService(overrides: Partial<Record<keyof RagService, jest.Mock>> = {
   return {
     status: jest.fn().mockResolvedValue(status),
     list: jest.fn().mockResolvedValue([source]),
+    listPage: jest.fn().mockResolvedValue({ sources: [source], count: 1, pagination: { pageSize: 50, nextCursor: null } }),
     ingest: jest.fn().mockResolvedValue(source),
     ingestDocument: jest.fn().mockResolvedValue({ source, created: true }),
     delete: jest.fn().mockResolvedValue(undefined),
@@ -77,6 +78,14 @@ function invoke(
 }
 
 describe('knowledge routes', () => {
+  it('routes an explicit empty cursor to bounded history without changing legacy listing', async () => {
+    const service = fakeService();
+    const result = await invoke(createKnowledgeRouter(service), 'get', '/sources', { query: { cursor: '', projectId } });
+    expect(service.listPage).toHaveBeenCalledWith(ownerId, projectId, undefined, '');
+    expect(service.list).not.toHaveBeenCalled();
+    expect(result.body.data.pagination).toEqual({ pageSize: 50, nextCursor: null });
+  });
+
   it('rejects an unauthenticated request before the protected knowledge router', () => {
     expect(() => authenticateToken(
       { headers: {} } as any,
@@ -107,6 +116,14 @@ describe('knowledge routes', () => {
     const result = await invoke(createKnowledgeRouter(invalid), 'get', '/sources', { query: { scope: 'orphaned', projectId: '' } });
     expect(invalid.list).toHaveBeenCalledWith(ownerId, '', 'orphaned');
     expect(result).toMatchObject({ status: 400, body: { error: { code: 'INVALID_RAG_INPUT' } } });
+  });
+
+  it('returns a stable quota error for ingestion without exposing slot internals', async () => {
+    const service = fakeService({ ingest: jest.fn().mockRejectedValue(new RagServiceError(
+      'Knowledge source limit reached (200 per account).', 'RAG_SOURCE_LIMIT_EXCEEDED', 409)) });
+    const result = await invoke(createKnowledgeRouter(service), 'post', '/sources', { body: {} });
+    expect(result).toMatchObject({ status: 409, body: { success: false, error: { code: 'RAG_SOURCE_LIMIT_EXCEEDED' } } });
+    expect(JSON.stringify(result)).not.toContain('quotaSlot');
   });
 
   it('returns synchronous ingestion, query references, and deletion envelopes', async () => {

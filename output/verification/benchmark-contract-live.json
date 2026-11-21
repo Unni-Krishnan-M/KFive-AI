@@ -1,0 +1,19 @@
+{
+  "topology": "native API/worker, loopback synthetic Ollama protocol fixture, isolated Docker MongoDB/Redis",
+  "model": "acceptance-fixture",
+  "checks": [
+    "Six exact 16-KiB UTF-8 outputs persist; 96-KiB total stays below the defensive 128-KiB run bound",
+    "16-KiB plus one UTF-8 character stops after one call, persists no overflowing output, and closes provider transport",
+    "Real 180-second timeout terminalizes once with zero completed calls and closes the held provider transport",
+    "Running cancellation closes the provider fixture connection without another call",
+    "Two owners and two worker processes complete twelve calls with provider-observed peak concurrency one",
+    "With 94 seeded terminal records: admit record 100, reject 101 without persistence, paginate 100 unique IDs, delete and readmit",
+    "Concurrent owner starts admit exactly one durable queued run and return BENCHMARK_BUSY for the loser",
+    "Exact fixture containers/network removed; existing volume identities unchanged"
+  ],
+  "modelDigest": "local-contract-fixture-v1",
+  "timeoutElapsedMs": 180229,
+  "providerCalls": 21,
+  "fixtureOnly": true,
+  "status": "PASS"
+}

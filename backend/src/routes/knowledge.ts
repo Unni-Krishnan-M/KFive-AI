@@ -31,6 +31,11 @@ export function createKnowledgeRouter(service: RagService = ragService): Router 
 
   router.get('/sources', asyncHandler(async (req, res) => {
     try {
+      if (req.query.cursor !== undefined) {
+        const page = await service.listPage(getAuthenticatedUserId(req), req.query.projectId, req.query.scope, req.query.cursor);
+        res.json({ success: true, data: page });
+        return;
+      }
       const sources = await service.list(getAuthenticatedUserId(req), req.query.projectId, req.query.scope);
       res.json({ success: true, data: { sources, count: sources.length } });
     } catch (error) {
